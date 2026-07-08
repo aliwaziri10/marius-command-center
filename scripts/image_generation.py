@@ -32,7 +32,7 @@ def extract_shot_descriptions(shot_list):
     if isinstance(shot_list, list):
         for shot in shot_list:
             if isinstance(shot, dict):
-                text = shot.get("description") or shot.get("visual") or shot.get("shot") or shot.get("text")
+                text = shot.get("visual_description") or shot.get("description") or shot.get("visual") or shot.get("shot") or shot.get("text")
                 if text:
                     descriptions.append(text)
             elif isinstance(shot, str):
@@ -98,3 +98,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
+        
