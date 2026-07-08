@@ -39,16 +39,20 @@ def generate_audio(text, output_path):
 def upload_audio(script_id, file_path):
     file_name = f"{script_id}.mp3"
     with open(file_path, "rb") as f:
-        resp = requests.post(
-            f"{SUPABASE_URL}/storage/v1/object/{BUCKET_NAME}/{file_name}",
-            headers={
-                "Authorization": f"Bearer {SUPABASE_KEY}",
-                "Content-Type": "audio/mpeg",
-                "x-upsert": "true",
-            },
-            data=f.read(),
-            timeout=60,
-        )
+        file_bytes = f.read()
+
+    resp = requests.put(
+        f"{SUPABASE_URL}/storage/v1/object/{BUCKET_NAME}/{file_name}",
+        headers={
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "audio/mpeg",
+        },
+        data=file_bytes,
+        timeout=60,
+    )
+    if resp.status_code >= 400:
+        print(f"Upload failed - status {resp.status_code}: {resp.text}")
     resp.raise_for_status()
     return f"{SUPABASE_URL}/storage/v1/object/public/{BUCKET_NAME}/{file_name}"
 
