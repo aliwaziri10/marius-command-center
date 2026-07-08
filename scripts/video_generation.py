@@ -78,4 +78,33 @@ def main():
         video_path = first.get("video") if isinstance(first, dict) else first
 
     if not video_path or not os.path.exists(video_path):
-        print(f"Could not locate a valid
+        print(f"Could not locate a valid output video file. Raw result: {result}")
+        sys.exit(1)
+
+    filename = f"{script_id}_clip_{next_index + 1}.mp4"
+    with open(video_path, "rb") as f:
+        supabase.storage.from_("video_clips").upload(
+            filename,
+            f,
+            {"content-type": "video/mp4", "upsert": "true"}
+        )
+
+    public_url = supabase.storage.from_("video_clips").get_public_url(filename)
+    video_urls.append(public_url)
+    new_index = next_index + 1
+
+    update_data = {
+        "video_urls": video_urls,
+        "video_next_index": new_index,
+        "status": "videos_generated" if new_index >= len(image_urls) else "video_in_progress"
+    }
+    supabase.table("scripts").update(update_data).eq("id", script_id).execute()
+
+    print(f"Uploaded clip {new_index}/{len(image_urls)}: {public_url}")
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
