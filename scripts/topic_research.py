@@ -6,10 +6,14 @@ ordinary people caught in extraordinary historical moments.
 Duplicate-checking is built in from the start (unlike Nova's early bug):
 it fetches every existing topic title before generating new ones, and asks
 the AI to avoid them, then double-checks the results itself.
+
+Uses OpenRouter's auto-router (openrouter/free) with retries, so a busy
+individual free model doesn't fail the whole run.
 """
 
 import os
 import json
+import time
 import requests
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
@@ -23,10 +27,10 @@ HEADERS = {
 }
 
 NUM_NEW_TOPICS = 3
+MAX_RETRIES = 4
 
 
 def get_existing_titles():
-    """Fetch every topic title already in the database, so we never repeat one."""
     resp = requests.get(
         f"{SUPABASE_URL}/rest/v1/topics?select=title",
         headers=HEADERS,
@@ -36,8 +40,35 @@ def get_existing_titles():
     return [row["title"] for row in resp.json()]
 
 
+def call_openrouter(prompt):
+    """Call OpenRouter's free auto-router, retrying with backoff on 429s."""
+    last_error = None
+    for attempt in range(MAX_RETRIES):
+        resp = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "openrouter/free",
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            timeout=60,
+        )
+        if resp.status_code == 429:
+            wait = (attempt + 1) * 15
+            print(f"Rate limited, waiting {wait}s before retry...")
+            time.sleep(wait)
+            last_error = resp
+            continue
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
+
+    raise RuntimeError(f"OpenRouter still rate-limited after {MAX_RETRIES} attempts: {last_error.text if last_error else 'unknown'}")
+
+
 def generate_topics(existing_titles):
-    """Ask the AI for new topic ideas, explicitly excluding existing ones."""
     exclude_list = "\n".join(f"- {t}" for t in existing_titles) or "(none yet)"
 
     prompt = f"""You are a research assistant for a YouTube documentary channel
@@ -55,22 +86,7 @@ no other text, in this exact format:
   {{"title": "Short episode title", "angle": "2-3 sentence description of the real story and why it matters"}}
 ]"""
 
-    resp = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {OPENROUTER_KEY}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": "meta-llama/llama-3.3-70b-instruct:free",
-            "messages": [{"role": "user", "content": prompt}],
-        },
-        timeout=60,
-    )
-    resp.raise_for_status()
-    content = resp.json()["choices"][0]["message"]["content"]
-
-    content = content.strip()
+    content = call_openrouter(prompt).strip()
     if content.startswith("```"):
         content = content.split("```")[1]
         if content.startswith("json"):
