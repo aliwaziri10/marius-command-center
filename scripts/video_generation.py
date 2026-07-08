@@ -53,10 +53,20 @@ def main():
 
     try:
         result = client.predict(
-            handle_file(image_url),
-            prompt,
-            "",  # negative_prompt
-            api_name="/predict"
+            prompt=prompt,
+            negative_prompt="worst quality, inconsistent motion, blurry, jittery, distorted",
+            input_image_filepath=handle_file(image_url),
+            input_video_filepath=None,
+            height_ui=512,
+            width_ui=704,
+            mode="image-to-video",
+            duration_ui=2,
+            ui_frames_to_use=9,
+            seed_ui=42,
+            randomize_seed=True,
+            ui_guidance_scale=1,
+            improve_texture_flag=True,
+            api_name="/image_to_video",
         )
     except Exception as e:
         print(f"First attempt failed: {e}")
@@ -67,7 +77,7 @@ def main():
             print(f"Could not fetch API schema either: {inner_e}")
         sys.exit(1)
 
-    # result is typically a filepath or dict containing a filepath, depending on the Space's output component
+    # result is (generated_video_dict, seed) per the /image_to_video schema
     video_path = None
     if isinstance(result, str):
         video_path = result
