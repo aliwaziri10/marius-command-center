@@ -13,7 +13,8 @@ MODEL_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model
 VOICES_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices.json"
 MODEL_PATH = "kokoro-v0_19.onnx"
 VOICES_PATH = "voices.json"
-VOICE_NAME = "am_adam"
+VOICE_NAME = "bm_george"
+LANG = "en-gb"
 
 def download_if_missing(url, path):
     if not os.path.exists(path):
@@ -46,7 +47,7 @@ def main():
 
     # 3. Generate narration audio
     kokoro = Kokoro(MODEL_PATH, VOICES_PATH)
-    samples, sample_rate = kokoro.create(narration_text, voice=VOICE_NAME, speed=1.0, lang="en-us")
+    samples, sample_rate = kokoro.create(narration_text, voice=VOICE_NAME, speed=1.0, lang=LANG)
 
     output_filename = f"narration_{script_id}.wav"
     sf.write(output_filename, samples, sample_rate)
