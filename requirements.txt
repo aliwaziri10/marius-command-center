@@ -1,2 +1,3 @@
 requests
-edge-tts
+kokoro-onnx
+soundfile
