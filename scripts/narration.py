@@ -14,8 +14,8 @@ MODEL_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model
 VOICES_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.bin"
 MODEL_PATH = "kokoro-v0_19.onnx"
 VOICES_PATH = "voices.bin"
-VOICE_NAME = "bm_george"
-LANG = "en-gb"
+VOICE_NAME = "am_adam"
+LANG = "en-us"
 
 def download_if_missing(url, path):
     if not os.path.exists(path):
