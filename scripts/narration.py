@@ -1,111 +1,79 @@
-"""
-Marius Command Center - Narration Agent
-Takes the oldest pending script and generates a narrated audio file using
-Microsoft Edge's neural voices (free, no API key needed) - a deep, warm
-male voice suited to documentary storytelling - then uploads it to
-Supabase Storage.
-"""
-
 import os
-import asyncio
+import sys
 import requests
-import edge_tts
+from supabase import create_client
+from kokoro_onnx import Kokoro
+import soundfile as sf
 
+# --- Config from GitHub Actions secrets ---
 SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
+SUPABASE_SECRET_KEY = os.environ["SUPABASE_SECRET_KEY"]
 
-HEADERS = {
-    "apikey": SUPABASE_KEY,
-    "Authorization": f"Bearer {SUPABASE_KEY}",
-    "Content-Type": "application/json",
-}
+MODEL_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v0_19.onnx"
+VOICES_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices.json"
+MODEL_PATH = "kokoro-v0_19.onnx"
+VOICES_PATH = "voices.json"
+VOICE_NAME = "am_adam"
 
-BUCKET_NAME = "narration"
-VOICE = "en-US-ChristopherNeural"  # deep, resonant, documentary-style male voice
-
-
-def get_next_pending_script():
-    resp = requests.get(
-        f"{SUPABASE_URL}/rest/v1/scripts?status=eq.pending&order=created_at.asc&limit=1",
-        headers=HEADERS,
-        timeout=30,
-    )
-    resp.raise_for_status()
-    rows = resp.json()
-    return rows[0] if rows else None
-
-
-async def _generate_audio_async(text, output_path):
-    communicate = edge_tts.Communicate(text, voice=VOICE, rate="-5%", pitch="-2Hz")
-    await communicate.save(output_path)
-
-
-def generate_audio(text, output_path):
-    asyncio.run(_generate_audio_async(text, output_path))
-
-
-def upload_audio(script_id, file_path):
-    file_name = f"{script_id}.mp3"
-    with open(file_path, "rb") as f:
-        file_bytes = f.read()
-
-    resp = requests.put(
-        f"{SUPABASE_URL}/storage/v1/object/{BUCKET_NAME}/{file_name}",
-        headers={
-            "apikey": SUPABASE_KEY,
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-            "Content-Type": "audio/mpeg",
-        },
-        data=file_bytes,
-        timeout=60,
-    )
-    if resp.status_code >= 400:
-        print(f"Upload failed - status {resp.status_code}: {resp.text}")
-    resp.raise_for_status()
-    return f"{SUPABASE_URL}/storage/v1/object/public/{BUCKET_NAME}/{file_name}"
-
-
-def update_video_record(script_id, narration_url):
-    resp = requests.post(
-        f"{SUPABASE_URL}/rest/v1/videos",
-        headers={**HEADERS, "Prefer": "return=representation"},
-        json={
-            "script_id": script_id,
-            "narration_url": narration_url,
-            "status": "narrated",
-        },
-        timeout=30,
-    )
-    resp.raise_for_status()
-
-
-def mark_script_narrated(script_id):
-    resp = requests.patch(
-        f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
-        headers=HEADERS,
-        json={"status": "narrated"},
-        timeout=30,
-    )
-    resp.raise_for_status()
-
+def download_if_missing(url, path):
+    if not os.path.exists(path):
+        print(f"Downloading {path} ...")
+        r = requests.get(url, timeout=120)
+        r.raise_for_status()
+        with open(path, "wb") as f:
+            f.write(r.content)
+        print(f"Saved {path}")
+    else:
+        print(f"{path} already present, skipping download")
 
 def main():
-    script = get_next_pending_script()
-    if not script:
-        print("No pending scripts found. Nothing to do.")
+    supabase = create_client(SUPABASE_URL, SUPABASE_SECRET_KEY)
+
+    # 1. Get one pending script
+    result = supabase.table("scripts").select("*").eq("status", "pending").limit(1).execute()
+    if not result.data:
+        print("No pending scripts found. Exiting.")
         return
 
-    print(f"Generating narration for script {script['id']}")
-    output_path = "/tmp/narration.mp3"
-    generate_audio(script["narration_text"], output_path)
+    script = result.data[0]
+    script_id = script["id"]
+    narration_text = script["narration_text"]
+    print(f"Narrating script id={script_id}, length={len(narration_text)} chars")
 
-    narration_url = upload_audio(script["id"], output_path)
-    print(f"Uploaded: {narration_url}")
+    # 2. Download Kokoro model files if not cached
+    download_if_missing(MODEL_URL, MODEL_PATH)
+    download_if_missing(VOICES_URL, VOICES_PATH)
 
-    update_video_record(script["id"], narration_url)
-    mark_script_narrated(script["id"])
-    print("Done.")
+    # 3. Generate narration audio
+    kokoro = Kokoro(MODEL_PATH, VOICES_PATH)
+    samples, sample_rate = kokoro.create(narration_text, voice=VOICE_NAME, speed=1.0, lang="en-us")
 
+    output_filename = f"narration_{script_id}.wav"
+    sf.write(output_filename, samples, sample_rate)
+    print(f"Audio written to {output_filename}")
+
+    # 4. Upload to Supabase storage bucket 'narration'
+    with open(output_filename, "rb") as f:
+        supabase.storage.from_("narration").upload(
+            output_filename,
+            f,
+            {"content-type": "audio/wav", "upsert": "true"}
+        )
+
+    public_url = supabase.storage.from_("narration").get_public_url(output_filename)
+    print(f"Uploaded. Public URL: {public_url}")
+
+    # 5. Update script status and store narration URL
+    supabase.table("scripts").update({
+        "status": "narrated",
+        "narration_url": public_url
+    }).eq("id", script_id).execute()
+
+    print("Script status updated to 'narrated'. Done.")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
