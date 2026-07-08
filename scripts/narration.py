@@ -1,12 +1,15 @@
 """
 Marius Command Center - Narration Agent
 Takes the oldest pending script and generates a narrated audio file using
-gTTS (free, no API key needed), then uploads it to Supabase Storage.
+Microsoft Edge's neural voices (free, no API key needed) - a deep, warm
+male voice suited to documentary storytelling - then uploads it to
+Supabase Storage.
 """
 
 import os
+import asyncio
 import requests
-from gtts import gTTS
+import edge_tts
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
@@ -18,6 +21,7 @@ HEADERS = {
 }
 
 BUCKET_NAME = "narration"
+VOICE = "en-US-ChristopherNeural"  # deep, resonant, documentary-style male voice
 
 
 def get_next_pending_script():
@@ -31,9 +35,13 @@ def get_next_pending_script():
     return rows[0] if rows else None
 
 
+async def _generate_audio_async(text, output_path):
+    communicate = edge_tts.Communicate(text, voice=VOICE, rate="-5%", pitch="-2Hz")
+    await communicate.save(output_path)
+
+
 def generate_audio(text, output_path):
-    tts = gTTS(text=text, lang="en", tld="co.uk", slow=False)
-    tts.save(output_path)
+    asyncio.run(_generate_audio_async(text, output_path))
 
 
 def upload_audio(script_id, file_path):
