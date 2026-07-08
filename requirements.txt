@@ -2,3 +2,4 @@ requests
 kokoro-onnx
 soundfile
 supabase
+gradio_client
