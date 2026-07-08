@@ -1,6 +1,7 @@
 import os
 import sys
 import requests
+import numpy as np
 from supabase import create_client
 from kokoro_onnx import Kokoro
 import soundfile as sf
@@ -27,6 +28,12 @@ def download_if_missing(url, path):
     else:
         print(f"{path} already present, skipping download")
 
+def normalize_volume(samples, target_peak=0.95):
+    peak = np.max(np.abs(samples))
+    if peak == 0:
+        return samples
+    return samples * (target_peak / peak)
+
 def main():
     supabase = create_client(SUPABASE_URL, SUPABASE_SECRET_KEY)
 
@@ -48,6 +55,9 @@ def main():
     # 3. Generate narration audio
     kokoro = Kokoro(MODEL_PATH, VOICES_PATH)
     samples, sample_rate = kokoro.create(narration_text, voice=VOICE_NAME, speed=1.0, lang=LANG)
+
+    # 3b. Boost volume to a normal loudness
+    samples = normalize_volume(samples, target_peak=0.95)
 
     output_filename = f"narration_{script_id}.wav"
     sf.write(output_filename, samples, sample_rate)
