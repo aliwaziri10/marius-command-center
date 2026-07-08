@@ -1,0 +1,79 @@
+# Marius Command Center — Continuation Log
+**Version:** v3 (this is the third version of this file — supersedes v2)
+**Last updated:** July 9, 2026 (paste this into a new chat to resume instantly)
+
+## Project
+YouTube channel **"Forgotten Names"** — real documented stories of ordinary people in extraordinary historical moments. Long-form (8-15 min), English first, Hindi dubbing later. Fully separate from Nova Command Center — no shared code/credentials.
+
+## Architecture
+- **No Railway.** GitHub Actions (free, 7GB RAM) does all processing on schedules. Supabase (free) = database + file storage.
+- Repo: `https://github.com/aliwaziri10/marius-command-center` (owner: aliwaziri10)
+- Supabase project: `marius`, region Mumbai (ap-south-1)
+- Supabase URL: `https://swnjzzejsuupecdgbzzf.supabase.co`
+- Supabase Publishable key: `sb_publishable_lTcvuqEcDMN4OHlJg2yOFw_hkj9uz_9`
+- Supabase Secret key: stored only in GitHub Actions secret `SUPABASE_SECRET_KEY` (never write the real value in this file — repo is public)
+- DB password: stored only in Supabase dashboard (never write the real value in this file)
+- OpenRouter key: stored only in GitHub Actions secret `OPENROUTER_API_KEY` (never write the real value in this file)
+- All 3 keys already saved as GitHub Actions secrets: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `OPENROUTER_API_KEY`
+
+## Database tables (Supabase)
+`topics` (id, title, angle, status, created_at)
+`scripts` (id, topic_id, narration_text, shot_list jsonb, status, created_at, narration_url text, image_urls jsonb, video_urls jsonb default '[]', video_next_index integer default 0)
+`videos` (id, script_id, narration_url, video_url, youtube_video_id, status, created_at)
+
+## Storage buckets (Supabase, all public)
+- `narration` — narrated .wav files
+- `images` — one .jpg per shot, named `<script_id>_shot_<n>.jpg`
+- `video_clips` — one .mp4 per shot, named `<script_id>_clip_<n>.mp4`
+
+## Pipeline status
+
+1. **Topic Research** (`scripts/topic_research.py` + workflow) — ✅ WORKING. OpenRouter `openrouter/free` auto-router, retry/backoff. Runs every 6 hours.
+
+2. **Script Writing** (`scripts/script_writing.py` + workflow) — ✅ WORKING. Same OpenRouter approach. Runs twice daily. `shot_list` field per shot is named `visual_description` (not `description`/`visual`/`shot`/`text` — this cost debugging time, note it clearly).
+
+3. **Narration** (`scripts/narration.py` + workflow) — ✅ WORKING, confirmed good by user.
+   - Uses `kokoro-onnx` + `soundfile`. Model files downloaded at runtime from `https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx` and `.../model-files/voices.bin` (note: NOT `voices.json` — that format is outdated for current kokoro-onnx pip package; NOT the `model-files-v1.0` release tag — that 404s).
+   - Voice: `am_adam` (American male), `lang="en-us"`. User explicitly rejected `bm_george` (British/BBC) — go with Adam.
+   - Volume fix applied: raw Kokoro output is very quiet: script normalizes peak amplitude to 0.95 before saving (`normalize_volume()` function in the script) — required, do not remove.
+   - requirements.txt must include: `requests`, `kokoro-onnx`, `soundfile`, `supabase`, `gradio_client`.
+
+4. **Image Generation** (`scripts/image_generation.py` + `.github/workflows/image_generation.yml`) — ✅ WORKING, confirmed producing images in the `images` bucket.
+   - Uses free, no-key Pollinations endpoint: `https://image.pollinations.ai/prompt/{encoded_prompt}` with `width=1280&height=720&seed=<shot_index>&nologo=true`.
+   - Anonymous rate limit is 1 request per 15 seconds — script waits 16 seconds between shots.
+   - Reads `visual_description` field from each shot in `shot_list`.
+   - On success, sets script `status = 'images_generated'` and stores the array of public image URLs in `image_urls`.
+   - Approach chosen deliberately: **still images + Ken Burns pan/zoom in the later assembly stage**, NOT AI video generation for the base visuals — this is what most narrated documentary channels actually use; reliable and free.
+
+5. **Video Clip Generation** (`scripts/video_generation.py` + `.github/workflows/video_generation.yml`) — ⚠️ BUILT, NOT YET CONFIRMED WORKING. This is a *separate, optional* enhancement on top of stage 4 — user wants real moving-image clips (not just Ken Burns), accepted the added risk knowingly.
+   - Chosen tool: **LTX Video Fast** (Hugging Face Space `Lightricks/ltx-video-distilled`) — official, lighter/faster than Wan 2.2. Wan 2.2 was considered and explicitly rejected for this stage because it's the same tool already causing the unresolved Railway OOM crash on the separate Nova Command Center project.
+   - Also considered and rejected: Hugging Face's official "Inference Providers" (fal-ai/replicate routing) — technically more reliable (no cold starts, documented API) but NOT free at real volume; disqualified by the zero-cost-until-revenue rule for this project.
+   - Processes **one clip per workflow run** (not all shots in one run) — same reliable pattern as narration — to avoid timeouts/quota issues on the free shared Space. Workflow scheduled every 20 minutes.
+   - State tracking: `scripts.video_urls` (jsonb array, appended to each run) and `scripts.video_next_index` (integer, incremented each run). When `video_next_index` reaches the number of images, status becomes `videos_generated`.
+   - **STATUS AT CUTOFF:** script and workflow are committed, but the exact `gradio_client.predict()` parameter names/order for the `Lightricks/ltx-video-distilled` Space were NOT confirmed before this log was written — Hugging Face doesn't publish this without inspecting the live app. The script has a built-in safety net: if the first `predict()` call fails, it catches the exception and calls `client.view_api()` to print the exact required schema to the GitHub Actions log, so the fix should take one round (same pattern that worked for the narration `voices.bin` bug).
+   - **First test run has not been executed yet as of this log.**
+
+6. **Assembly** (ffmpeg — Ken Burns pan/zoom over stills, or splice in video clips where available, sync to narration) — NOT STARTED.
+
+7. **YouTube upload** — NOT STARTED. Needs `containsSyntheticMedia` disclosure field set on upload (AI content disclosure requirement).
+
+## IMMEDIATE NEXT STEPS (resume here)
+1. Go to `https://github.com/aliwaziri10/marius-command-center/actions`, click **Video Generation**, click **Run workflow**. Expect it may fail on the first attempt — that's expected.
+2. If it fails, open the failed step's black log box (not the Annotations summary) and look for the `client.view_api()` output — it will show the exact parameter names the Space expects.
+3. Update `scripts/video_generation.py`'s `client.predict(...)` call to match those exact parameter names, commit, and re-run.
+4. Once one clip generates successfully, check the `video_clips` bucket in Supabase Storage, download and preview it (bucket preview will likely say "too large to preview" — use Download instead, same as narration).
+5. If clip quality/motion looks good, let the scheduled workflow keep running every 20 minutes until all shots for the current script have clips (or just periodically run it manually).
+6. Once decided, move to Assembly stage (ffmpeg): stitch narration + still images (Ken Burns) or video clips (if stage 5 is working) into one video file per script.
+
+## Standing rules for this project
+- User (Zarah, also referred to as Velorique in some contexts) is a complete non-coder working on a shared browser-only laptop.
+- **Every step must include the exact path/URL to paste into the browser address bar in its own copy-paste box** — never just describe "go to GitHub" or "go to Supabase" without the literal URL.
+- **Every piece of text the user needs to type, paste, or click must be in its own separate copy-paste box** — filenames, SQL, code, commit messages, everything. Never inline it in a sentence.
+- Max 3-4 steps per message, wait for confirmation before continuing.
+- When editing an existing GitHub file: always explicitly instruct **Ctrl+A then Delete** before pasting fresh content — spell this out every single time, never abbreviate to "clear it" or skip it.
+- Never combine "go here" with unexplained follow-up actions in a way that assumes the user already knows GitHub's UI (e.g. don't say "click Edit" if the `/edit/main/...` URL already opens directly into edit mode — say so explicitly).
+- No Railway. No Nova Command Center code/IDs/credentials reused — ever.
+- If a GitHub Actions run fails: get the real error from inside the black log box under the failed step (e.g. "Run narration"), not the Annotations summary — the summary only ever says "Process completed with exit code 1" and hides the real reason.
+- **A green tick does NOT necessarily mean real work happened** — always verify actual output (check the database / storage bucket), especially for early/fast-exiting runs. This has caused confusion twice in this project (images stage exiting in 19s due to a field-name mismatch, video stage exiting in 19s because the prior stage's data wasn't actually ready).
+- Before committing any file to this repo, make sure no live secrets (API keys, DB passwords) are pasted in — this is a **public** repo. GitHub's push-protection will block and warn; when it does, cancel the commit and redact instead of clicking through the warning.
+- Continuation log files must be named with the date first, then "MARIUS_LOG" — and must state the version number if this is the second, third, or later version created.
