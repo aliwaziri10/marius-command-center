@@ -10,9 +10,9 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SECRET_KEY = os.environ["SUPABASE_SECRET_KEY"]
 
 MODEL_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx"
-VOICES_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.json"
+VOICES_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.bin"
 MODEL_PATH = "kokoro-v0_19.onnx"
-VOICES_PATH = "voices.json"
+VOICES_PATH = "voices.bin"
 VOICE_NAME = "bm_george"
 LANG = "en-gb"
 
