@@ -91,7 +91,7 @@ def main():
         print(f"All {len(image_urls)} clips already generated for script {script_id}. Status updated.")
         return
 
-    client = Client(SPACE_NAME)
+    client = Client(SPACE_NAME, hf_token=os.environ.get("HF_TOKEN"))
 
     failures = 0
     while next_index < len(image_urls):
@@ -103,13 +103,12 @@ def main():
             if failures >= 3:
                 print("3 consecutive-ish failures reached this run — stopping early, progress saved so far.")
                 break
-            next_index += 1  # skip this shot for now rather than getting stuck forever; revisit later if needed
+            next_index += 1
             continue
 
         video_urls.append(public_url)
         next_index += 1
 
-        # Save progress after EVERY clip — same safety pattern as the Nova/Silk Road fix
         update_data = {
             "video_urls": video_urls,
             "video_next_index": next_index,
