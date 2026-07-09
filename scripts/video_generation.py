@@ -31,8 +31,8 @@ AGNES_HEADERS = {
 VIDEO_BUCKET = "videos"
 WIDTH, HEIGHT = 1152, 768
 FRAME_RATE = 24
-MIN_FRAMES = 48   # ~2s
-MAX_FRAMES = 168  # ~7s per generated clip
+MIN_FRAMES = 48
+MAX_FRAMES = 168
 
 
 def get_next_ready_script():
@@ -68,6 +68,8 @@ def create_agnes_task(prompt, num_frames):
         },
         timeout=60,
     )
+    if resp.status_code >= 400:
+        print(f"AGNES ERROR {resp.status_code}: {resp.text}")
     resp.raise_for_status()
     data = resp.json()
     return data.get("video_id") or data.get("id") or data.get("task_id")
@@ -92,6 +94,8 @@ def poll_agnes_task(video_id, max_wait=300, interval=10):
             headers=AGNES_HEADERS,
             timeout=30,
         )
+        if resp.status_code >= 400:
+            print(f"AGNES POLL ERROR {resp.status_code}: {resp.text}")
         resp.raise_for_status()
         data = resp.json()
         status = data.get("status")
@@ -145,7 +149,7 @@ def build_video(shot_list, audio_path, output_path):
         clip = fit_clip_to_duration(clip, target_duration)
         clips.append(clip)
 
-        time.sleep(4)  # stay comfortably under Agnes' free-tier rate limit
+        time.sleep(4)
 
     final = concatenate_videoclips(clips, method="compose")
     final = final.with_audio(audio_clip)
