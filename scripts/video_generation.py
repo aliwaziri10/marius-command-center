@@ -1,137 +1,224 @@
+"""
+Marius Command Center - Video Generation Agent
+Takes the oldest narrated script and generates one real AI video clip per
+shot using Agnes AI (text-to-video, no Hugging Face, no API-key reset
+limits), sized to match the narration timing, then assembles the final
+video with the narration audio track.
+"""
+
 import os
-import sys
 import json
+import time
 import requests
-from supabase import create_client
-from gradio_client import Client, handle_file
+from moviepy import VideoFileClip, AudioFileClip, concatenate_videoclips
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_SECRET_KEY = os.environ["SUPABASE_SECRET_KEY"]
+SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
+AGNES_API_KEY = os.environ["AGNES_API_KEY"]
 
-SPACE_NAME = "Lightricks/ltx-video-distilled"
+HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+}
 
-def get_shot_prompt(shot_list, index):
-    if not isinstance(shot_list, list) or index >= len(shot_list):
-        return "cinematic, gentle camera movement, documentary style"
-    shot = shot_list[index]
-    if isinstance(shot, dict):
-        base = shot.get("visual_description") or shot.get("description") or ""
-    elif isinstance(shot, str):
-        base = shot
-    else:
-        base = ""
-    return f"{base}. Cinematic, gentle camera movement, documentary film style."
+AGNES_BASE = "https://apihub.agnes-ai.com/v1"
+AGNES_HEADERS = {
+    "Authorization": f"Bearer {AGNES_API_KEY}",
+    "Content-Type": "application/json",
+}
 
-def make_client():
-    hf_token = os.environ.get("HF_TOKEN")
-    try:
-        return Client(SPACE_NAME, hf_token=hf_token)
-    except TypeError:
-        print("This gradio_client version does not accept hf_token as a keyword — falling back to plain Client(). "
-              "If HF_TOKEN is set as an env var, the underlying huggingface_hub layer may still pick it up automatically.")
-        return Client(SPACE_NAME)
+VIDEO_BUCKET = "videos"
+WIDTH, HEIGHT = 1152, 768
+FRAME_RATE = 24
+MIN_FRAMES = 48   # ~2s
+MAX_FRAMES = 168  # ~7s per generated clip
 
-def generate_one_clip(client, supabase, script_id, image_urls, shot_list, video_urls, next_index):
-    image_url = image_urls[next_index]
-    prompt = get_shot_prompt(shot_list, next_index)
 
-    print(f"Script id={script_id}, generating clip {next_index + 1}/{len(image_urls)}")
-    print(f"Prompt: {prompt}")
-    print(f"Source image: {image_url}")
-
-    result = client.predict(
-        prompt=prompt,
-        negative_prompt="worst quality, inconsistent motion, blurry, jittery, distorted",
-        input_image_filepath=handle_file(image_url),
-        input_video_filepath=None,
-        height_ui=512,
-        width_ui=704,
-        mode="image-to-video",
-        duration_ui=2,
-        ui_frames_to_use=9,
-        seed_ui=42,
-        randomize_seed=True,
-        ui_guidance_scale=1,
-        improve_texture_flag=True,
-        api_name="/image_to_video",
+def get_next_ready_script():
+    resp = requests.get(
+        f"{SUPABASE_URL}/rest/v1/scripts?status=eq.narrated&order=created_at.asc&limit=1",
+        headers=HEADERS,
+        timeout=30,
     )
+    resp.raise_for_status()
+    rows = resp.json()
+    return rows[0] if rows else None
 
-    video_path = None
-    if isinstance(result, str):
-        video_path = result
-    elif isinstance(result, dict):
-        video_path = result.get("video") or result.get("path") or result.get("name")
-    elif isinstance(result, (list, tuple)) and len(result) > 0:
-        first = result[0]
-        video_path = first.get("video") if isinstance(first, dict) else first
 
-    if not video_path or not os.path.exists(video_path):
-        raise RuntimeError(f"Could not locate a valid output video file. Raw result: {result}")
+def download_file(url, out_path):
+    r = requests.get(url, timeout=120)
+    r.raise_for_status()
+    with open(out_path, "wb") as f:
+        f.write(r.content)
+    return out_path
 
-    filename = f"{script_id}_clip_{next_index + 1}.mp4"
-    with open(video_path, "rb") as f:
-        supabase.storage.from_("video_clips").upload(
-            filename,
-            f,
-            {"content-type": "video/mp4", "upsert": "true"}
+
+def create_agnes_task(prompt, num_frames):
+    resp = requests.post(
+        f"{AGNES_BASE}/videos",
+        headers=AGNES_HEADERS,
+        json={
+            "model": "agnes-video-v2.0",
+            "prompt": prompt,
+            "height": HEIGHT,
+            "width": WIDTH,
+            "num_frames": num_frames,
+            "frame_rate": FRAME_RATE,
+        },
+        timeout=60,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return data.get("video_id") or data.get("id") or data.get("task_id")
+
+
+def extract_video_url(data):
+    for key in ("video_url", "url", "remixed_from_video_id"):
+        val = data.get(key)
+        if isinstance(val, str) and val.startswith("http"):
+            return val
+    for val in data.values():
+        if isinstance(val, str) and val.startswith("http") and val.endswith(".mp4"):
+            return val
+    return None
+
+
+def poll_agnes_task(video_id, max_wait=300, interval=10):
+    waited = 0
+    while waited < max_wait:
+        resp = requests.get(
+            f"{AGNES_BASE}/videos/{video_id}",
+            headers=AGNES_HEADERS,
+            timeout=30,
         )
+        resp.raise_for_status()
+        data = resp.json()
+        status = data.get("status")
+        if status == "completed":
+            url = extract_video_url(data)
+            if url:
+                return url
+            raise RuntimeError(f"Completed but no video URL found: {data}")
+        if status == "failed":
+            raise RuntimeError(f"Agnes generation failed: {data}")
+        time.sleep(interval)
+        waited += interval
+    raise RuntimeError(f"Agnes generation timed out after {max_wait}s for video_id {video_id}")
 
-    public_url = supabase.storage.from_("video_clips").get_public_url(filename)
-    return public_url
+
+def generate_shot_clip(prompt, target_duration, out_path):
+    num_frames = int(target_duration * FRAME_RATE)
+    num_frames = max(MIN_FRAMES, min(MAX_FRAMES, num_frames))
+
+    video_id = create_agnes_task(prompt, num_frames)
+    video_url = poll_agnes_task(video_id)
+    download_file(video_url, out_path)
+    return out_path
+
+
+def fit_clip_to_duration(clip, target):
+    if clip.duration >= target:
+        return clip.subclipped(0, target)
+    reps = int(target // clip.duration) + 1
+    looped = concatenate_videoclips([clip] * reps)
+    return looped.subclipped(0, target)
+
+
+def build_video(shot_list, audio_path, output_path):
+    audio_clip = AudioFileClip(audio_path)
+    total_duration = audio_clip.duration
+
+    weights = [max(len(s.get("narration_excerpt", "")), 20) for s in shot_list]
+    total_weight = sum(weights)
+
+    clips = []
+    for i, (shot, weight) in enumerate(zip(shot_list, weights)):
+        target_duration = (weight / total_weight) * total_duration
+        raw_path = f"/tmp/shot_{i:03d}.mp4"
+
+        print(f"Generating shot {i+1}/{len(shot_list)} (~{target_duration:.1f}s)...")
+        generate_shot_clip(shot["visual_description"], target_duration, raw_path)
+
+        clip = VideoFileClip(raw_path)
+        clip = clip.resized(new_size=(WIDTH, HEIGHT))
+        clip = fit_clip_to_duration(clip, target_duration)
+        clips.append(clip)
+
+        time.sleep(4)  # stay comfortably under Agnes' free-tier rate limit
+
+    final = concatenate_videoclips(clips, method="compose")
+    final = final.with_audio(audio_clip)
+    final.write_videofile(
+        output_path,
+        fps=FRAME_RATE,
+        codec="libx264",
+        audio_codec="aac",
+        threads=2,
+        logger=None,
+    )
+    return output_path
+
+
+def upload_video(script_id, file_path):
+    file_name = f"{script_id}.mp4"
+    with open(file_path, "rb") as f:
+        file_bytes = f.read()
+
+    resp = requests.put(
+        f"{SUPABASE_URL}/storage/v1/object/{VIDEO_BUCKET}/{file_name}",
+        headers={
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "video/mp4",
+        },
+        data=file_bytes,
+        timeout=300,
+    )
+    if resp.status_code >= 400:
+        print(f"Upload failed - status {resp.status_code}: {resp.text}")
+    resp.raise_for_status()
+    return f"{SUPABASE_URL}/storage/v1/object/public/{VIDEO_BUCKET}/{file_name}"
+
+
+def mark_video_generated(script_id, video_url):
+    resp = requests.patch(
+        f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
+        headers=HEADERS,
+        json={"status": "video_generated", "video_url": video_url},
+        timeout=30,
+    )
+    resp.raise_for_status()
 
 
 def main():
-    supabase = create_client(SUPABASE_URL, SUPABASE_SECRET_KEY)
-
-    result = supabase.table("scripts").select("*").in_("status", ["images_generated", "video_in_progress"]).limit(1).execute()
-    if not result.data:
-        print("No scripts ready for video generation. Exiting.")
+    script = get_next_ready_script()
+    if not script:
+        print("No narrated scripts ready for video generation. Nothing to do.")
+        return
+    if not script.get("narration_url"):
+        print("Script has no narration_url yet. Skipping.")
         return
 
-    script = result.data[0]
-    script_id = script["id"]
-    image_urls = script.get("image_urls") or []
-    shot_list = script.get("shot_list") or []
-    video_urls = script.get("video_urls") or []
-    next_index = script.get("video_next_index") or 0
+    print(f"Building video for script {script['id']}")
 
-    if next_index >= len(image_urls):
-        supabase.table("scripts").update({"status": "videos_generated"}).eq("id", script_id).execute()
-        print(f"All {len(image_urls)} clips already generated for script {script_id}. Status updated.")
-        return
+    audio_path = "/tmp/narration_audio"
+    audio_path += ".mp3" if script["narration_url"].endswith(".mp3") else ".wav"
+    download_file(script["narration_url"], audio_path)
 
-    client = make_client()
+    shot_list = script["shot_list"]
+    if isinstance(shot_list, str):
+        shot_list = json.loads(shot_list)
 
-    failures = 0
-    while next_index < len(image_urls):
-        try:
-            public_url = generate_one_clip(client, supabase, script_id, image_urls, shot_list, video_urls, next_index)
-        except Exception as e:
-            failures += 1
-            print(f"Clip {next_index + 1}/{len(image_urls)} FAILED: {e}")
-            if failures >= 3:
-                print("3 consecutive-ish failures reached this run — stopping early, progress saved so far.")
-                break
-            next_index += 1
-            continue
+    output_path = "/tmp/final_video.mp4"
+    build_video(shot_list, audio_path, output_path)
 
-        video_urls.append(public_url)
-        next_index += 1
+    video_url = upload_video(script["id"], output_path)
+    print(f"Uploaded: {video_url}")
 
-        update_data = {
-            "video_urls": video_urls,
-            "video_next_index": next_index,
-            "status": "videos_generated" if next_index >= len(image_urls) else "video_in_progress"
-        }
-        supabase.table("scripts").update(update_data).eq("id", script_id).execute()
-        print(f"Uploaded clip {next_index}/{len(image_urls)}: {public_url}")
-
-    print(f"Run finished. {next_index}/{len(image_urls)} clips done overall. Failures this run: {failures}")
+    mark_video_generated(script["id"], video_url)
+    print("Done.")
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        sys.exit(1)
+    main()
