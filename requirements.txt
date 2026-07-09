@@ -2,4 +2,4 @@ requests
 kokoro-onnx
 soundfile
 supabase
-gradio_client>=1.7.0
+moviepy
