@@ -22,6 +22,15 @@ def get_shot_prompt(shot_list, index):
         base = ""
     return f"{base}. Cinematic, gentle camera movement, documentary film style."
 
+def make_client():
+    hf_token = os.environ.get("HF_TOKEN")
+    try:
+        return Client(SPACE_NAME, hf_token=hf_token)
+    except TypeError:
+        print("This gradio_client version does not accept hf_token as a keyword — falling back to plain Client(). "
+              "If HF_TOKEN is set as an env var, the underlying huggingface_hub layer may still pick it up automatically.")
+        return Client(SPACE_NAME)
+
 def generate_one_clip(client, supabase, script_id, image_urls, shot_list, video_urls, next_index):
     image_url = image_urls[next_index]
     prompt = get_shot_prompt(shot_list, next_index)
@@ -91,7 +100,7 @@ def main():
         print(f"All {len(image_urls)} clips already generated for script {script_id}. Status updated.")
         return
 
-    client = Client(SPACE_NAME, hf_token=os.environ.get("HF_TOKEN"))
+    client = make_client()
 
     failures = 0
     while next_index < len(image_urls):
