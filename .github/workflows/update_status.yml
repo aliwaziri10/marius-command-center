@@ -1,0 +1,29 @@
+name: Update Status
+
+on:
+  workflow_run:
+    workflows: ["Topic Research", "Script Writing", "Narration", "Image Generation", "Video Generation"]
+    types: [completed]
+  workflow_dispatch:
+
+jobs:
+  update-status:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install supabase
+      - run: python scripts/update_status.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      - run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add STATUS.md
+          git diff --staged --quiet || git commit -m "update status"
+          git push
