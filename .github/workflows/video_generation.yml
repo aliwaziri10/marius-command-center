@@ -1,15 +1,14 @@
 name: Video Generation
 
 on:
-  schedule:
-    - cron: "*/20 * * * *"
   workflow_dispatch:
 
 jobs:
-  generate-video-clip:
+  generate:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
-      - name: Checkout repo
+      - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -24,5 +23,5 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          AGNES_API_KEY: ${{ secrets.AGNES_API_KEY }}
         run: python scripts/video_generation.py
