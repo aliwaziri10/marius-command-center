@@ -24,4 +24,5 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: python scripts/video_generation.py
