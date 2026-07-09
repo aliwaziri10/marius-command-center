@@ -1,9 +1,8 @@
 """
 Marius Command Center - Video Generation Agent
 Takes the oldest narrated script and generates one real AI video clip per
-shot using Agnes AI (text-to-video, no Hugging Face, no API-key reset
-limits), sized to match the narration timing, then assembles the final
-video with the narration audio track.
+shot using Agnes AI, sized to match narration timing, then assembles the
+final video with the narration audio track.
 """
 
 import os
@@ -31,8 +30,14 @@ AGNES_HEADERS = {
 VIDEO_BUCKET = "videos"
 WIDTH, HEIGHT = 1152, 768
 FRAME_RATE = 24
-MIN_FRAMES = 48
-MAX_FRAMES = 168
+MIN_FRAMES = 49   # 8*6+1, ~2s - Agnes requires num_frames = 8*n+1
+MAX_FRAMES = 169  # 8*21+1, ~7s
+
+
+def round_to_valid_frames(num_frames):
+    n = round((num_frames - 1) / 8)
+    n = max(0, n)
+    return 8 * n + 1
 
 
 def get_next_ready_script():
@@ -112,7 +117,9 @@ def poll_agnes_task(video_id, max_wait=300, interval=10):
 
 
 def generate_shot_clip(prompt, target_duration, out_path):
-    num_frames = int(target_duration * FRAME_RATE)
+    raw_frames = int(target_duration * FRAME_RATE)
+    raw_frames = max(MIN_FRAMES, min(MAX_FRAMES, raw_frames))
+    num_frames = round_to_valid_frames(raw_frames)
     num_frames = max(MIN_FRAMES, min(MAX_FRAMES, num_frames))
 
     video_id = create_agnes_task(prompt, num_frames)
