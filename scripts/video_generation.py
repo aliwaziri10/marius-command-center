@@ -95,7 +95,8 @@ def poll_agnes_task(video_id, max_wait=300, interval=10):
     waited = 0
     while waited < max_wait:
         resp = requests.get(
-            f"{AGNES_BASE}/videos/{video_id}",
+            f"https://apihub.agnes-ai.com/agnesapi",
+            params={"video_id": video_id, "model_name": "agnes-video-v2.0"},
             headers=AGNES_HEADERS,
             timeout=30,
         )
