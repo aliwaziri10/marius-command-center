@@ -180,6 +180,15 @@ def compute_shot_durations(shot_list, total_duration):
     return [(weight / total_weight) * total_duration for weight in weights]
 
 
+def compute_target_bitrate(duration_seconds, target_mb=42, audio_kbps=128):
+    """Pick a video bitrate so the final file lands under the 50MB
+    Supabase free-tier cap, leaving 8MB headroom, regardless of length."""
+    target_bits = target_mb * 8 * 1024 * 1024
+    audio_bits = audio_kbps * 1000 * duration_seconds
+    video_bits = max(target_bits - audio_bits, 300_000 * duration_seconds)
+    return f"{int(video_bits / duration_seconds / 1000)}k"
+
+
 def assemble_final_video(script_id, video_urls, audio_path, shot_durations, output_path):
     clips = []
     for i, url in enumerate(video_urls):
@@ -193,11 +202,15 @@ def assemble_final_video(script_id, video_urls, audio_path, shot_durations, outp
     audio_clip = AudioFileClip(audio_path)
     final = concatenate_videoclips(clips, method="compose")
     final = final.with_audio(audio_clip)
+    target_bitrate = compute_target_bitrate(audio_clip.duration)
+    print(f"Target video bitrate: {target_bitrate} (duration {audio_clip.duration:.1f}s)")
     final.write_videofile(
         output_path,
         fps=FRAME_RATE,
         codec="libx264",
         audio_codec="aac",
+        audio_bitrate="128k",
+        bitrate=target_bitrate,
         threads=2,
         logger=None,
     )
@@ -206,6 +219,8 @@ def assemble_final_video(script_id, video_urls, audio_path, shot_durations, outp
 
 def upload_video(script_id, file_path):
     file_name = f"{script_id}.mp4"
+    file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    print(f"Final video size: {file_size_mb:.1f}MB")
     with open(file_path, "rb") as f:
         file_bytes = f.read()
 
@@ -255,10 +270,6 @@ def main():
     video_urls = script.get("video_urls") or []
     next_index = script.get("video_next_index") or 0
 
-    # Don't trust the database blindly - verify every clip we think is done
-    # actually exists and is downloadable. Stale/ghost URLs (e.g. from an
-    # older version of this script, or a file that got deleted later) must
-    # be treated as not-done, or final assembly will crash on a 400/404.
     verified_urls = []
     for i, url in enumerate(video_urls):
         try:
@@ -303,7 +314,6 @@ def main():
             os.remove(raw_path)
             time.sleep(4)
 
-    # Final assembly once every shot exists
     if len(video_urls) >= total_shots:
         print("All shots done. Assembling final video...")
         audio_path = "/tmp/narration_audio_final"
