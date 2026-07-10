@@ -1,7 +1,7 @@
 """
 Marius Command Center - Script Writing Agent
 Takes the oldest pending topic and turns it into a full narration script
-plus a shot-by-shot visual production plan for "Forgotten Names."
+plus a shot-by-shot visual production plan for "Erased."
 """
 
 import os
@@ -61,16 +61,40 @@ def call_openrouter(prompt):
 
 
 def generate_script(title, angle):
-    prompt = f"""You are the head writer for "Forgotten Names," a YouTube documentary
+    prompt = f"""You are the head writer for "Erased," a YouTube documentary
 channel telling real, historically documented true stories of ordinary people
-caught in extraordinary historical moments.
+caught in extraordinary historical moments, whose names history left out.
 
 Episode topic: {title}
 Angle: {angle}
 
-Write a complete 8-10 minute narration script (roughly 1200-1500 words) with a
-strong hook in the first 15 seconds, a clear narrative arc, and a reflective
-closing line. Also break the episode into shots for visual generation.
+OPENING HOOK - this is the most important part of the script. The first 8
+seconds of narration determine whether the viewer stays or leaves, so follow
+this exact structure for the opening lines:
+
+1. STAKE (first 1-2 sentences): State the single most dramatic, concrete fact
+   of the story immediately. Do NOT say "today we'll look at" or "this is the
+   story of" or introduce the channel/topic first. Lead with the fact itself,
+   as if the viewer already knows what's at risk. Use a real, specific number,
+   name, or consequence from the story - not a vague tease.
+   Bad: "Today we're going to talk about a forgotten hero of history."
+   Good: "140,000 men dug the trenches of the Western Front - and history
+   erased every one of their names."
+
+2. VISUAL LOCK (next 1 sentence): A concrete, specific image or moment that
+   proves the stake is real - not generic scene-setting.
+
+3. CURIOSITY GAP (next 1-2 sentences): Pose the specific question the rest of
+   the episode answers, so the viewer needs to keep watching to find out.
+
+Only after these opening beats should the script settle into the normal
+narrative arc. No channel intro, no "welcome back," no restating the title -
+go straight into the stake.
+
+Write a complete 8-10 minute narration script (roughly 1200-1500 words) with
+this opening structure, a clear narrative arc through the rest of the story,
+and a reflective closing line. Also break the episode into shots for visual
+generation.
 
 Return ONLY valid JSON, no other text, in this exact format:
 
