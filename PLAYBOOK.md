@@ -2,33 +2,34 @@
 
 Repo: https://github.com/aliwaziri10/marius-command-center
 Supabase: https://supabase.com/dashboard/project/swnjzzejsuupecdgbzzf
-Zia is non-coder. Never ask her to explain the schema/structure - it's all below. Just tell her what to click.
+Zarah is non-coder. Never ask her to explain the schema/structure - it's all below. Just tell her what to click.
 
-## Pipeline order
-Topic Research -> Script Writing -> Narration -> Image Generation -> Video Generation -> Assembly -> YouTube Upload.
-Check STATUS.md for which stage the latest script is on, then help with the NEXT stage only.
+## Pipeline order (CURRENT - do not use an older order)
+Topic Research -> Script Writing -> Narration -> Video Generation -> YouTube Upload.
+There is NO separate Image Generation stage and NO separate Assembly stage anymore. video_generation.py does both: generates a video clip per shot directly from text via Agnes AI, sizes each to match narration timing, stitches them together with narration audio, uploads ONE final file. Do not build or run a separate image_generation.py workflow even if old files/workflows for it still exist in the repo - they are abandoned, ignore them.
 
 ## Database (Supabase table "scripts")
-Columns: id, topic_id, narration_text, shot_list (jsonb - each shot has a "visual_description" field, NOT "description"/"visual"/"text"), status, narration_url, image_urls (jsonb array), video_urls (jsonb array), video_next_index (int), created_at.
-Status values in order: pending -> narrated -> images_generated -> video_in_progress -> videos_generated.
+Columns: id, topic_id, narration_text, shot_list (jsonb - each shot has "visual_description" for the visual and "narration_excerpt" for its matching narration text), status, narration_url, video_url (singular).
+Status values in order: pending -> narrated -> video_generated.
+Columns image_urls/video_urls/video_next_index still exist but are LEFTOVER/unused - ignore them.
 
 ## Storage buckets (all public)
-narration (.wav files), images (.jpg, named <script_id>_shot_<n>.jpg), video_clips (.mp4, named <script_id>_clip_<n>.mp4), final_videos (not yet used).
+narration (.wav), videos (final .mp4 per script - the only bucket video_generation.py uses).
 
 ## GitHub Actions secrets already set
-SUPABASE_URL, SUPABASE_SECRET_KEY, OPENROUTER_API_KEY, AGNES_API_KEY, HF_TOKEN (currently unused - video gen uses Agnes, not Hugging Face - HF_TOKEN can be ignored/removed).
+SUPABASE_URL, SUPABASE_SECRET_KEY, OPENROUTER_API_KEY, AGNES_API_KEY.
 
 ## Known gotchas already solved - do not rediscover these
-- shot_list field is "visual_description" not "description".
-- Kokoro voices file must be voices.bin (not voices.json) from the "model-files" release tag (not "model-files-v1.0").
-- Kokoro raw audio is too quiet - must normalize_volume() before saving.
-- Voice = am_adam (American), NOT bm_george (British) - Zarah explicitly chose Adam.
-- Video generation uses Agnes AI (agnes-ai.com) - Zarah knowingly chose this over Hugging Face/LTX despite it being a newer, less established company, because free HF ZeroGPU quota (2-5 min/day) is too small for a 20-clip episode. Do not silently switch this back - ask first if considering a change.
-- A green tick on a workflow does NOT mean it did real work - always verify counts in the database or files in the bucket.
+- Kokoro voices file must be voices.bin from the "model-files" release tag. Voice = am_adam.
+- Agnes num_frames must equal 8*n+1 (e.g. 49, 169) - video_generation.py already handles this via round_to_valid_frames().
+- Agnes video result polling uses GET https://apihub.agnes-ai.com/agnesapi?video_id=... - NOT /v1/videos/{id}. Already fixed in current code.
+- Video generation uses Agnes AI (agnes-ai.com), a newer/less established company, chosen knowingly over Hugging Face/LTX due to HF's tiny free quota. Do not silently switch this back - ask first.
+- A green tick on a workflow does NOT mean it did real work - always verify counts/files in the actual database or bucket.
+- IMPORTANT: file edits confirmed by Zarah as "done" have repeatedly NOT actually been committed on GitHub. Always verify via the GitHub API or by re-reading the file, don't just trust a confirmation.
+- video_generation.py has NO checkpoint/resume - if it fails partway through a 20-shot run, it must restart from shot 1. A single run can take 60-100+ minutes; this is normal.
 
-## Remaining stages to build
-Assembly (ffmpeg): stitch narration + video clips (or images with Ken Burns pan/zoom as fallback) into one file per script, upload to final_videos bucket.
+## Remaining stage to build
 YouTube Upload: needs Google Cloud OAuth setup first (not started), then title/description/thumbnail + containsSyntheticMedia disclosure field.
 
 ## Standing communication rules
-Always give exact URLs in copy boxes, combined with what to click, in the same step. Always spell out Ctrl+A then Delete before any paste-replace. Max 3-4 steps per message, wait for confirmation. Never write real secrets into any file - GitHub secrets only. Do not add third-party AI services without asking first.
+Always give exact URLs in copy boxes, combined with what to click, in the same step. Always spell out Ctrl+A then Delete before any paste-replace. Max 3-4 steps per message, wait for confirmation. Never write real secrets into any file - GitHub secrets only. Do not add third-party AI services without asking first. ALWAYS give full file contents when editing code, never partial snippets.
