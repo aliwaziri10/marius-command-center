@@ -1,8 +1,9 @@
 """
 Marius Command Center - Video Generation Agent
-Takes the oldest narrated script and generates one real AI video clip per
-shot using Agnes AI, sized to match narration timing, then assembles the
-final video with a 3-layer audio mix: narration, background score, and SFX.
+Takes the oldest script with images generated and generates one real AI
+video clip per shot using Agnes AI, sized to match narration timing, then
+assembles the final video with a 3-layer audio mix: narration, background
+score, and SFX.
 
 RESUME-SAFE: generated clips are uploaded to storage and recorded in
 video_urls/video_next_index after every single shot, so a run that gets
@@ -74,7 +75,7 @@ def round_to_valid_frames(num_frames):
 
 def get_next_ready_script():
     resp = requests.get(
-        f"{SUPABASE_URL}/rest/v1/scripts?status=eq.narrated&order=created_at.asc&limit=1",
+        f"{SUPABASE_URL}/rest/v1/scripts?status=eq.images_generated&order=created_at.asc&limit=1",
         headers=HEADERS,
         timeout=30,
     )
@@ -474,7 +475,7 @@ def mark_video_generated(script_id, video_url):
 def main():
     script = get_next_ready_script()
     if not script:
-        print("No narrated scripts ready for video generation. Nothing to do.")
+        print("No scripts with images ready for video generation. Nothing to do.")
         return
     if not script.get("narration_url"):
         print("Script has no narration_url yet. Skipping.")
