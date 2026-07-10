@@ -1,6 +1,6 @@
 # Marius Status
-Updated: 2026-07-10 14:58 UTC
+Updated: 2026-07-10 15:11 UTC
 
 Topics: 12
-Scripts by status: images_generated=1, narrated=2
-Latest script: e7a4dea1 — narrated (20 clips)
+Scripts by status: images_generated=2, narrated=1
+Latest script: 3e16511c — images_generated (0 clips)
