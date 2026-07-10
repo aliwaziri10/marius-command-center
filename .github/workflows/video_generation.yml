@@ -1,8 +1,11 @@
 name: Video Generation
-
 on:
   workflow_dispatch:
-
+  schedule:
+    - cron: '*/20 * * * *'
+concurrency:
+  group: video-generation
+  cancel-in-progress: false
 jobs:
   generate:
     runs-on: ubuntu-latest
@@ -10,15 +13,12 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Install dependencies
         run: pip install -r requirements.txt
-
       - name: Run video generation
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
