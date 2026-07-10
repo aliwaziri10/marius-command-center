@@ -255,15 +255,14 @@ def compute_target_bitrate(duration_seconds, target_mb=42, audio_kbps=128):
 # Sound Designer: background score (ACE Music) + SFX (Freesound)
 # ---------------------------------------------------------------------------
 
-def poll_ace_music_task(task_id, out_path, max_wait=180, interval=8):
-    """Best-effort polling for async ACE Music generation. UNVERIFIED against
-    the live hosted API - endpoint/field names are a documented guess based
-    on the self-hosted ACE-Step task pattern. If this breaks, the real error
-    response will tell us what to fix."""
+def poll_ace_music_task(job_id, out_path, max_wait=180, interval=8):
+    """Polls ACE Music job status via GET /v1/jobs/{job_id}, per the
+    documented ACE-Step API (job created by POST /v1/music/generate
+    returns a job_id, not a task_id)."""
     waited = 0
     while waited < max_wait:
         resp = requests.get(
-            f"{ACE_MUSIC_BASE}/v1/music/status/{task_id}",
+            f"{ACE_MUSIC_BASE}/v1/jobs/{job_id}",
             headers=ACE_MUSIC_HEADERS,
             timeout=30,
         )
@@ -272,7 +271,7 @@ def poll_ace_music_task(task_id, out_path, max_wait=180, interval=8):
             return None
         data = resp.json()
         status = data.get("status")
-        if status in ("completed", "SUCCESS", "success"):
+        if status in ("completed", "SUCCESS", "success", "succeeded", "SUCCEEDED"):
             url = data.get("audio_url") or data.get("url")
             if url:
                 download_file(url, out_path)
@@ -289,15 +288,14 @@ def poll_ace_music_task(task_id, out_path, max_wait=180, interval=8):
             return None
         time.sleep(interval)
         waited += interval
-    print(f"ACE Music task {task_id} timed out after {max_wait}s")
+    print(f"ACE Music job {job_id} timed out after {max_wait}s")
     return None
 
 
 def generate_background_music(prompt, duration, out_path):
-    """Generates the episode's background score. UNVERIFIED endpoint - if
-    this fails on the real run, check the printed error for the actual
-    field/endpoint the live API expects, then fix create call below.
-    Fails gracefully: returns None instead of crashing the whole video."""
+    """Generates the episode's background score via POST /v1/music/generate,
+    which returns a job_id polled via GET /v1/jobs/{job_id}. Fails
+    gracefully: returns None instead of crashing the whole video."""
     if not ACE_MUSIC_API_KEY:
         print("No ACE_MUSIC_API_KEY set - skipping background music.")
         return None
@@ -329,9 +327,9 @@ def generate_background_music(prompt, duration, out_path):
                 f.write(base64.b64decode(b64))
             return out_path
 
-        task_id = data.get("task_id") or data.get("id") or data.get("request_id")
-        if task_id:
-            return poll_ace_music_task(task_id, out_path)
+        job_id = data.get("job_id") or data.get("task_id") or data.get("id") or data.get("request_id")
+        if job_id:
+            return poll_ace_music_task(job_id, out_path)
 
         print(f"ACE Music response had no recognizable audio field: {list(data.keys())}")
         return None
