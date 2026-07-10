@@ -2,44 +2,35 @@
 
 Repo: https://github.com/aliwaziri10/marius-command-center
 Supabase: https://supabase.com/dashboard/project/swnjzzejsuupecdgbzzf
-Google Cloud project: marius-command-center (owned by ziawaziri@gmail.com, the YouTube channel account)
-Zarah is non-coder. Never ask her to explain the schema/structure - it's all below. Just tell her what to click.
+Zia is non-coder. Never ask her to explain the schema/structure - it's all below. Just tell her what to click.
 
-## Pipeline order (CURRENT - do not use an older order)
+## Pipeline order
 Topic Research -> Script Writing -> Narration -> Video Generation -> YouTube Upload.
-There is NO separate Image Generation stage and NO separate Assembly stage. video_generation.py does both: generates a video clip per shot directly from text via Agnes AI, sizes each to match narration timing, stitches with narration audio, uploads ONE final file. Ignore any old image_generation.py/workflow if still present - abandoned.
+Video Generation now includes clip generation AND final assembly in one script (video_generation.py) - no separate Image Generation or Assembly stage. Image Generation still exists as a workflow in GitHub Actions but is unused/deprecated - do not run it for new scripts.
+Check STATUS.md for which stage the latest script is on, then help with the NEXT stage only.
 
 ## Database (Supabase table "scripts")
-Columns: id, topic_id, narration_text, shot_list (jsonb - "visual_description" for visual, "narration_excerpt" for matching narration), status, narration_url, video_url (singular).
-Status values: pending -> narrated -> video_generated.
-image_urls/video_urls/video_next_index columns still exist but are unused leftovers - ignore.
+Columns: id, topic_id, narration_text, shot_list (jsonb - each shot has a "visual_description" field, NOT "description"/"visual"/"text"), status, narration_url, image_urls (jsonb array, legacy/unused for new scripts), video_urls (jsonb array - per-shot clip URLs), video_next_index (int - how many shots are done), video_url (text - final assembled video), created_at.
+Status values in order: pending -> narrated -> video_generated.
+"video_generated" means the final assembled video (narration + all clips) is done and sitting in the videos bucket.
 
 ## Storage buckets (all public)
-narration (.wav), videos (final .mp4 per script).
+narration (.wav/.mp3 files), images (.jpg, legacy/unused for new scripts), video_clips (.mp4, per-shot clips named <script_id>/shot_<n>.mp4, used as working storage during generation), videos (.mp4, final assembled video per script, named <script_id>.mp4).
 
-## GitHub Actions secrets currently set
-SUPABASE_URL, SUPABASE_SECRET_KEY, OPENROUTER_API_KEY, AGNES_API_KEY, YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_TOKEN. (HF_TOKEN also exists but is unused, safe to remove.)
-
-## YouTube OAuth status (as of this writing)
-Google Cloud project "marius-command-center" created under ziawaziri@gmail.com. YouTube Data API v3 enabled. TWO OAuth clients exist: "marius-uploader" (Desktop type, UNUSED, do not use) and "marius-uploader-web" (Web application type, THIS IS THE ONE IN USE - client ID starts with 264653492219-8orr0...). YOUTUBE_CLIENT_ID/SECRET/REFRESH_TOKEN in GitHub all correctly match the Web app client as of now.
-IMPORTANT UNRESOLVED ISSUE: the app is still in "Testing" publish status on the OAuth consent screen, which caps refresh tokens at 7 days (not indefinite). This WILL break uploads after 7 days from token creation unless fixed. Fix = publish the OAuth consent screen to "Production" (Google Cloud Console -> APIs & Services -> OAuth consent screen -> Publish App). This does NOT require Google's full verification review for apps only requesting the youtube.upload scope in this way, but confirm before relying on it. This was not yet done as of this writing - do it before the 7-day window expires, or the refresh token will need to be regenerated via the whole OAuth Playground flow again.
-The upload step in video_generation.py (or a separate youtube_upload.py) has NOT been written yet - only the OAuth credentials exist so far.
+## GitHub Actions secrets already set
+SUPABASE_URL, SUPABASE_SECRET_KEY, OPENROUTER_API_KEY, AGNES_API_KEY, HF_TOKEN (currently unused - video gen uses Agnes, not Hugging Face - HF_TOKEN can be ignored/removed).
 
 ## Known gotchas already solved - do not rediscover these
-- Kokoro voices file must be voices.bin from the "model-files" release tag. Voice = am_adam.
-- Agnes num_frames must equal 8*n+1 (e.g. 49, 169) - already handled via round_to_valid_frames().
-- Agnes video result polling uses GET https://apihub.agnes-ai.com/agnesapi?video_id=... (not /v1/videos/{id}) - already fixed.
-- Video generation uses Agnes AI (agnes-ai.com), chosen knowingly over Hugging Face/LTX due to HF's tiny free quota (2-5 min/day). Do not silently switch back - ask first.
-- A green tick on a workflow does NOT mean it did real work - always verify counts/files in the actual database or bucket.
-- Zarah's "done"/"." confirmations have repeatedly NOT meant a GitHub commit actually landed, AND fetch tools (raw.githubusercontent.com and api.github.com) have both been unreliable in other Claude sessions (silent empty results, rate limits, one session fabricated file contents entirely without noticing). Always verify file contents independently before trusting either a human confirmation or a fetch result - re-fetch if anything seems inconsistent, and say so if a fetch tool seems broken rather than guessing.
-- Google OAuth Playground's "use your own OAuth credentials" setting is unreliable/gets silently wiped on redirect. If a token exchange fails with "unauthorized_client" and the request body shows client_id=407408718192... (Google's own default test client), the custom credentials reverted - re-enter them and use the Playground's own "Authorize APIs" button (not a manually typed auth URL) without closing the settings popup in between, then check the gear icon again immediately upon return before clicking anything else.
-- OAuth client type matters: "Desktop app" type does NOT support custom redirect URIs needed for OAuth Playground - must use "Web application" type with redirect URI https://developers.google.com/oauthplayground added.
-- video_generation.py has NO checkpoint/resume - if it fails partway through a 20-shot run, it must restart from shot 1. A single run can take 60-100+ minutes; this is normal, not stuck.
+- shot_list field is "visual_description" not "description".
+- Kokoro voices file must be voices.bin (not voices.json) from the "model-files" release tag (not "model-files-v1.0").
+- Kokoro raw audio is too quiet - must normalize_volume() before saving.
+- Voice = am_adam (American), NOT bm_george (British) - Zarah explicitly chose Adam.
+- Video generation uses Agnes AI (agnes-ai.com) - Zarah knowingly chose this over Hugging Face/LTX despite it being a newer, less established company, because free HF ZeroGPU quota (2-5 min/day) is too small for a 20-clip episode. Do not silently switch this back - ask first if considering a change.
+- video_generation.py is resume-safe: it checks video_next_index and video_urls on the script row before generating anything, uploads each shot's clip individually to video_clips as soon as it's made, and saves progress after every single shot. Re-running it after a partial/interrupted run continues from where it stopped instead of regenerating finished shots. Do not remove this without a strong reason - the earlier version without it wasted a full re-render of an already-half-done script.
+- A green tick on a workflow does NOT mean it did real work - always verify counts in the database or files in the bucket.
 
-## Remaining work
-1. Fix YouTube OAuth 7-day token expiry (publish app to Production - see above).
-2. Write the actual YouTube upload code (title/description generation from script data, thumbnail, containsSyntheticMedia disclosure field, using the saved OAuth credentials to upload the video from the "videos" bucket).
-3. Confirm video_generation.py itself completes a full successful run end to end (was in progress as of this writing, for script e7a4dea1-a29f-47e5-a0e4-9944f4bc9b35).
+## Remaining stages to build
+YouTube Upload: needs Google Cloud OAuth setup first (not started), then title/description/thumbnail + containsSyntheticMedia disclosure field.
 
 ## Standing communication rules
-Always give exact URLs in copy boxes, combined with what to click, in the same step. Always spell out Ctrl+A then Delete before any paste-replace. Max 3-4 steps per message, wait for confirmation. Never write real secrets into any file - GitHub secrets only. Do not add third-party AI services without asking first. ALWAYS give full file contents when editing code, never partial snippets. Act proactively rather than asking permission for obvious next steps like updating this file.
+Always give exact URLs in copy boxes, combined with what to click, in the same step. Always spell out Ctrl+A then Delete before any paste-replace. Max 3-4 steps per message, wait for confirmation. Never write real secrets into any file - GitHub secrets only. Do not add third-party AI services without asking first.
