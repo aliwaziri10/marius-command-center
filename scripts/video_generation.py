@@ -255,6 +255,29 @@ def main():
     video_urls = script.get("video_urls") or []
     next_index = script.get("video_next_index") or 0
 
+    # Don't trust the database blindly - verify every clip we think is done
+    # actually exists and is downloadable. Stale/ghost URLs (e.g. from an
+    # older version of this script, or a file that got deleted later) must
+    # be treated as not-done, or final assembly will crash on a 400/404.
+    verified_urls = []
+    for i, url in enumerate(video_urls):
+        try:
+            head = requests.head(url, timeout=30)
+            if head.status_code == 200:
+                verified_urls.append(url)
+            else:
+                print(f"Clip {i} failed verification (status {head.status_code}), will regenerate: {url}")
+                break
+        except requests.RequestException as e:
+            print(f"Clip {i} failed verification ({e}), will regenerate: {url}")
+            break
+
+    if len(verified_urls) != len(video_urls):
+        video_urls = verified_urls
+        next_index = len(verified_urls)
+        save_progress(script_id, video_urls, next_index)
+        print(f"Corrected progress after verification: {next_index}/{total_shots} shots actually confirmed done")
+
     if next_index >= total_shots:
         print(f"All {total_shots} shots already generated, video_urls has {len(video_urls)} entries. Skipping to assembly check.")
     else:
