@@ -4,8 +4,16 @@ Takes the oldest script with status 'video_generated' and uploads its
 final video to YouTube via the YouTube Data API v3, using a stored OAuth
 refresh token (no browser interaction needed at runtime).
 
-Uploads are set to 'unlisted' by default - anyone with the link can view,
-but videos won't appear in search or on the channel page publicly.
+Uploads are set to 'public' - videos are fully live and discoverable
+immediately on upload.
+
+Sets status.containsSyntheticMedia = True on every upload, per YouTube's
+Altered/Synthetic content disclosure requirement (API field added
+2024-10-30) - required since every video here is AI-generated.
+
+Also sets a custom thumbnail via thumbnails.set, using thumbnail_url from
+the scripts row if video_generation.py produced one. Missing thumbnail
+never blocks the upload itself - it's a best-effort step.
 """
 
 import os
@@ -25,6 +33,7 @@ HEADERS = {
 
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos"
+THUMBNAIL_SET_URL = "https://www.googleapis.com/upload/youtube/v3/thumbnails/set"
 
 
 def get_access_token():
@@ -87,8 +96,11 @@ def upload_to_youtube(access_token, video_path, title, description):
             "categoryId": "27",
         },
         "status": {
-            "privacyStatus": "unlisted",
+            "privacyStatus": "public",
             "selfDeclaredMadeForKids": False,
+            # Required disclosure for AI-generated/altered realistic content.
+            # Field added to the YouTube Data API v3 on 2024-10-30.
+            "containsSyntheticMedia": True,
         },
     }
 
@@ -128,6 +140,30 @@ def upload_to_youtube(access_token, video_path, title, description):
     return put_resp.json()["id"]
 
 
+def set_thumbnail(access_token, youtube_id, thumbnail_path):
+    """Best-effort: a thumbnail failure should never fail the whole upload,
+    since the video itself already succeeded by the time this runs."""
+    file_size = os.path.getsize(thumbnail_path)
+    with open(thumbnail_path, "rb") as f:
+        file_bytes = f.read()
+
+    resp = requests.post(
+        f"{THUMBNAIL_SET_URL}?videoId={youtube_id}",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "image/jpeg",
+            "Content-Length": str(file_size),
+        },
+        data=file_bytes,
+        timeout=60,
+    )
+    if resp.status_code >= 400:
+        print(f"THUMBNAIL SET ERROR {resp.status_code}: {resp.text}")
+        return False
+    print("Custom thumbnail set.")
+    return True
+
+
 def mark_uploaded(script_id, youtube_id):
     resp = requests.patch(
         f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
@@ -159,7 +195,18 @@ def main():
 
     access_token = get_access_token()
     youtube_id = upload_to_youtube(access_token, video_path, title, description)
-    print(f"Uploaded to YouTube (UNLISTED): https://youtube.com/watch?v={youtube_id}")
+    print(f"Uploaded to YouTube (PUBLIC): https://youtube.com/watch?v={youtube_id}")
+
+    thumbnail_url = script.get("thumbnail_url")
+    if thumbnail_url:
+        try:
+            thumb_path = "/tmp/upload_thumbnail.jpg"
+            download_file(thumbnail_url, thumb_path)
+            set_thumbnail(access_token, youtube_id, thumb_path)
+        except Exception as e:
+            print(f"Thumbnail upload failed, video is still live without a custom thumbnail: {e}")
+    else:
+        print("No thumbnail_url on this script - skipping custom thumbnail.")
 
     mark_uploaded(script_id, youtube_id)
     print("Done.")
