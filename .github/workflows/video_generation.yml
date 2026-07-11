@@ -24,4 +24,6 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           AGNES_API_KEY: ${{ secrets.AGNES_API_KEY }}
+          ACE_MUSIC_API_KEY: ${{ secrets.ACE_MUSIC_API_KEY }}
+          FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
         run: python scripts/video_generation.py
