@@ -583,4 +583,15 @@ def main():
         audio_clip = AudioFileClip(audio_path)
         shot_durations = compute_shot_durations(shot_list, audio_clip.duration)
 
-        output_path =
+        output_path = "/tmp/final_video.mp4"
+        assemble_final_video(script_id, video_urls, audio_path, music_mood, shot_list, shot_durations, output_path)
+
+        video_url = upload_video(script_id, output_path)
+        print(f"Uploaded: {video_url}")
+
+        mark_video_generated(script_id, video_url)
+        print("Done.")
+
+
+if __name__ == "__main__":
+    main()
