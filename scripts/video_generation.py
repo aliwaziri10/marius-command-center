@@ -17,7 +17,10 @@ next scheduled run.
 
 RETRY-SAFE: create_agnes_task retries transient backend errors (429 rate
 limit, 500/502/503/504 server-side issues) with backoff before giving up,
-so a single flaky Agnes response doesn't kill the whole run.
+so a single flaky Agnes response doesn't kill the whole run. Clip
+verification (HEAD checks on already-generated shots) also retries before
+concluding a shot is genuinely broken, so a single transient network
+blip doesn't discard already-finished work.
 """
 
 import os
@@ -77,6 +80,9 @@ SFX_VOLUME = 0.85
 
 AGNES_RETRYABLE_CODES = {429, 500, 502, 503, 504}
 AGNES_MAX_RETRIES = 4
+
+CLIP_VERIFY_RETRIES = 3
+CLIP_VERIFY_RETRY_WAIT = 5
 
 
 def round_to_valid_frames(num_frames):
@@ -519,15 +525,23 @@ def main():
 
     verified_urls = []
     for i, url in enumerate(video_urls):
-        try:
-            head = requests.head(url, timeout=30)
-            if head.status_code == 200:
-                verified_urls.append(url)
-            else:
-                print(f"Clip {i} failed verification (status {head.status_code}), will regenerate: {url}")
-                break
-        except requests.RequestException as e:
-            print(f"Clip {i} failed verification ({e}), will regenerate: {url}")
+        verified = False
+        last_error = None
+        for attempt in range(CLIP_VERIFY_RETRIES):
+            try:
+                head = requests.head(url, timeout=30)
+                if head.status_code == 200:
+                    verified = True
+                    break
+                last_error = f"status {head.status_code}"
+            except requests.RequestException as e:
+                last_error = str(e)
+            if attempt < CLIP_VERIFY_RETRIES - 1:
+                time.sleep(CLIP_VERIFY_RETRY_WAIT)
+        if verified:
+            verified_urls.append(url)
+        else:
+            print(f"Clip {i} failed verification after {CLIP_VERIFY_RETRIES} attempts ({last_error}), will regenerate: {url}")
             break
 
     if len(verified_urls) != len(video_urls):
