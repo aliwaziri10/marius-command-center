@@ -5,7 +5,7 @@ from supabase import create_client
 supabase = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SECRET_KEY"])
 
 topics = supabase.table("topics").select("id", count="exact").execute()
-scripts = supabase.table("scripts").select("id,status,video_urls,video_next_index").execute().data
+scripts = supabase.table("scripts").select("id,status,video_urls,video_next_index,created_at").order("created_at").execute().data
 
 counts = {}
 for s in scripts:
