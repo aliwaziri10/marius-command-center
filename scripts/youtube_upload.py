@@ -4,8 +4,8 @@ Takes the oldest script with status 'video_generated' and uploads its
 final video to YouTube via the YouTube Data API v3, using a stored OAuth
 refresh token (no browser interaction needed at runtime).
 
-Uploads are set to 'private' by default - review and publish manually
-in YouTube Studio before making anything public.
+Uploads are set to 'unlisted' by default - anyone with the link can view,
+but videos won't appear in search or on the channel page publicly.
 """
 
 import os
@@ -87,7 +87,7 @@ def upload_to_youtube(access_token, video_path, title, description):
             "categoryId": "27",
         },
         "status": {
-            "privacyStatus": "private",
+            "privacyStatus": "unlisted",
             "selfDeclaredMadeForKids": False,
         },
     }
@@ -159,7 +159,7 @@ def main():
 
     access_token = get_access_token()
     youtube_id = upload_to_youtube(access_token, video_path, title, description)
-    print(f"Uploaded to YouTube (PRIVATE): https://youtube.com/watch?v={youtube_id}")
+    print(f"Uploaded to YouTube (UNLISTED): https://youtube.com/watch?v={youtube_id}")
 
     mark_uploaded(script_id, youtube_id)
     print("Done.")
