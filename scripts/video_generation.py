@@ -32,6 +32,11 @@ from moviepy import (
     concatenate_videoclips,
     concatenate_audioclips,
 )
+from moviepy.video.fx import FadeIn, FadeOut
+from moviepy.audio.fx import AudioFadeIn, AudioFadeOut
+
+FADE_IN_SECONDS = 0.75
+FADE_OUT_SECONDS = 1.5
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
@@ -445,7 +450,12 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
         narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration
     )
 
+    final_audio = final_audio.with_effects(
+        [AudioFadeIn(FADE_IN_SECONDS), AudioFadeOut(FADE_OUT_SECONDS)]
+    )
+
     final = concatenate_videoclips(clips, method="compose")
+    final = final.with_effects([FadeIn(FADE_IN_SECONDS), FadeOut(FADE_OUT_SECONDS)])
     final = final.with_audio(final_audio)
     target_bitrate = compute_target_bitrate(total_duration)
     print(f"Target video bitrate: {target_bitrate} (duration {total_duration:.1f}s)")
@@ -573,15 +583,4 @@ def main():
         audio_clip = AudioFileClip(audio_path)
         shot_durations = compute_shot_durations(shot_list, audio_clip.duration)
 
-        output_path = "/tmp/final_video.mp4"
-        assemble_final_video(script_id, video_urls, audio_path, music_mood, shot_list, shot_durations, output_path)
-
-        video_url = upload_video(script_id, output_path)
-        print(f"Uploaded: {video_url}")
-
-        mark_video_generated(script_id, video_url)
-        print("Done.")
-
-
-if __name__ == "__main__":
-    main()
+        output_path =
