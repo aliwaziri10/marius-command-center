@@ -23,6 +23,7 @@ MAX_RETRIES = 4
 MIN_SHOTS = 35
 MAX_SHOTS = 55
 MAX_GENERATION_ATTEMPTS = 3
+MAX_HOOK_TEXT_CHARS = 60
 
 VALID_SHOT_TYPES = {
     "wide", "medium", "close_up", "extreme_close_up", "establishing", "detail_insert"
@@ -126,6 +127,27 @@ def normalize_shot(shot, index):
     }
 
 
+def normalize_hook_text(result):
+    """hook_text is thumbnail copy, not narration - short, punchy, and
+    written to be read in under a second at thumbnail size. Falls back to
+    a trimmed version of the first shot's narration_excerpt if the model
+    didn't provide one, so downstream thumbnail generation always has
+    something usable."""
+    hook_text = (result.get("hook_text") or "").strip()
+    if hook_text:
+        return hook_text[:MAX_HOOK_TEXT_CHARS].rstrip()
+
+    shot_list = result.get("shot_list") or []
+    if shot_list:
+        fallback = (shot_list[0].get("narration_excerpt") or "").strip()
+        if len(fallback) <= MAX_HOOK_TEXT_CHARS:
+            return fallback
+        if fallback:
+            return fallback[:MAX_HOOK_TEXT_CHARS].rsplit(" ", 1)[0] + "..."
+
+    return ""
+
+
 def validate_and_normalize(result):
     """Returns (is_valid, normalized_result_or_error_reason)."""
     if "narration_text" not in result or not result["narration_text"].strip():
@@ -147,6 +169,7 @@ def validate_and_normalize(result):
         "the middle, explosive full-orchestra climax at the reveal, "
         "tapering to a quiet resolution."
     )
+    result["hook_text"] = normalize_hook_text(result)
 
     return True, result
 
@@ -185,6 +208,17 @@ go straight into the stake.
 Write a complete 8-10 minute narration script (roughly 1200-1500 words) with
 this opening structure, a clear narrative arc through the rest of the story,
 and a reflective closing line.
+
+THUMBNAIL HOOK TEXT - separate from the narration, also write a short,
+punchy line of thumbnail cover text (under {MAX_HOOK_TEXT_CHARS} characters,
+ALL CAPS not required - it will be capitalized automatically) that would make
+someone scrolling YouTube stop and click. This is NOT a narration sentence -
+it should read like a headline: concrete, high-stakes, and built around the
+single most shocking number, name, or fact in the story. Favor short
+fragments over full grammatical sentences.
+   Bad (too long/sentence-like): "When a bomb hit the pub, 312 diaries were
+   buried under the rubble."
+   Good: "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 
 CINEMATIC DIRECTOR - shot list requirements:
 Break the episode into EXACTLY between {MIN_SHOTS} and {MAX_SHOTS} shots -
@@ -240,6 +274,7 @@ format:
 
 {{
   "narration_text": "The full narration script as one string, written to be read aloud.",
+  "hook_text": "Short punchy thumbnail cover line, under {MAX_HOOK_TEXT_CHARS} characters.",
   "music_mood": "Background score prompt for the whole episode, describing its build-up arc.",
   "shot_list": [
     {{
@@ -277,7 +312,7 @@ Include between {MIN_SHOTS} and {MAX_SHOTS} shots covering the full narration.""
     raise RuntimeError(f"Script generation failed after {MAX_GENERATION_ATTEMPTS} attempts. Last reason: {last_reason}")
 
 
-def save_script(topic_id, narration_text, shot_list, music_mood):
+def save_script(topic_id, narration_text, shot_list, music_mood, hook_text):
     resp = requests.post(
         f"{SUPABASE_URL}/rest/v1/scripts",
         headers={**HEADERS, "Prefer": "return=representation"},
@@ -286,6 +321,7 @@ def save_script(topic_id, narration_text, shot_list, music_mood):
             "narration_text": narration_text,
             "shot_list": shot_list,
             "music_mood": music_mood,
+            "hook_text": hook_text,
             "status": "pending",
         },
         timeout=30,
@@ -317,6 +353,7 @@ def main():
         result["narration_text"],
         result["shot_list"],
         result["music_mood"],
+        result["hook_text"],
     )
     mark_topic_scripted(topic["id"])
     print("Done.")
