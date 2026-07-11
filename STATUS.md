@@ -1,6 +1,6 @@
 # Marius Status
-Updated: 2026-07-11 18:28 UTC
+Updated: 2026-07-11 19:16 UTC
 
 Topics: 18
-Scripts by status: archived=1, video_generated=1, images_generated=2, pending=1
-Latest script: 1cb89fbe — pending (0 clips)
+Scripts by status: archived=1, uploaded=1, images_generated=2, narrated=1
+Latest script: 1cb89fbe — narrated (0 clips)
