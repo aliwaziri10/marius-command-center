@@ -20,7 +20,11 @@ limit, 500/502/503/504 server-side issues) with backoff before giving up,
 so a single flaky Agnes response doesn't kill the whole run. Clip
 verification (HEAD checks on already-generated shots) also retries before
 concluding a shot is genuinely broken, so a single transient network
-blip doesn't discard already-finished work.
+blip doesn't discard already-finished work. poll_agnes_task now retries
+a stalled/timed-out poll a couple of times before giving up on that shot,
+and a shot that still fails after that no longer kills the whole run -
+it's logged and skipped, and the run stops cleanly so the next scheduled
+run can retry it (same pattern used for background music and SFX).
 """
 
 import os
@@ -83,6 +87,10 @@ AGNES_MAX_RETRIES = 4
 
 CLIP_VERIFY_RETRIES = 3
 CLIP_VERIFY_RETRY_WAIT = 5
+
+# How many times poll_agnes_task will restart a stalled/failed poll before
+# giving up on that shot entirely (each attempt waits up to max_wait itself).
+AGNES_POLL_MAX_ATTEMPTS = 2
 
 
 def round_to_valid_frames(num_frames):
@@ -178,7 +186,9 @@ def extract_video_url(data):
     return None
 
 
-def poll_agnes_task(video_id, max_wait=300, interval=10):
+def poll_agnes_task_once(video_id, max_wait=300, interval=10):
+    """Single polling attempt. Raises RuntimeError on failure/timeout,
+    same as before - poll_agnes_task wraps this with retries."""
     waited = 0
     while waited < max_wait:
         resp = requests.get(
@@ -202,6 +212,23 @@ def poll_agnes_task(video_id, max_wait=300, interval=10):
         time.sleep(interval)
         waited += interval
     raise RuntimeError(f"Agnes generation timed out after {max_wait}s for video_id {video_id}")
+
+
+def poll_agnes_task(video_id, max_wait=300, interval=10):
+    """Wraps poll_agnes_task_once with retries, mirroring the resilience
+    already used in create_agnes_task - a single stalled/timed-out poll
+    (Agnes queue backed up, one-off network issue) shouldn't be treated as
+    fatal on the first attempt."""
+    last_error = None
+    for attempt in range(AGNES_POLL_MAX_ATTEMPTS):
+        try:
+            return poll_agnes_task_once(video_id, max_wait=max_wait, interval=interval)
+        except Exception as e:
+            last_error = e
+            if attempt < AGNES_POLL_MAX_ATTEMPTS - 1:
+                print(f"Agnes poll attempt {attempt + 1}/{AGNES_POLL_MAX_ATTEMPTS} failed for {video_id}: {e}")
+                print("Retrying poll once more...")
+    raise RuntimeError(f"Agnes polling failed after {AGNES_POLL_MAX_ATTEMPTS} attempts for video_id {video_id}: {last_error}")
 
 
 def generate_shot_clip(shot, target_duration, out_path):
@@ -566,7 +593,14 @@ def main():
             shot = shot_list[i]
             raw_path = f"/tmp/shot_{i:03d}.mp4"
             print(f"Generating shot {i+1}/{total_shots} (~{shot_durations[i]:.1f}s)...")
-            generate_shot_clip(shot, shot_durations[i], raw_path)
+
+            try:
+                generate_shot_clip(shot, shot_durations[i], raw_path)
+            except Exception as e:
+                print(f"Shot {i+1}/{total_shots} failed to generate: {e}")
+                print(f"Stopping this run cleanly. {i}/{total_shots} shots saved so far. "
+                      f"Shot {i+1} will be retried automatically on the next scheduled run.")
+                return
 
             clip_url = upload_clip(script_id, i, raw_path)
             video_urls.append(clip_url)
