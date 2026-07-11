@@ -14,6 +14,10 @@ QUOTA-SAFE: Agnes's free tier appears to silently repeat/stale past a
 per-run quota ceiling, so each run generates at most CLIP_BATCH_LIMIT new
 clips then stops cleanly. The resume logic above picks up the rest on the
 next scheduled run.
+
+RETRY-SAFE: create_agnes_task retries transient backend errors (429 rate
+limit, 500/502/503/504 server-side issues) with backoff before giving up,
+so a single flaky Agnes response doesn't kill the whole run.
 """
 
 import os
@@ -66,6 +70,9 @@ CLIP_BATCH_LIMIT = 8  # max new clips generated per run - stay under Agnes's fre
 MUSIC_VOLUME = 0.18
 SFX_VOLUME = 0.85
 
+AGNES_RETRYABLE_CODES = {429, 500, 502, 503, 504}
+AGNES_MAX_RETRIES = 4
+
 
 def round_to_valid_frames(num_frames):
     n = round((num_frames - 1) / 8)
@@ -111,24 +118,42 @@ def build_agnes_prompt(shot):
 
 
 def create_agnes_task(prompt, num_frames):
-    resp = requests.post(
-        f"{AGNES_BASE}/videos",
-        headers=AGNES_HEADERS,
-        json={
-            "model": "agnes-video-v2.0",
-            "prompt": prompt,
-            "height": HEIGHT,
-            "width": WIDTH,
-            "num_frames": num_frames,
-            "frame_rate": FRAME_RATE,
-        },
-        timeout=60,
-    )
-    if resp.status_code >= 400:
-        print(f"AGNES ERROR {resp.status_code}: {resp.text}")
-    resp.raise_for_status()
-    data = resp.json()
-    return data.get("video_id") or data.get("id") or data.get("task_id")
+    """Retries on transient Agnes/backend errors (429 rate limit, 500/502/
+    503/504 server-side issues) with backoff before raising - one flaky
+    response from Agnes should not kill the whole run and force a manual
+    re-trigger."""
+    last_error_text = None
+
+    for attempt in range(AGNES_MAX_RETRIES):
+        resp = requests.post(
+            f"{AGNES_BASE}/videos",
+            headers=AGNES_HEADERS,
+            json={
+                "model": "agnes-video-v2.0",
+                "prompt": prompt,
+                "height": HEIGHT,
+                "width": WIDTH,
+                "num_frames": num_frames,
+                "frame_rate": FRAME_RATE,
+            },
+            timeout=60,
+        )
+
+        if resp.status_code in AGNES_RETRYABLE_CODES:
+            last_error_text = resp.text
+            wait = 20 * (attempt + 1)
+            print(f"AGNES transient error {resp.status_code} (attempt {attempt + 1}/{AGNES_MAX_RETRIES}): {resp.text}")
+            print(f"Retrying in {wait}s...")
+            time.sleep(wait)
+            continue
+
+        if resp.status_code >= 400:
+            print(f"AGNES ERROR {resp.status_code}: {resp.text}")
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("video_id") or data.get("id") or data.get("task_id")
+
+    raise RuntimeError(f"Agnes still failing after {AGNES_MAX_RETRIES} attempts: {last_error_text}")
 
 
 def extract_video_url(data):
