@@ -285,84 +285,75 @@ def compute_target_bitrate(duration_seconds, target_mb=42, audio_kbps=128):
 # Sound Designer: background score (ACE Music) + SFX (Freesound)
 # ---------------------------------------------------------------------------
 
-def poll_ace_music_task(job_id, out_path, max_wait=180, interval=8):
-    """Polls ACE Music job status via GET /v1/jobs/{job_id}, per the
-    documented ACE-Step API (job created by POST /v1/music/generate
-    returns a job_id, not a task_id)."""
+def poll_ace_music_task(task_id, out_path, max_wait=180, interval=8):
+    """Polls ACE Music task status via POST /query_result, per the real
+    ACE-Step API (a task created by POST /release_task returns a task_id,
+    queried via POST task_id_list - not GET /v1/jobs/{job_id})."""
     waited = 0
     while waited < max_wait:
-        resp = requests.get(
-            f"{ACE_MUSIC_BASE}/v1/jobs/{job_id}",
+        resp = requests.post(
+            f"{ACE_MUSIC_BASE}/query_result",
             headers=ACE_MUSIC_HEADERS,
+            json={"task_id_list": [task_id]},
             timeout=30,
         )
         if resp.status_code >= 400:
             print(f"ACE MUSIC POLL ERROR {resp.status_code}: {resp.text}")
             return None
-        data = resp.json()
-        status = data.get("status")
-        if status in ("completed", "SUCCESS", "success", "succeeded", "SUCCEEDED"):
-            url = data.get("audio_url") or data.get("url")
-            if url:
-                download_file(url, out_path)
-                return out_path
-            b64 = data.get("audio_base64") or data.get("audio")
-            if b64:
-                with open(out_path, "wb") as f:
-                    f.write(base64.b64decode(b64))
-                return out_path
-            print(f"ACE Music task completed but no audio field found: {list(data.keys())}")
-            return None
-        if status in ("failed", "FAILED", "ERROR", "error"):
-            print(f"ACE Music task failed: {data}")
+        entries = resp.json().get("data", [])
+        if not entries:
+            time.sleep(interval)
+            waited += interval
+            continue
+        entry = entries[0]
+        status = entry.get("status")
+        if status == 1:
+            result_list = json.loads(entry.get("result", "[]"))
+            if not result_list or not result_list[0].get("file"):
+                print(f"ACE Music task succeeded but no file in result: {result_list}")
+                return None
+            file_path = result_list[0]["file"]
+            audio_resp = requests.get(f"{ACE_MUSIC_BASE}{file_path}", timeout=60)
+            audio_resp.raise_for_status()
+            with open(out_path, "wb") as f:
+                f.write(audio_resp.content)
+            return out_path
+        if status == 2:
+            print(f"ACE Music task failed: {entry}")
             return None
         time.sleep(interval)
         waited += interval
-    print(f"ACE Music job {job_id} timed out after {max_wait}s")
+    print(f"ACE Music task {task_id} timed out after {max_wait}s")
     return None
 
 
 def generate_background_music(prompt, duration, out_path):
-    """Generates the episode's background score via POST /v1/music/generate,
-    which returns a job_id polled via GET /v1/jobs/{job_id}. Fails
-    gracefully: returns None instead of crashing the whole video."""
+    """Generates the episode's background score via POST /release_task,
+    polled via POST /query_result. Fails gracefully: returns None instead
+    of crashing the whole video."""
     if not ACE_MUSIC_API_KEY:
         print("No ACE_MUSIC_API_KEY set - skipping background music.")
         return None
     try:
         resp = requests.post(
-            f"{ACE_MUSIC_BASE}/v1/music/generate",
+            f"{ACE_MUSIC_BASE}/release_task",
             headers=ACE_MUSIC_HEADERS,
             json={
                 "prompt": prompt,
-                "duration": min(int(duration) + 5, 600),
-                "instrumental": True,
+                "audio_duration": max(10, min(int(duration) + 5, 600)),
+                "thinking": True,
             },
-            timeout=120,
+            timeout=60,
         )
         if resp.status_code >= 400:
             print(f"ACE MUSIC ERROR {resp.status_code}: {resp.text}")
             print("Continuing without background music - check the error above and fix the endpoint/fields.")
             return None
-        data = resp.json()
-
-        audio_url = data.get("audio_url") or data.get("url")
-        if audio_url:
-            download_file(audio_url, out_path)
-            return out_path
-
-        b64 = data.get("audio_base64") or data.get("audio")
-        if b64:
-            with open(out_path, "wb") as f:
-                f.write(base64.b64decode(b64))
-            return out_path
-
-        job_id = data.get("job_id") or data.get("task_id") or data.get("id") or data.get("request_id")
-        if job_id:
-            return poll_ace_music_task(job_id, out_path)
-
-        print(f"ACE Music response had no recognizable audio field: {list(data.keys())}")
-        return None
+        task_id = resp.json().get("data", {}).get("task_id")
+        if not task_id:
+            print(f"ACE Music response had no task_id: {resp.json()}")
+            return None
+        return poll_ace_music_task(task_id, out_path)
     except Exception as e:
         print(f"ACE Music generation raised an exception, continuing without background score: {e}")
         return None
