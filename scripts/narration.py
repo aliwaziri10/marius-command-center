@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import json
 import requests
 import numpy as np
 from supabase import create_client
@@ -70,13 +71,44 @@ def synthesize_with_pauses(kokoro, narration_text, voice, lang, sample_rate_hint
         audio_chunks.append(samples)
 
         if i < len(segments) - 1:
-            # Alternate between min/max within range for a touch of natural
-            # variation rather than an identical mechanical gap every time.
             pause_len = PAUSE_SECONDS_MIN if i % 2 == 0 else PAUSE_SECONDS_MAX
             silence = np.zeros(int(pause_len * sample_rate), dtype=audio_chunks[-1].dtype)
             audio_chunks.append(silence)
 
     return np.concatenate(audio_chunks), sample_rate
+
+
+def synthesize_per_shot(kokoro, shot_list, voice, lang, sample_rate_hint=24000):
+    """Synthesizes narration one shot at a time using each shot's own
+    narration_excerpt (guaranteed 1:1 with shot_list, unlike a separate
+    regex re-split of the full narration_text). Records each shot's real
+    audio duration - INCLUDING its trailing pause - so video generation
+    can size clips to true narration timing instead of estimating from
+    character count, which ignores the 1-2s silence gap inserted after
+    every sentence and drifts further out of sync as the script goes on."""
+    audio_chunks = []
+    shot_durations = []
+    sample_rate = sample_rate_hint
+
+    for i, shot in enumerate(shot_list):
+        text = (shot.get("narration_excerpt") or "").strip()
+        if not text:
+            shot_durations.append(0.0)
+            continue
+
+        samples, sample_rate = kokoro.create(text, voice=voice, speed=1.0, lang=lang)
+        audio_chunks.append(samples)
+        shot_seconds = len(samples) / sample_rate
+
+        if i < len(shot_list) - 1:
+            pause_len = PAUSE_SECONDS_MIN if i % 2 == 0 else PAUSE_SECONDS_MAX
+            silence = np.zeros(int(pause_len * sample_rate), dtype=samples.dtype)
+            audio_chunks.append(silence)
+            shot_seconds += pause_len
+
+        shot_durations.append(shot_seconds)
+
+    return np.concatenate(audio_chunks), sample_rate, shot_durations
 
 
 def main():
@@ -91,15 +123,26 @@ def main():
     script = result.data[0]
     script_id = script["id"]
     narration_text = script["narration_text"]
-    print(f"Narrating script id={script_id}, length={len(narration_text)} chars")
+    shot_list = script.get("shot_list")
+    if isinstance(shot_list, str):
+        shot_list = json.loads(shot_list)
+    print(f"Narrating script id={script_id}, length={len(narration_text)} chars, {len(shot_list or [])} shots")
 
     # 2. Download Kokoro model files if not cached
     download_if_missing(MODEL_URL, MODEL_PATH)
     download_if_missing(VOICES_URL, VOICES_PATH)
 
-    # 3. Generate narration audio, with real pauses after every sentence
+    # 3. Generate narration audio. If shot_list is available, synthesize
+    # per-shot so each shot's real spoken duration (plus its trailing
+    # pause) is known exactly - this is what video generation uses for
+    # true narration-synced timing. Falls back to the old whole-text
+    # sentence-split method if shot_list isn't available yet.
     kokoro = Kokoro(MODEL_PATH, VOICES_PATH)
-    samples, sample_rate = synthesize_with_pauses(kokoro, narration_text, VOICE_NAME, LANG)
+    shot_durations = None
+    if shot_list:
+        samples, sample_rate, shot_durations = synthesize_per_shot(kokoro, shot_list, VOICE_NAME, LANG)
+    else:
+        samples, sample_rate = synthesize_with_pauses(kokoro, narration_text, VOICE_NAME, LANG)
 
     # 3b. Boost volume to a normal loudness
     samples = normalize_volume(samples, target_peak=0.95)
@@ -118,11 +161,14 @@ def main():
     public_url = supabase.storage.from_("narration").get_public_url(output_filename)
     print(f"Uploaded. Public URL: {public_url}")
 
-    # 5. Update script status and store narration URL
-    supabase.table("scripts").update({
+    # 5. Update script status, narration URL, and real per-shot timing
+    update_payload = {
         "status": "narrated",
         "narration_url": public_url
-    }).eq("id", script_id).execute()
+    }
+    if shot_durations is not None:
+        update_payload["shot_durations"] = shot_durations
+    supabase.table("scripts").update(update_payload).eq("id", script_id).execute()
     print("Script status updated to 'narrated'. Done.")
 
 
