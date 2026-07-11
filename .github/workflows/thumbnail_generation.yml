@@ -1,0 +1,26 @@
+name: Thumbnail Generation
+on:
+  workflow_dispatch:
+concurrency:
+  group: thumbnail-generation
+  cancel-in-progress: false
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install DejaVu fonts (guarantees overlay font exists)
+        run: sudo apt-get update && sudo apt-get install -y fonts-dejavu-core
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run thumbnail generation
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python scripts/thumbnail_generation.py
