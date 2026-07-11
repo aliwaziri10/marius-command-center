@@ -1,9 +1,8 @@
 """
 Marius Command Center - Video Generation Agent
-Takes the oldest script with images generated and generates one real AI
-video clip per shot using Agnes AI, sized to match narration timing, then
-assembles the final video with a 3-layer audio mix: narration, background
-score, and SFX.
+Takes the oldest narrated script and generates one real AI video clip per
+shot using Agnes AI, sized to match narration timing, then assembles the
+final video with a 3-layer audio mix: narration, background score, and SFX.
 
 RESUME-SAFE: generated clips are uploaded to storage and recorded in
 video_urls/video_next_index after every single shot, so a run that gets
@@ -25,6 +24,19 @@ a stalled/timed-out poll a couple of times before giving up on that shot,
 and a shot that still fails after that no longer kills the whole run -
 it's logged and skipped, and the run stops cleanly so the next scheduled
 run can retry it (same pattern used for background music and SFX).
+
+FIXED 2026-07-11: get_next_ready_script() was querying
+status=eq.images_generated, a status nothing in the current pipeline ever
+sets (image_generation.py is deprecated/unused - this script now does
+clip generation + assembly + thumbnail all in one). Any script sitting at
+'narrated' was permanently stuck and could never be picked up. Now
+queries status=eq.narrated to match the real pipeline: narrated ->
+video_generated (this file) -> uploaded (youtube_upload.py).
+
+FIXED 2026-07-11: create_agnes_task's request timeout raised from 60s to
+180s, per Agnes's own documented guidance for deadline-exceeded/server
+errors ("increase client timeout") - under heavy load, 60s was cutting
+off requests that just needed more time, not actually failing.
 """
 
 import os
@@ -84,10 +96,8 @@ SFX_VOLUME = 0.85
 
 AGNES_RETRYABLE_CODES = {429, 500, 502, 503, 504}
 AGNES_MAX_RETRIES = 4
-
 CLIP_VERIFY_RETRIES = 3
 CLIP_VERIFY_RETRY_WAIT = 5
-
 # How many times poll_agnes_task will restart a stalled/failed poll before
 # giving up on that shot entirely (each attempt waits up to max_wait itself).
 AGNES_POLL_MAX_ATTEMPTS = 2
@@ -101,7 +111,7 @@ def round_to_valid_frames(num_frames):
 
 def get_next_ready_script():
     resp = requests.get(
-        f"{SUPABASE_URL}/rest/v1/scripts?status=eq.images_generated&order=created_at.asc&limit=1",
+        f"{SUPABASE_URL}/rest/v1/scripts?status=eq.narrated&order=created_at.asc&limit=1",
         headers=HEADERS,
         timeout=30,
     )
@@ -140,9 +150,10 @@ def create_agnes_task(prompt, num_frames):
     """Retries on transient Agnes/backend errors (429 rate limit, 500/502/
     503/504 server-side issues) with backoff before raising - one flaky
     response from Agnes should not kill the whole run and force a manual
-    re-trigger."""
+    re-trigger. Timeout raised to 180s per Agnes's own documented guidance
+    ("increase client timeout") for deadline-exceeded/server errors under
+    heavy load."""
     last_error_text = None
-
     for attempt in range(AGNES_MAX_RETRIES):
         resp = requests.post(
             f"{AGNES_BASE}/videos",
@@ -155,9 +166,8 @@ def create_agnes_task(prompt, num_frames):
                 "num_frames": num_frames,
                 "frame_rate": FRAME_RATE,
             },
-            timeout=60,
+            timeout=180,
         )
-
         if resp.status_code in AGNES_RETRYABLE_CODES:
             last_error_text = resp.text
             wait = 20 * (attempt + 1)
@@ -165,13 +175,11 @@ def create_agnes_task(prompt, num_frames):
             print(f"Retrying in {wait}s...")
             time.sleep(wait)
             continue
-
         if resp.status_code >= 400:
             print(f"AGNES ERROR {resp.status_code}: {resp.text}")
         resp.raise_for_status()
         data = resp.json()
         return data.get("video_id") or data.get("id") or data.get("task_id")
-
     raise RuntimeError(f"Agnes still failing after {AGNES_MAX_RETRIES} attempts: {last_error_text}")
 
 
@@ -473,7 +481,6 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
     final_audio = build_audio_mix(
         narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration
     )
-
     final_audio = final_audio.with_effects(
         [AudioFadeIn(FADE_IN_SECONDS), AudioFadeOut(FADE_OUT_SECONDS)]
     )
@@ -593,7 +600,6 @@ def main():
             shot = shot_list[i]
             raw_path = f"/tmp/shot_{i:03d}.mp4"
             print(f"Generating shot {i+1}/{total_shots} (~{shot_durations[i]:.1f}s)...")
-
             try:
                 generate_shot_clip(shot, shot_durations[i], raw_path)
             except Exception as e:
