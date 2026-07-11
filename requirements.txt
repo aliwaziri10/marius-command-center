@@ -3,3 +3,4 @@ kokoro-onnx
 soundfile
 supabase
 moviepy
+Pillow
