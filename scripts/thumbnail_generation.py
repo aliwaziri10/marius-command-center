@@ -11,6 +11,13 @@ HOOK TEXT SOURCE: uses the script's own hook_text column if present.
 Falls back to shot 1's narration_excerpt (the "STAKE" fact - see the
 OPENING HOOK structure in script_writing.py's prompt) trimmed to a legible
 thumbnail length, for older scripts written before hook_text existed.
+
+CANVAS-SAFE: Pollinations.ai doesn't always return an image at exactly
+the requested width/height. The downloaded image is force-fit to the
+exact target canvas (cover-crop resize: scale to fill, then center-crop,
+no stretching) before any text layout happens, so the overlay math is
+always working against the real image dimensions - otherwise text sized
+for an assumed-wider canvas can overflow a narrower real one.
 """
 
 import os
@@ -64,6 +71,23 @@ def generate_background_image(prompt, seed=0):
     r = requests.get(url, params=params, timeout=60)
     r.raise_for_status()
     return r.content
+
+
+def resize_to_canvas(img, target_w, target_h):
+    """Force-fits img to exactly (target_w, target_h) via a cover-crop:
+    scale up/down so the image fully covers the target box, then crop
+    the center - no stretching or distortion. Needed because Pollinations
+    doesn't always honor the requested width/height, and the text overlay
+    math below assumes the canvas is exactly IMAGE_WIDTH x IMAGE_HEIGHT."""
+    src_w, src_h = img.size
+    if (src_w, src_h) == (target_w, target_h):
+        return img
+    scale = max(target_w / src_w, target_h / src_h)
+    new_w, new_h = int(src_w * scale + 0.5), int(src_h * scale + 0.5)
+    img = img.resize((new_w, new_h), Image.LANCZOS)
+    left = (new_w - target_w) // 2
+    top = (new_h - target_h) // 2
+    return img.crop((left, top, left + target_w, top + target_h))
 
 
 def derive_hook_text(script, shot_list):
@@ -148,6 +172,7 @@ def overlay_hook_text(image_bytes, hook_text):
         return image_bytes
 
     img = Image.open(BytesIO(image_bytes)).convert("RGB")
+    img = resize_to_canvas(img, IMAGE_WIDTH, IMAGE_HEIGHT)
     draw = ImageDraw.Draw(img)
 
     max_text_width = IMAGE_WIDTH - (TEXT_MARGIN * 2)
