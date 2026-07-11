@@ -2,8 +2,8 @@
 Marius Command Center - Video Generation Agent
 Takes the oldest script with images generated and generates one real AI
 video clip per shot using Agnes AI, sized to match narration timing, then
-assembles the final video with a 4-layer audio mix: narration, background
-score, SFX, and Agnes's own embedded clip ambience.
+assembles the final video with a 3-layer audio mix: narration, background
+score, and SFX.
 
 RESUME-SAFE: generated clips are uploaded to storage and recorded in
 video_urls/video_next_index after every single shot, so a run that gets
@@ -17,32 +17,17 @@ next scheduled run.
 
 RETRY-SAFE: create_agnes_task retries transient backend errors (429 rate
 limit, 500/502/503/504 server-side issues) with backoff before giving up,
-so a single flaky Agnes response doesn't kill the whole run.
+so a single flaky Agnes response doesn't kill the whole run. Clip
+verification (HEAD checks on already-generated shots) also retries before
+concluding a shot is genuinely broken, so a single transient network
+blip doesn't discard already-finished work.
 
-AMBIENCE-PRESERVING: Agnes generates each clip with its own embedded
-ambient sound/music baked in by the model. The original concatenated clip
-audio is captured before final.with_audio() would otherwise overwrite it,
-and mixed in as a low ambient layer alongside narration/music/SFX.
-
-PACED ENDING: the final shot is held ~TAIL_SECONDS longer than narration
-requires, so the episode doesn't cut the instant the last line of
-narration ends - music and visuals get a moment to settle first.
-
-NO-REPEAT TAIL FIX: fit_clip_to_duration used to fill a duration deficit
-by looping the WHOLE clip from frame 0 - meaning the last fraction of a
-second of a shot could visibly repeat that same shot's own opening
-footage. It now trims a small safety margin off each clip's tail first,
-then fills any remaining deficit with a frozen last-frame hold instead
-of a loop - no repeated footage is ever visible.
-
-TIMEOUT-SAFE: generate_shot_clip retries with a brand-new Agnes task
-(not just re-polling the same stuck one) if a shot times out, instead of
-killing the whole run and forcing a manual re-trigger.
-
-SYNC-ACCURATE: compute_shot_durations uses real per-shot narration audio
-duration (captured during narration synthesis) when available, instead
-of estimating from character count - which ignores inter-sentence pauses
-and drifts out of sync on longer scripts.
+CONTENT-POLICY-CLEAR: if Agnes rejects a shot's prompt on content-policy
+grounds, the run still stops (there's no safe automatic image-content
+fix), but the log names the exact shot index and its visual_description
+plus the fix (reword that shot's visual_description in the scripts
+table, then re-run - it resumes from that exact shot) so this is
+diagnosable without needing to read a raw traceback or loop in Claude.
 """
 
 import os
@@ -57,6 +42,11 @@ from moviepy import (
     concatenate_videoclips,
     concatenate_audioclips,
 )
+from moviepy.video.fx import FadeIn, FadeOut
+from moviepy.audio.fx import AudioFadeIn, AudioFadeOut
+
+FADE_IN_SECONDS = 0.75
+FADE_OUT_SECONDS = 1.5
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
@@ -92,17 +82,21 @@ MAX_FRAMES = 169  # 8*21+1, ~7s
 
 CLIP_BATCH_LIMIT = 8  # max new clips generated per run - stay under Agnes's free-tier quota
 
-MUSIC_VOLUME = 0.30
-SFX_VOLUME = 0.95
-AMBIENT_VOLUME = 0.42
-
-TAIL_SECONDS = 2.5  # extra seconds held on the final shot past narration's end
-
-END_TRIM_SECONDS = 0.4     # trimmed off every raw clip's tail before fitting
-MIN_CLIP_SAFETY = 0.5      # never trim a clip shorter than this
+MUSIC_VOLUME = 0.18
+SFX_VOLUME = 0.85
 
 AGNES_RETRYABLE_CODES = {429, 500, 502, 503, 504}
 AGNES_MAX_RETRIES = 4
+
+CLIP_VERIFY_RETRIES = 3
+CLIP_VERIFY_RETRY_WAIT = 5
+
+
+class ContentPolicyRejection(Exception):
+    """Raised when Agnes rejects a shot's prompt on content-policy
+    grounds, so the caller can print a clear, actionable message instead
+    of letting a raw HTTPError/traceback be the only signal."""
+    pass
 
 
 def round_to_valid_frames(num_frames):
@@ -152,7 +146,8 @@ def create_agnes_task(prompt, num_frames):
     """Retries on transient Agnes/backend errors (429 rate limit, 500/502/
     503/504 server-side issues) with backoff before raising - one flaky
     response from Agnes should not kill the whole run and force a manual
-    re-trigger."""
+    re-trigger. Raises ContentPolicyRejection distinctly (not retryable)
+    if Agnes rejects the prompt on content grounds."""
     last_error_text = None
 
     for attempt in range(AGNES_MAX_RETRIES):
@@ -169,6 +164,9 @@ def create_agnes_task(prompt, num_frames):
             },
             timeout=60,
         )
+
+        if resp.status_code == 400 and "content_policy_violation" in resp.text:
+            raise ContentPolicyRejection(resp.text)
 
         if resp.status_code in AGNES_RETRYABLE_CODES:
             last_error_text = resp.text
@@ -207,6 +205,8 @@ def poll_agnes_task(video_id, max_wait=300, interval=10):
             headers=AGNES_HEADERS,
             timeout=30,
         )
+        if resp.status_code == 400 and "content_policy_violation" in resp.text:
+            raise ContentPolicyRejection(resp.text)
         if resp.status_code >= 400:
             print(f"AGNES POLL ERROR {resp.status_code}: {resp.text}")
         resp.raise_for_status()
@@ -224,46 +224,25 @@ def poll_agnes_task(video_id, max_wait=300, interval=10):
     raise RuntimeError(f"Agnes generation timed out after {max_wait}s for video_id {video_id}")
 
 
-def generate_shot_clip(shot, target_duration, out_path, max_timeout_retries=2):
+def generate_shot_clip(shot, target_duration, out_path):
     prompt = build_agnes_prompt(shot)
     raw_frames = int(target_duration * FRAME_RATE)
     raw_frames = max(MIN_FRAMES, min(MAX_FRAMES, raw_frames))
     num_frames = round_to_valid_frames(raw_frames)
     num_frames = max(MIN_FRAMES, min(MAX_FRAMES, num_frames))
 
-    last_error = None
-    for attempt in range(1, max_timeout_retries + 2):
-        try:
-            video_id = create_agnes_task(prompt, num_frames)
-            video_url = poll_agnes_task(video_id)
-            download_file(video_url, out_path)
-            return out_path
-        except RuntimeError as e:
-            last_error = e
-            if "timed out" in str(e) and attempt <= max_timeout_retries:
-                print(f"Shot generation timed out (attempt {attempt}/{max_timeout_retries}), retrying with a fresh task...")
-                continue
-            raise
-    raise last_error
+    video_id = create_agnes_task(prompt, num_frames)
+    video_url = poll_agnes_task(video_id)
+    download_file(video_url, out_path)
+    return out_path
 
 
 def fit_clip_to_duration(clip, target):
-    """Trims a small safety margin off the clip's tail first (Agnes clips
-    occasionally degrade or repeat content right at the very end), then
-    fills any remaining deficit with a frozen last-frame hold - NEVER by
-    looping the clip from frame 0, which would visibly replay that same
-    shot's own opening footage."""
-    trimmed_duration = max(clip.duration - END_TRIM_SECONDS, MIN_CLIP_SAFETY)
-    if trimmed_duration < clip.duration:
-        clip = clip.subclipped(0, trimmed_duration)
-
     if clip.duration >= target:
         return clip.subclipped(0, target)
-
-    deficit = target - clip.duration
-    freeze_frame = clip.to_ImageClip(t=max(clip.duration - 0.04, 0)).with_duration(deficit)
-    freeze_frame = freeze_frame.with_fps(FRAME_RATE)
-    return concatenate_videoclips([clip, freeze_frame])
+    reps = int(target // clip.duration) + 1
+    looped = concatenate_videoclips([clip] * reps)
+    return looped.subclipped(0, target)
 
 
 def fit_audio_to_duration(audio_clip, target):
@@ -304,16 +283,7 @@ def save_progress(script_id, video_urls, next_index):
     resp.raise_for_status()
 
 
-def compute_shot_durations(shot_list, total_duration, real_shot_durations=None):
-    """Uses real per-shot narration timing (captured during narration
-    synthesis) when available - this is exact, since it comes from
-    Kokoro's actual audio output including pauses. Falls back to a
-    character-count estimate for older scripts narrated before this was
-    tracked, which does NOT account for the 1-2s pause inserted after
-    every sentence and drifts out of sync on longer scripts."""
-    if real_shot_durations and len(real_shot_durations) == len(shot_list):
-        return list(real_shot_durations)
-
+def compute_shot_durations(shot_list, total_duration):
     weights = [max(len(s.get("narration_excerpt", "")), 20) for s in shot_list]
     total_weight = sum(weights)
     return [(weight / total_weight) * total_duration for weight in weights]
@@ -338,87 +308,78 @@ def compute_target_bitrate(duration_seconds, target_mb=42, audio_kbps=128):
 
 
 # ---------------------------------------------------------------------------
-# Sound Designer: background score (ACE Music) + SFX (Freesound) + ambience
+# Sound Designer: background score (ACE Music) + SFX (Freesound)
 # ---------------------------------------------------------------------------
 
-def poll_ace_music_task(job_id, out_path, max_wait=180, interval=8):
-    """Polls ACE Music job status via GET /v1/jobs/{job_id}, per the
-    documented ACE-Step API (job created by POST /v1/music/generate
-    returns a job_id, not a task_id)."""
+def poll_ace_music_task(task_id, out_path, max_wait=180, interval=8):
+    """Polls ACE Music task status via POST /query_result, per the real
+    ACE-Step API (a task created by POST /release_task returns a task_id,
+    queried via POST task_id_list - not GET /v1/jobs/{job_id})."""
     waited = 0
     while waited < max_wait:
-        resp = requests.get(
-            f"{ACE_MUSIC_BASE}/v1/jobs/{job_id}",
+        resp = requests.post(
+            f"{ACE_MUSIC_BASE}/query_result",
             headers=ACE_MUSIC_HEADERS,
+            json={"task_id_list": [task_id]},
             timeout=30,
         )
         if resp.status_code >= 400:
             print(f"ACE MUSIC POLL ERROR {resp.status_code}: {resp.text}")
             return None
-        data = resp.json()
-        status = data.get("status")
-        if status in ("completed", "SUCCESS", "success", "succeeded", "SUCCEEDED"):
-            url = data.get("audio_url") or data.get("url")
-            if url:
-                download_file(url, out_path)
-                return out_path
-            b64 = data.get("audio_base64") or data.get("audio")
-            if b64:
-                with open(out_path, "wb") as f:
-                    f.write(base64.b64decode(b64))
-                return out_path
-            print(f"ACE Music task completed but no audio field found: {list(data.keys())}")
-            return None
-        if status in ("failed", "FAILED", "ERROR", "error"):
-            print(f"ACE Music task failed: {data}")
+        entries = resp.json().get("data", [])
+        if not entries:
+            time.sleep(interval)
+            waited += interval
+            continue
+        entry = entries[0]
+        status = entry.get("status")
+        if status == 1:
+            result_list = json.loads(entry.get("result", "[]"))
+            if not result_list or not result_list[0].get("file"):
+                print(f"ACE Music task succeeded but no file in result: {result_list}")
+                return None
+            file_path = result_list[0]["file"]
+            audio_resp = requests.get(f"{ACE_MUSIC_BASE}{file_path}", timeout=60)
+            audio_resp.raise_for_status()
+            with open(out_path, "wb") as f:
+                f.write(audio_resp.content)
+            return out_path
+        if status == 2:
+            print(f"ACE Music task failed: {entry}")
             return None
         time.sleep(interval)
         waited += interval
-    print(f"ACE Music job {job_id} timed out after {max_wait}s")
+    print(f"ACE Music task {task_id} timed out after {max_wait}s")
     return None
 
 
 def generate_background_music(prompt, duration, out_path):
-    """Generates the episode's background score via POST /v1/music/generate,
-    which returns a job_id polled via GET /v1/jobs/{job_id}. Fails
-    gracefully: returns None instead of crashing the whole video."""
+    """Generates the episode's background score via POST /release_task,
+    polled via POST /query_result. Fails gracefully: returns None instead
+    of crashing the whole video."""
     if not ACE_MUSIC_API_KEY:
         print("No ACE_MUSIC_API_KEY set - skipping background music.")
         return None
     try:
         resp = requests.post(
-            f"{ACE_MUSIC_BASE}/v1/music/generate",
+            f"{ACE_MUSIC_BASE}/release_task",
             headers=ACE_MUSIC_HEADERS,
             json={
                 "prompt": prompt,
-                "duration": min(int(duration) + 5, 600),
-                "instrumental": True,
+                "audio_duration": max(10, min(int(duration) + 5, 600)),
+                "thinking": True,
             },
-            timeout=120,
+            timeout=60,
         )
         if resp.status_code >= 400:
             print(f"ACE MUSIC ERROR {resp.status_code}: {resp.text}")
             print("Continuing without background music - check the error above and fix the endpoint/fields.")
             return None
-        data = resp.json()
-
-        audio_url = data.get("audio_url") or data.get("url")
-        if audio_url:
-            download_file(audio_url, out_path)
-            return out_path
-
-        b64 = data.get("audio_base64") or data.get("audio")
-        if b64:
-            with open(out_path, "wb") as f:
-                f.write(base64.b64decode(b64))
-            return out_path
-
-        job_id = data.get("job_id") or data.get("task_id") or data.get("id") or data.get("request_id")
-        if job_id:
-            return poll_ace_music_task(job_id, out_path)
-
-        print(f"ACE Music response had no recognizable audio field: {list(data.keys())}")
-        return None
+        task_id = resp.json().get("data", {}).get("task_id")
+        if not task_id:
+            print(f"ACE Music response had no task_id: {resp.json()}")
+            return None
+        return poll_ace_music_task(task_id, out_path)
     except Exception as e:
         print(f"ACE Music generation raised an exception, continuing without background score: {e}")
         return None
@@ -461,18 +422,10 @@ def search_freesound_sfx(query, out_path):
         return None
 
 
-def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration, clip_audio=None):
-    """Composites up to 4 audio layers: narration (full volume), looped
-    background score (ducked), per-shot SFX at their exact timestamps, and
-    Agnes's own embedded clip ambience (ducked) so it survives assembly
-    instead of being silently discarded."""
+def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration):
+    """Composites 3 audio layers: narration (full volume), looped background
+    score (ducked), and per-shot SFX placed at their exact timestamps."""
     layers = [AudioFileClip(narration_path)]
-
-    if clip_audio is not None:
-        try:
-            layers.append(clip_audio.with_volume_scaled(AMBIENT_VOLUME))
-        except Exception as e:
-            print(f"Could not include original clip ambience, continuing without it: {e}")
 
     if music_mood:
         music_path = "/tmp/background_music.mp3"
@@ -499,35 +452,28 @@ def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_
 
 
 def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot_list, shot_durations, output_path):
-    # Extend the final shot slightly so the video doesn't cut the instant
-    # narration ends - gives the last line room to land before it's over.
-    video_durations = list(shot_durations)
-    video_durations[-1] += TAIL_SECONDS
-
     clips = []
     for i, url in enumerate(video_urls):
         raw_path = f"/tmp/final_shot_{i:03d}.mp4"
         download_file(url, raw_path)
         clip = VideoFileClip(raw_path)
         clip = clip.resized(new_size=(WIDTH, HEIGHT))
-        clip = fit_clip_to_duration(clip, video_durations[i])
+        clip = fit_clip_to_duration(clip, shot_durations[i])
         clips.append(clip)
 
-    total_duration = sum(video_durations)
-    shot_starts = compute_shot_start_times(shot_durations)  # SFX timing stays tied to narration pacing
-
-    concatenated = concatenate_videoclips(clips, method="compose")
-
-    # Capture Agnes's own embedded clip audio BEFORE it gets overwritten below,
-    # so it can be blended in as ambience instead of thrown away.
-    original_clip_audio = concatenated.audio
-
+    total_duration = sum(shot_durations)
+    shot_starts = compute_shot_start_times(shot_durations)
     final_audio = build_audio_mix(
-        narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration,
-        clip_audio=original_clip_audio,
+        narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration
     )
 
-    final = concatenated.with_audio(final_audio)
+    final_audio = final_audio.with_effects(
+        [AudioFadeIn(FADE_IN_SECONDS), AudioFadeOut(FADE_OUT_SECONDS)]
+    )
+
+    final = concatenate_videoclips(clips, method="compose")
+    final = final.with_effects([FadeIn(FADE_IN_SECONDS), FadeOut(FADE_OUT_SECONDS)])
+    final = final.with_audio(final_audio)
     target_bitrate = compute_target_bitrate(total_duration)
     print(f"Target video bitrate: {target_bitrate} (duration {total_duration:.1f}s)")
     final.write_videofile(
@@ -599,15 +545,23 @@ def main():
 
     verified_urls = []
     for i, url in enumerate(video_urls):
-        try:
-            head = requests.head(url, timeout=30)
-            if head.status_code == 200:
-                verified_urls.append(url)
-            else:
-                print(f"Clip {i} failed verification (status {head.status_code}), will regenerate: {url}")
-                break
-        except requests.RequestException as e:
-            print(f"Clip {i} failed verification ({e}), will regenerate: {url}")
+        verified = False
+        last_error = None
+        for attempt in range(CLIP_VERIFY_RETRIES):
+            try:
+                head = requests.head(url, timeout=30)
+                if head.status_code == 200:
+                    verified = True
+                    break
+                last_error = f"status {head.status_code}"
+            except requests.RequestException as e:
+                last_error = str(e)
+            if attempt < CLIP_VERIFY_RETRIES - 1:
+                time.sleep(CLIP_VERIFY_RETRY_WAIT)
+        if verified:
+            verified_urls.append(url)
+        else:
+            print(f"Clip {i} failed verification after {CLIP_VERIFY_RETRIES} attempts ({last_error}), will regenerate: {url}")
             break
 
     if len(verified_urls) != len(video_urls):
@@ -623,7 +577,7 @@ def main():
         audio_path += ".mp3" if script["narration_url"].endswith(".mp3") else ".wav"
         download_file(script["narration_url"], audio_path)
         audio_clip = AudioFileClip(audio_path)
-        shot_durations = compute_shot_durations(shot_list, audio_clip.duration, script.get("shot_durations"))
+        shot_durations = compute_shot_durations(shot_list, audio_clip.duration)
 
         batch_end = min(next_index + CLIP_BATCH_LIMIT, total_shots)
         print(f"Resuming from shot {next_index + 1}/{total_shots} ({len(video_urls)} already done) - generating up to shot {batch_end} this run")
@@ -632,7 +586,16 @@ def main():
             shot = shot_list[i]
             raw_path = f"/tmp/shot_{i:03d}.mp4"
             print(f"Generating shot {i+1}/{total_shots} (~{shot_durations[i]:.1f}s)...")
-            generate_shot_clip(shot, shot_durations[i], raw_path)
+            try:
+                generate_shot_clip(shot, shot_durations[i], raw_path)
+            except ContentPolicyRejection as e:
+                print(f"CONTENT POLICY REJECTION on shot {i+1}/{total_shots}: {e}")
+                print(f"Rejected visual_description: {shot.get('visual_description', '')!r}")
+                print(f"FIX: reword shot_list[{i}].visual_description for script {script_id} in the "
+                      f"scripts table to remove graphic/explicit language, keeping the narrative "
+                      f"beat but describing it less literally. Then re-run this workflow - it will "
+                      f"resume from exactly this shot, no other data is affected.")
+                raise
 
             clip_url = upload_clip(script_id, i, raw_path)
             video_urls.append(clip_url)
@@ -652,7 +615,7 @@ def main():
         audio_path += ".mp3" if script["narration_url"].endswith(".mp3") else ".wav"
         download_file(script["narration_url"], audio_path)
         audio_clip = AudioFileClip(audio_path)
-        shot_durations = compute_shot_durations(shot_list, audio_clip.duration, script.get("shot_durations"))
+        shot_durations = compute_shot_durations(shot_list, audio_clip.duration)
 
         output_path = "/tmp/final_video.mp4"
         assemble_final_video(script_id, video_urls, audio_path, music_mood, shot_list, shot_durations, output_path)
