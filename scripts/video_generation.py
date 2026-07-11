@@ -20,12 +20,20 @@ limit, 500/502/503/504 server-side issues) with backoff before giving up,
 so a single flaky Agnes response doesn't kill the whole run.
 
 AMBIENCE-PRESERVING: Agnes generates each clip with its own embedded
-ambient sound/music baked in by the model. Previous versions of this
-script threw that away entirely via final.with_audio(final_audio), which
-REPLACES a clip's audio rather than blending it. Now the original
-concatenated clip audio is captured before that overwrite and mixed in
-as a low ambient layer, so real Agnes-generated ambience survives into
-the final video even when ACE_MUSIC_API_KEY/FREESOUND_API_KEY aren't set.
+ambient sound/music baked in by the model. The original concatenated clip
+audio is captured before final.with_audio() would otherwise overwrite it,
+and mixed in as a low ambient layer alongside narration/music/SFX.
+
+PACED ENDING: the final shot is held ~TAIL_SECONDS longer than narration
+requires, so the episode doesn't cut the instant the last line of
+narration ends - music and visuals get a moment to settle first.
+
+NO-REPEAT TAIL FIX: fit_clip_to_duration used to fill a duration deficit
+by looping the WHOLE clip from frame 0 - meaning the last fraction of a
+second of a shot could visibly repeat that same shot's own opening
+footage. It now trims a small safety margin off each clip's tail first,
+then fills any remaining deficit with a frozen last-frame hold instead
+of a loop - no repeated footage is ever visible.
 """
 
 import os
@@ -75,9 +83,14 @@ MAX_FRAMES = 169  # 8*21+1, ~7s
 
 CLIP_BATCH_LIMIT = 8  # max new clips generated per run - stay under Agnes's free-tier quota
 
-MUSIC_VOLUME = 0.18
-SFX_VOLUME = 0.85
-AMBIENT_VOLUME = 0.35  # Agnes's own embedded clip audio, kept quiet under narration
+MUSIC_VOLUME = 0.30
+SFX_VOLUME = 0.95
+AMBIENT_VOLUME = 0.42
+
+TAIL_SECONDS = 2.5  # extra seconds held on the final shot past narration's end
+
+END_TRIM_SECONDS = 0.4     # trimmed off every raw clip's tail before fitting
+MIN_CLIP_SAFETY = 0.5      # never trim a clip shorter than this
 
 AGNES_RETRYABLE_CODES = {429, 500, 502, 503, 504}
 AGNES_MAX_RETRIES = 4
@@ -216,11 +229,22 @@ def generate_shot_clip(shot, target_duration, out_path):
 
 
 def fit_clip_to_duration(clip, target):
+    """Trims a small safety margin off the clip's tail first (Agnes clips
+    occasionally degrade or repeat content right at the very end), then
+    fills any remaining deficit with a frozen last-frame hold - NEVER by
+    looping the clip from frame 0, which would visibly replay that same
+    shot's own opening footage."""
+    trimmed_duration = max(clip.duration - END_TRIM_SECONDS, MIN_CLIP_SAFETY)
+    if trimmed_duration < clip.duration:
+        clip = clip.subclipped(0, trimmed_duration)
+
     if clip.duration >= target:
         return clip.subclipped(0, target)
-    reps = int(target // clip.duration) + 1
-    looped = concatenate_videoclips([clip] * reps)
-    return looped.subclipped(0, target)
+
+    deficit = target - clip.duration
+    freeze_frame = clip.to_ImageClip(t=max(clip.duration - 0.04, 0)).with_duration(deficit)
+    freeze_frame = freeze_frame.with_fps(FRAME_RATE)
+    return concatenate_videoclips([clip, freeze_frame])
 
 
 def fit_audio_to_duration(audio_clip, target):
@@ -447,17 +471,22 @@ def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_
 
 
 def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot_list, shot_durations, output_path):
+    # Extend the final shot slightly so the video doesn't cut the instant
+    # narration ends - gives the last line room to land before it's over.
+    video_durations = list(shot_durations)
+    video_durations[-1] += TAIL_SECONDS
+
     clips = []
     for i, url in enumerate(video_urls):
         raw_path = f"/tmp/final_shot_{i:03d}.mp4"
         download_file(url, raw_path)
         clip = VideoFileClip(raw_path)
         clip = clip.resized(new_size=(WIDTH, HEIGHT))
-        clip = fit_clip_to_duration(clip, shot_durations[i])
+        clip = fit_clip_to_duration(clip, video_durations[i])
         clips.append(clip)
 
-    total_duration = sum(shot_durations)
-    shot_starts = compute_shot_start_times(shot_durations)
+    total_duration = sum(video_durations)
+    shot_starts = compute_shot_start_times(shot_durations)  # SFX timing stays tied to narration pacing
 
     concatenated = concatenate_videoclips(clips, method="compose")
 
