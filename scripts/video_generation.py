@@ -34,6 +34,15 @@ second of a shot could visibly repeat that same shot's own opening
 footage. It now trims a small safety margin off each clip's tail first,
 then fills any remaining deficit with a frozen last-frame hold instead
 of a loop - no repeated footage is ever visible.
+
+TIMEOUT-SAFE: generate_shot_clip retries with a brand-new Agnes task
+(not just re-polling the same stuck one) if a shot times out, instead of
+killing the whole run and forcing a manual re-trigger.
+
+SYNC-ACCURATE: compute_shot_durations uses real per-shot narration audio
+duration (captured during narration synthesis) when available, instead
+of estimating from character count - which ignores inter-sentence pauses
+and drifts out of sync on longer scripts.
 """
 
 import os
@@ -215,17 +224,27 @@ def poll_agnes_task(video_id, max_wait=300, interval=10):
     raise RuntimeError(f"Agnes generation timed out after {max_wait}s for video_id {video_id}")
 
 
-def generate_shot_clip(shot, target_duration, out_path):
+def generate_shot_clip(shot, target_duration, out_path, max_timeout_retries=2):
     prompt = build_agnes_prompt(shot)
     raw_frames = int(target_duration * FRAME_RATE)
     raw_frames = max(MIN_FRAMES, min(MAX_FRAMES, raw_frames))
     num_frames = round_to_valid_frames(raw_frames)
     num_frames = max(MIN_FRAMES, min(MAX_FRAMES, num_frames))
 
-    video_id = create_agnes_task(prompt, num_frames)
-    video_url = poll_agnes_task(video_id)
-    download_file(video_url, out_path)
-    return out_path
+    last_error = None
+    for attempt in range(1, max_timeout_retries + 2):
+        try:
+            video_id = create_agnes_task(prompt, num_frames)
+            video_url = poll_agnes_task(video_id)
+            download_file(video_url, out_path)
+            return out_path
+        except RuntimeError as e:
+            last_error = e
+            if "timed out" in str(e) and attempt <= max_timeout_retries:
+                print(f"Shot generation timed out (attempt {attempt}/{max_timeout_retries}), retrying with a fresh task...")
+                continue
+            raise
+    raise last_error
 
 
 def fit_clip_to_duration(clip, target):
@@ -285,7 +304,16 @@ def save_progress(script_id, video_urls, next_index):
     resp.raise_for_status()
 
 
-def compute_shot_durations(shot_list, total_duration):
+def compute_shot_durations(shot_list, total_duration, real_shot_durations=None):
+    """Uses real per-shot narration timing (captured during narration
+    synthesis) when available - this is exact, since it comes from
+    Kokoro's actual audio output including pauses. Falls back to a
+    character-count estimate for older scripts narrated before this was
+    tracked, which does NOT account for the 1-2s pause inserted after
+    every sentence and drifts out of sync on longer scripts."""
+    if real_shot_durations and len(real_shot_durations) == len(shot_list):
+        return list(real_shot_durations)
+
     weights = [max(len(s.get("narration_excerpt", "")), 20) for s in shot_list]
     total_weight = sum(weights)
     return [(weight / total_weight) * total_duration for weight in weights]
@@ -595,7 +623,7 @@ def main():
         audio_path += ".mp3" if script["narration_url"].endswith(".mp3") else ".wav"
         download_file(script["narration_url"], audio_path)
         audio_clip = AudioFileClip(audio_path)
-        shot_durations = compute_shot_durations(shot_list, audio_clip.duration)
+        shot_durations = compute_shot_durations(shot_list, audio_clip.duration, script.get("shot_durations"))
 
         batch_end = min(next_index + CLIP_BATCH_LIMIT, total_shots)
         print(f"Resuming from shot {next_index + 1}/{total_shots} ({len(video_urls)} already done) - generating up to shot {batch_end} this run")
@@ -624,7 +652,7 @@ def main():
         audio_path += ".mp3" if script["narration_url"].endswith(".mp3") else ".wav"
         download_file(script["narration_url"], audio_path)
         audio_clip = AudioFileClip(audio_path)
-        shot_durations = compute_shot_durations(shot_list, audio_clip.duration)
+        shot_durations = compute_shot_durations(shot_list, audio_clip.duration, script.get("shot_durations"))
 
         output_path = "/tmp/final_video.mp4"
         assemble_final_video(script_id, video_urls, audio_path, music_mood, shot_list, shot_durations, output_path)
