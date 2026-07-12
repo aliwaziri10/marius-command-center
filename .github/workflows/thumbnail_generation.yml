@@ -1,6 +1,8 @@
 name: Thumbnail Generation
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '*/10 * * * *'
 concurrency:
   group: thumbnail-generation
   cancel-in-progress: false
