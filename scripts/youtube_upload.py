@@ -72,7 +72,7 @@ def get_topic_title(topic_id):
     )
     resp.raise_for_status()
     rows = resp.json()
-    return rows[0]["title"] if rows else "Forgotten Names"
+    return rows[0]["title"] if rows else "Erased"
 
 
 def download_file(url, out_path):
@@ -85,7 +85,12 @@ def download_file(url, out_path):
 
 def build_description(narration_text):
     snippet = (narration_text or "").strip()[:1500]
-    return f"{snippet}\n\n#history #documentary #forgottennames"
+    return (
+        f"{snippet}\n\n"
+        f"If this story moved you, subscribe - every episode of Erased "
+        f"brings back a name history tried to bury.\n\n"
+        f"#erased #history #documentary"
+    )
 
 
 def upload_to_youtube(access_token, video_path, title, description):
