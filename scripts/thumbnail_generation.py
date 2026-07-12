@@ -1,23 +1,27 @@
 """
 Marius Command Center - Thumbnail Generation Agent
 Picks the oldest script that has a finished video but no thumbnail yet,
-generates a vibrant, high-contrast background image (same Pollinations.ai
-source used by image_generation.py, for consistency), overlays bold hook
-text via Pillow (text is composited locally, not AI-rendered, since AI
-image models render text unreliably), and uploads the result to the
-'thumbnails' bucket.
+pulls a real frame directly out of that finished video as the background
+(the same idea YouTube Studio's own auto-suggested thumbnails use - an
+actual frame from the footage, not an unrelated AI-generated image),
+overlays bold hook text via Pillow (text is composited locally, not
+AI-rendered, since AI image models render text unreliably), and uploads
+the result to the 'thumbnails' bucket.
 
 HOOK TEXT SOURCE: uses the script's own hook_text column if present.
 Falls back to shot 1's narration_excerpt (the "STAKE" fact - see the
 OPENING HOOK structure in script_writing.py's prompt) trimmed to a legible
 thumbnail length, for older scripts written before hook_text existed.
 
-CANVAS-SAFE: Pollinations.ai doesn't always return an image at exactly
-the requested width/height. The downloaded image is force-fit to the
-exact target canvas (cover-crop resize: scale to fill, then center-crop,
-no stretching) before any text layout happens, so the overlay math is
-always working against the real image dimensions - otherwise text sized
-for an assumed-wider canvas can overflow a narrower real one.
+PHRASE-PER-LINE: hook_text is written as short punctuation-separated
+fragments (e.g. "312 DIARIES. ONE BOMB. GONE IN SECONDS."). Each fragment
+gets its own line rather than being greedily word-wrapped across lines,
+so the layout reads the way it was written.
+
+CANVAS-SAFE: the extracted video frame is force-fit to the exact target
+canvas (cover-crop resize: scale to fill, then center-crop, no
+stretching) before any text layout happens, so the overlay math is
+always working against the real image dimensions.
 
 LIVE-VIDEO PUSH: if the script this runs on is already 'uploaded' (has a
 youtube_video_id), the freshly generated thumbnail is also pushed directly
@@ -26,12 +30,13 @@ see push_thumbnail_to_youtube().
 """
 
 import os
+import re
 import sys
 import json
-import urllib.parse
 import requests
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
+from moviepy import VideoFileClip
 from supabase import create_client
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
@@ -47,53 +52,52 @@ YOUTUBE_REFRESH_TOKEN = os.environ.get("YOUTUBE_REFRESH_TOKEN")
 YOUTUBE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 YOUTUBE_THUMBNAIL_SET_URL = "https://www.googleapis.com/upload/youtube/v3/thumbnails/set"
 
-POLLINATIONS_BASE = "https://image.pollinations.ai/prompt"
 IMAGE_WIDTH = 1280
 IMAGE_HEIGHT = 720
+FRAME_FRACTION = 0.2  # pull the background frame from 20% into the episode -
+                       # past the cold-open beat, before it settles into
+                       # slower narrative shots
 
 FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 MAX_HOOK_CHARS = 60  # keeps overlay text legible at thumbnail size
 
-MAX_FONT_SIZE = 88
-MIN_FONT_SIZE = 40
-FONT_SIZE_STEP = 4
+MAX_FONT_SIZE = 44   # was 88 - cut 50% per feedback, text was overwhelming the frame
+MIN_FONT_SIZE = 20   # was 40 - cut 50%
+FONT_SIZE_STEP = 2
 TEXT_MARGIN = 48
-LINE_SPACING = 12
-STROKE_WIDTH = 6
+LINE_SPACING = 10
+STROKE_WIDTH = 3     # was 6 - scaled down with the smaller font
 TEXT_COLOR = (255, 214, 0)       # high-visibility yellow, reads well on any bg
 STROKE_COLOR = (0, 0, 0)
-MAX_TEXT_BLOCK_HEIGHT = int(IMAGE_HEIGHT * 0.42)  # cap how much vertical space text can take
+MAX_TEXT_BLOCK_HEIGHT = int(IMAGE_HEIGHT * 0.20)  # was 0.42 - text now takes
+                                                   # a fifth of the frame, not
+                                                   # nearly half
 
 
-def generate_background_image(prompt, seed=0):
-    """Same Pollinations.ai call pattern as image_generation.py, with a
-    thumbnail-specific style boost tuned for high click-through: vivid,
-    saturated color rather than a desaturated/moody grade, since
-    high-contrast color thumbnails consistently outperform grayscale or
-    muted ones on YouTube."""
-    styled_prompt = (
-        f"{prompt}, cinematic YouTube thumbnail, vivid saturated colors, "
-        f"bold dramatic lighting, high contrast, punchy color grade, sharp focus"
-    )
-    encoded_prompt = urllib.parse.quote(styled_prompt)
-    url = f"{POLLINATIONS_BASE}/{encoded_prompt}"
-    params = {
-        "width": IMAGE_WIDTH,
-        "height": IMAGE_HEIGHT,
-        "seed": seed,
-        "nologo": "true",
-    }
-    r = requests.get(url, params=params, timeout=60)
+def download_video_frame(video_url, fraction=FRAME_FRACTION):
+    """Downloads the finished episode video and grabs a real frame from it
+    to use as the thumbnail background - the same approach YouTube
+    Studio's auto-suggested thumbnails use. Looks far more coherent than a
+    separately AI-generated background with no relation to the actual
+    footage."""
+    tmp_path = "/tmp/thumb_source.mp4"
+    r = requests.get(video_url, timeout=120)
     r.raise_for_status()
-    return r.content
+    with open(tmp_path, "wb") as f:
+        f.write(r.content)
+
+    clip = VideoFileClip(tmp_path)
+    t = max(0.0, min(clip.duration * fraction, clip.duration - 0.1))
+    frame = clip.get_frame(t)
+    clip.close()
+    os.remove(tmp_path)
+    return Image.fromarray(frame).convert("RGB")
 
 
 def resize_to_canvas(img, target_w, target_h):
     """Force-fits img to exactly (target_w, target_h) via a cover-crop:
     scale up/down so the image fully covers the target box, then crop
-    the center - no stretching or distortion. Needed because Pollinations
-    doesn't always honor the requested width/height, and the text overlay
-    math below assumes the canvas is exactly IMAGE_WIDTH x IMAGE_HEIGHT."""
+    the center - no stretching or distortion."""
     src_w, src_h = img.size
     if (src_w, src_h) == (target_w, target_h):
         return img
@@ -123,6 +127,15 @@ def derive_hook_text(script, shot_list):
     return ""
 
 
+def split_into_phrase_lines(text):
+    """Splits hook text on sentence-ending punctuation so each written
+    fragment ("312 DIARIES." / "ONE BOMB." / "GONE IN SECONDS.") becomes
+    its own line, instead of letting greedy word-wrap recombine them
+    however the width happens to allow."""
+    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    return [p.strip() for p in parts if p.strip()]
+
+
 def _line_bbox(draw, text, font):
     """Bounding box that includes the stroke outline, so width/height
     measurements match what actually gets rendered."""
@@ -130,9 +143,8 @@ def _line_bbox(draw, text, font):
 
 
 def wrap_text(text, font, draw, max_width):
-    """Greedy word wrap. If a single word is still wider than max_width
-    on its own, it's kept on its own line rather than silently overflowing
-    - the caller is responsible for shrinking the font until it fits."""
+    """Greedy word wrap, used as a fallback within a single phrase if
+    that phrase alone is still too wide for the frame."""
     words = text.split()
     lines = []
     current = ""
@@ -151,7 +163,6 @@ def wrap_text(text, font, draw, max_width):
 
 def fits(lines, font, draw, max_width, max_height):
     max_line_width = 0
-    total_height = 0
     line_heights = []
     for line in lines:
         bbox = _line_bbox(draw, line, font)
@@ -164,30 +175,37 @@ def fits(lines, font, draw, max_width, max_height):
 
 
 def fit_text_to_frame(hook_text, draw, max_width, max_height):
-    """Try progressively smaller font sizes until the wrapped text fits
-    entirely within the available width/height, so text can never be cut
-    off at the edges. Falls back to the smallest size (still wrapped) if
-    nothing fits perfectly, rather than overflowing."""
+    """Try progressively smaller font sizes until the phrase-per-line
+    text fits entirely within the available width/height. Each written
+    phrase is kept on its own line; a phrase only gets word-wrapped
+    further if it's still too wide on its own at the current size."""
     text = hook_text.upper()
+    phrases = split_into_phrase_lines(text) or [text]
     size = MAX_FONT_SIZE
     while size >= MIN_FONT_SIZE:
         font = ImageFont.truetype(FONT_PATH, size)
-        lines = wrap_text(text, font, draw, max_width)
+        lines = []
+        for phrase in phrases:
+            lines.extend(wrap_text(phrase, font, draw, max_width))
         if fits(lines, font, draw, max_width, max_height):
             return font, lines
         size -= FONT_SIZE_STEP
 
     font = ImageFont.truetype(FONT_PATH, MIN_FONT_SIZE)
-    lines = wrap_text(text, font, draw, max_width)
+    lines = []
+    for phrase in phrases:
+        lines.extend(wrap_text(phrase, font, draw, max_width))
     return font, lines
 
 
-def overlay_hook_text(image_bytes, hook_text):
-    if not hook_text:
-        return image_bytes
-
-    img = Image.open(BytesIO(image_bytes)).convert("RGB")
+def overlay_hook_text(img, hook_text):
     img = resize_to_canvas(img, IMAGE_WIDTH, IMAGE_HEIGHT)
+
+    if not hook_text:
+        out = BytesIO()
+        img.save(out, format="JPEG", quality=92)
+        return out.getvalue()
+
     draw = ImageDraw.Draw(img)
 
     max_text_width = IMAGE_WIDTH - (TEXT_MARGIN * 2)
@@ -292,20 +310,16 @@ def main():
 
     print(f"Generating thumbnail for script id={script_id}")
 
-    if not shot_list:
-        print("No shot_list found. Cannot generate thumbnail. Exiting.")
+    video_url = script.get("video_url")
+    if not video_url:
+        print("Script has no finished video yet. Cannot pull a thumbnail frame. Exiting.")
         return
 
-    background_prompt = shot_list[0].get("visual_description", "").strip()
-    if not background_prompt:
-        print("Shot 1 has no visual_description. Cannot generate thumbnail. Exiting.")
-        return
-
-    hook_text = derive_hook_text(script, shot_list)
+    hook_text = derive_hook_text(script, shot_list or [])
     print(f"Hook text: {hook_text!r}")
 
-    image_bytes = generate_background_image(background_prompt, seed=0)
-    final_bytes = overlay_hook_text(image_bytes, hook_text)
+    background_img = download_video_frame(video_url)
+    final_bytes = overlay_hook_text(background_img, hook_text)
 
     filename = f"{script_id}.jpg"
     supabase.storage.from_("thumbnails").upload(
