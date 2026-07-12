@@ -353,6 +353,15 @@ SOUND DESIGNER - audio requirements:
   "sfx_cue" to an empty string. Do not invent SFX for quiet or ordinary
   shots - use this field sparingly.
 
+  CALL TO ACTION: immediately after the emotional climax of the story and
+before the final reflective closing line, write one natural, in-voice
+sentence encouraging the viewer to like, subscribe, and share their own
+thoughts in the comments so more of these erased stories get told. This
+must NOT be a generic "smash that like button" line - write it in the
+tone and voice of this specific episode, using imagery or phrasing that
+echoes the story just told, and vary the wording from episode to episode.
+It is part of the narration_text itself, not a separate field.
+
 Return ONLY valid JSON, no other text, no markdown fences, in this exact
 format:
 
