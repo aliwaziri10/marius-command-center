@@ -18,6 +18,11 @@ exact target canvas (cover-crop resize: scale to fill, then center-crop,
 no stretching) before any text layout happens, so the overlay math is
 always working against the real image dimensions - otherwise text sized
 for an assumed-wider canvas can overflow a narrower real one.
+
+LIVE-VIDEO PUSH: if the script this runs on is already 'uploaded' (has a
+youtube_video_id), the freshly generated thumbnail is also pushed directly
+to the live YouTube video via thumbnails.set, not just saved to Supabase -
+see push_thumbnail_to_youtube().
 """
 
 import os
@@ -31,6 +36,16 @@ from supabase import create_client
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SECRET_KEY = os.environ["SUPABASE_SECRET_KEY"]
+
+# Only needed to push a regenerated thumbnail to an already-uploaded YouTube
+# video (see push_thumbnail_to_youtube below). Optional: if these aren't set,
+# that step is skipped and everything else still works normally.
+YOUTUBE_CLIENT_ID = os.environ.get("YOUTUBE_CLIENT_ID")
+YOUTUBE_CLIENT_SECRET = os.environ.get("YOUTUBE_CLIENT_SECRET")
+YOUTUBE_REFRESH_TOKEN = os.environ.get("YOUTUBE_REFRESH_TOKEN")
+
+YOUTUBE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+YOUTUBE_THUMBNAIL_SET_URL = "https://www.googleapis.com/upload/youtube/v3/thumbnails/set"
 
 POLLINATIONS_BASE = "https://image.pollinations.ai/prompt"
 IMAGE_WIDTH = 1280
@@ -204,6 +219,55 @@ def overlay_hook_text(image_bytes, hook_text):
     return out.getvalue()
 
 
+def push_thumbnail_to_youtube(youtube_video_id, image_bytes):
+    """Pushes a thumbnail directly to an already-live YouTube video.
+    youtube_upload.py only sets a thumbnail at the moment of upload - once
+    a script's status is 'uploaded', nothing else ever calls thumbnails.set
+    again. Without this, any thumbnail regenerated after upload (bug fixes,
+    quality improvements, a backfilled hook_text, etc.) sits unused in
+    Supabase forever while the live video keeps its original thumbnail.
+    Best-effort: failures here are logged but never raised, since the
+    thumbnail row in Supabase has already been updated successfully by the
+    time this runs, and a failed push shouldn't be treated as a fatal error."""
+    if not (YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET and YOUTUBE_REFRESH_TOKEN):
+        print("YouTube credentials not configured - skipping push to live video.")
+        return False
+
+    try:
+        token_resp = requests.post(
+            YOUTUBE_TOKEN_URL,
+            data={
+                "client_id": YOUTUBE_CLIENT_ID,
+                "client_secret": YOUTUBE_CLIENT_SECRET,
+                "refresh_token": YOUTUBE_REFRESH_TOKEN,
+                "grant_type": "refresh_token",
+            },
+            timeout=30,
+        )
+        token_resp.raise_for_status()
+        access_token = token_resp.json()["access_token"]
+
+        set_resp = requests.post(
+            f"{YOUTUBE_THUMBNAIL_SET_URL}?videoId={youtube_video_id}",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "image/jpeg",
+                "Content-Length": str(len(image_bytes)),
+            },
+            data=image_bytes,
+            timeout=60,
+        )
+        if set_resp.status_code >= 400:
+            print(f"YouTube thumbnail push failed ({set_resp.status_code}): {set_resp.text}")
+            return False
+
+        print(f"Pushed thumbnail directly to live YouTube video {youtube_video_id}.")
+        return True
+    except Exception as e:
+        print(f"YouTube thumbnail push failed: {e}")
+        return False
+
+
 def main():
     supabase = create_client(SUPABASE_URL, SUPABASE_SECRET_KEY)
 
@@ -253,6 +317,11 @@ def main():
     print(f"Uploaded thumbnail: {public_url}")
 
     supabase.table("scripts").update({"thumbnail_url": public_url}).eq("id", script_id).execute()
+
+    youtube_video_id = script.get("youtube_video_id")
+    if script.get("status") == "uploaded" and youtube_video_id:
+        push_thumbnail_to_youtube(youtube_video_id, final_bytes)
+
     print("Done.")
 
 
