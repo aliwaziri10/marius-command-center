@@ -47,6 +47,9 @@ from moviepy.audio.fx import AudioFadeIn, AudioFadeOut
 
 FADE_IN_SECONDS = 0.75
 FADE_OUT_SECONDS = 1.5
+TRAIL_SECONDS = 3.0  # extra hold at the very end so ambient/music keeps
+                      # breathing and fades out naturally instead of
+                      # cutting hard the instant narration ends
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
@@ -82,8 +85,8 @@ MAX_FRAMES = 169  # 8*21+1, ~7s
 
 CLIP_BATCH_LIMIT = 8  # max new clips generated per run - stay under Agnes's free-tier quota
 
-MUSIC_VOLUME = 0.18
-SFX_VOLUME = 0.85
+MUSIC_VOLUME = 0.198  # +10% from 0.18 - more present ambient/background bed
+SFX_VOLUME = 0.935    # +10% from 0.85 - more impactful sound effects
 
 AGNES_RETRYABLE_CODES = {429, 500, 502, 503, 504}
 AGNES_MAX_RETRIES = 4
@@ -238,11 +241,19 @@ def generate_shot_clip(shot, target_duration, out_path):
 
 
 def fit_clip_to_duration(clip, target):
+    """Fits a generated clip to its target duration. If the clip is
+    already long enough, trims it. If it's shorter, extends it by
+    freezing the last frame and holding it for the remaining time -
+    NOT by looping/repeating the clip from the start, which reads as an
+    obvious, jarring restart. A held final frame is invisible to the
+    viewer."""
     if clip.duration >= target:
         return clip.subclipped(0, target)
-    reps = int(target // clip.duration) + 1
-    looped = concatenate_videoclips([clip] * reps)
-    return looped.subclipped(0, target)
+
+    extra = target - clip.duration
+    freeze_frame = clip.to_ImageClip(t=max(clip.duration - 1 / FRAME_RATE, 0))
+    freeze_frame = freeze_frame.with_duration(extra).with_fps(FRAME_RATE)
+    return concatenate_videoclips([clip, freeze_frame])
 
 
 def fit_audio_to_duration(audio_clip, target):
@@ -616,6 +627,9 @@ def main():
         download_file(script["narration_url"], audio_path)
         audio_clip = AudioFileClip(audio_path)
         shot_durations = compute_shot_durations(shot_list, audio_clip.duration)
+        shot_durations[-1] += TRAIL_SECONDS  # hold the final shot a bit longer so
+                                              # the music/ambient bed fades out
+                                              # naturally instead of cutting off
 
         output_path = "/tmp/final_video.mp4"
         assemble_final_video(script_id, video_urls, audio_path, music_mood, shot_list, shot_durations, output_path)
