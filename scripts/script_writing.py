@@ -268,6 +268,15 @@ Write a complete 8-10 minute narration script (roughly 1200-1500 words) with
 this opening structure, a clear narrative arc through the rest of the story,
 and a reflective closing line.
 
+CALL TO ACTION: immediately after the emotional climax of the story and
+before the final reflective closing line, write one natural, in-voice
+sentence encouraging the viewer to like and subscribe so more of these
+erased stories get told. This must NOT be a generic "smash that like
+button" line - write it in the tone and voice of this specific episode,
+using imagery or phrasing that echoes the story just told, and vary the
+wording from episode to episode. It is part of the narration_text itself,
+not a separate field.
+
 THUMBNAIL HOOK TEXT - separate from the narration, also write a short,
 punchy line of thumbnail cover text that would make someone scrolling
 YouTube stop and click. This is NOT a narration sentence - it should read
