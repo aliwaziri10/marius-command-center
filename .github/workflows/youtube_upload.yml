@@ -1,6 +1,8 @@
 name: YouTube Upload
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
 concurrency:
   group: youtube-upload
   cancel-in-progress: false
