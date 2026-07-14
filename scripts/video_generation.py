@@ -28,6 +28,12 @@ fix), but the log names the exact shot index and its visual_description
 plus the fix (reword that shot's visual_description in the scripts
 table, then re-run - it resumes from that exact shot) so this is
 diagnosable without needing to read a raw traceback or loop in Claude.
+
+ACE-MUSIC-RESILIENT: ACE Music's free hosted API has had reported
+reliability issues (endpoint 404s/502s). generate_background_music now
+tries every host in ACE_MUSIC_BASES in order and only skips background
+music entirely if all of them fail, instead of giving up on the first
+error.
 """
 
 import os
@@ -70,7 +76,9 @@ AGNES_HEADERS = {
     "Content-Type": "application/json",
 }
 
-ACE_MUSIC_BASE = "https://api.acemusic.ai"
+# Try both known ACE Music hosts in order; only give up on background
+# music if every host in this list fails.
+ACE_MUSIC_BASES = ["https://api.acemusic.ai", "https://ai.acemusic.ai"]
 ACE_MUSIC_HEADERS = {
     "Authorization": f"Bearer {ACE_MUSIC_API_KEY}",
     "Content-Type": "application/json",
@@ -322,20 +330,25 @@ def compute_target_bitrate(duration_seconds, target_mb=42, audio_kbps=128):
 # Sound Designer: background score (ACE Music) + SFX (Freesound)
 # ---------------------------------------------------------------------------
 
-def poll_ace_music_task(task_id, out_path, max_wait=180, interval=8):
+def poll_ace_music_task(task_id, out_path, base_url=None, max_wait=180, interval=8):
     """Polls ACE Music task status via POST /query_result, per the real
     ACE-Step API (a task created by POST /release_task returns a task_id,
-    queried via POST task_id_list - not GET /v1/jobs/{job_id})."""
+    queried via POST task_id_list - not GET /v1/jobs/{job_id}).
+
+    base_url must be the same host that /release_task was called on -
+    passed in explicitly since generate_background_music now tries
+    multiple hosts and must poll/download from whichever one accepted
+    the task."""
     waited = 0
     while waited < max_wait:
         resp = requests.post(
-            f"{ACE_MUSIC_BASE}/query_result",
+            f"{base_url}/query_result",
             headers=ACE_MUSIC_HEADERS,
             json={"task_id_list": [task_id]},
             timeout=30,
         )
         if resp.status_code >= 400:
-            print(f"ACE MUSIC POLL ERROR {resp.status_code}: {resp.text}")
+            print(f"ACE MUSIC POLL ERROR ({base_url}) {resp.status_code}: {resp.text}")
             return None
         entries = resp.json().get("data", [])
         if not entries:
@@ -350,7 +363,7 @@ def poll_ace_music_task(task_id, out_path, max_wait=180, interval=8):
                 print(f"ACE Music task succeeded but no file in result: {result_list}")
                 return None
             file_path = result_list[0]["file"]
-            audio_resp = requests.get(f"{ACE_MUSIC_BASE}{file_path}", timeout=60)
+            audio_resp = requests.get(f"{base_url}{file_path}", timeout=60)
             audio_resp.raise_for_status()
             with open(out_path, "wb") as f:
                 f.write(audio_resp.content)
@@ -366,34 +379,42 @@ def poll_ace_music_task(task_id, out_path, max_wait=180, interval=8):
 
 def generate_background_music(prompt, duration, out_path):
     """Generates the episode's background score via POST /release_task,
-    polled via POST /query_result. Fails gracefully: returns None instead
-    of crashing the whole video."""
+    polled via POST /query_result. Tries every host in ACE_MUSIC_BASES in
+    order and only gives up (returns None, skipping music for this
+    episode) if every host fails - ACE Music's free hosted API has had
+    reported reliability issues on individual hosts, so a single 404/502
+    on one host should not silently kill background music forever."""
     if not ACE_MUSIC_API_KEY:
         print("No ACE_MUSIC_API_KEY set - skipping background music.")
         return None
-    try:
-        resp = requests.post(
-            f"{ACE_MUSIC_BASE}/release_task",
-            headers=ACE_MUSIC_HEADERS,
-            json={
-                "prompt": prompt,
-                "audio_duration": max(10, min(int(duration) + 5, 600)),
-                "thinking": True,
-            },
-            timeout=60,
-        )
-        if resp.status_code >= 400:
-            print(f"ACE MUSIC ERROR {resp.status_code}: {resp.text}")
-            print("Continuing without background music - check the error above and fix the endpoint/fields.")
-            return None
-        task_id = resp.json().get("data", {}).get("task_id")
-        if not task_id:
-            print(f"ACE Music response had no task_id: {resp.json()}")
-            return None
-        return poll_ace_music_task(task_id, out_path)
-    except Exception as e:
-        print(f"ACE Music generation raised an exception, continuing without background score: {e}")
-        return None
+
+    for base in ACE_MUSIC_BASES:
+        try:
+            resp = requests.post(
+                f"{base}/release_task",
+                headers=ACE_MUSIC_HEADERS,
+                json={
+                    "prompt": prompt,
+                    "audio_duration": max(10, min(int(duration) + 5, 600)),
+                    "thinking": True,
+                },
+                timeout=60,
+            )
+            if resp.status_code >= 400:
+                print(f"ACE MUSIC ERROR ({base}) {resp.status_code}: {resp.text}")
+                continue
+            task_id = resp.json().get("data", {}).get("task_id")
+            if not task_id:
+                print(f"ACE Music response had no task_id ({base}): {resp.json()}")
+                continue
+            result = poll_ace_music_task(task_id, out_path, base_url=base)
+            if result:
+                return result
+        except Exception as e:
+            print(f"ACE Music generation raised an exception on {base}, trying next host: {e}")
+
+    print("Continuing without background music - every ACE Music host failed this run.")
+    return None
 
 
 def search_freesound_sfx(query, out_path):
