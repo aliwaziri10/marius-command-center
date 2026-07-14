@@ -41,6 +41,7 @@ import json
 import time
 import base64
 import requests
+import numpy as np
 from moviepy import (
     VideoFileClip,
     AudioFileClip,
@@ -93,8 +94,12 @@ MAX_FRAMES = 169  # 8*21+1, ~7s
 
 CLIP_BATCH_LIMIT = 8  # max new clips generated per run - stay under Agnes's free-tier quota
 
-MUSIC_VOLUME = 0.198  # +10% from 0.18 - more present ambient/background bed
-SFX_VOLUME = 0.935    # +10% from 0.85 - more impactful sound effects
+MUSIC_VOLUME = 0.238  # +20% from 0.198 per Zarah's request - louder background score
+SFX_VOLUME = 1.0      # capped at source loudness - 0.935+20% would exceed 1.0 and risk clipping/distortion
+LIMITER_CEILING = 0.98  # safety cap on the fully mixed audio (narration + music + SFX
+                         # combined) - individual layer volumes staying under 1.0 doesn't
+                         # guarantee the mix does when loud moments overlap, so this checks
+                         # the actual mixed peak and scales down only if it would clip
 
 AGNES_RETRYABLE_CODES = {429, 500, 502, 503, 504}
 AGNES_MAX_RETRIES = 4
@@ -454,6 +459,37 @@ def search_freesound_sfx(query, out_path):
         return None
 
 
+def apply_safety_limiter(audio_clip, ceiling=LIMITER_CEILING):
+    """Checks the TRUE peak of the fully mixed audio (narration + music +
+    SFX layers all summed together, as they'll actually play back) and
+    scales the whole mix down only if that peak would exceed `ceiling`.
+
+    Individual layer volumes staying under 1.0 does not guarantee the
+    combined mix does - if narration, music, and an SFX cue all happen to
+    peak at the same instant, their amplitudes add together and can exceed
+    1.0 even though no single layer does on its own. That overshoot is
+    exactly what causes audible clipping/distortion. This checks the real
+    rendered peak instead of trusting the individual volume constants, and
+    only scales down (never up) so quiet mixes are left untouched.
+
+    Uses fps=44100 (CD-quality) for the peak scan - accurate enough to
+    catch true peaks without being so high-resolution it meaningfully
+    slows down the run."""
+    samples = audio_clip.to_soundarray(fps=44100)
+    peak = float(np.max(np.abs(samples))) if samples.size else 0.0
+
+    if peak <= 0:
+        print("Safety limiter: mixed audio is silent, nothing to scale.")
+        return audio_clip
+    if peak <= ceiling:
+        print(f"Safety limiter: peak was {peak:.3f} (ceiling {ceiling}), no scaling needed.")
+        return audio_clip
+
+    scale = ceiling / peak
+    print(f"Safety limiter: peak was {peak:.3f}, exceeds ceiling {ceiling} - scaling whole mix by {scale:.3f} to prevent clipping.")
+    return audio_clip.with_volume_scaled(scale)
+
+
 def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration):
     """Composites 3 audio layers: narration (full volume), looped background
     score (ducked), and per-shot SFX placed at their exact timestamps."""
@@ -480,7 +516,8 @@ def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_
             sfx_clip = sfx_clip.with_volume_scaled(SFX_VOLUME).with_start(shot_starts[i])
             layers.append(sfx_clip)
 
-    return CompositeAudioClip(layers)
+    mixed = CompositeAudioClip(layers)
+    return apply_safety_limiter(mixed)
 
 
 def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot_list, shot_durations, output_path):
