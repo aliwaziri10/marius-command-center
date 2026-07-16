@@ -1,6 +1,6 @@
 # Marius Status
-Updated: 2026-07-16 11:49 UTC
+Updated: 2026-07-16 13:24 UTC
 
 Topics: 54
-Scripts by status: archived=1, uploaded=6, images_generated=5, narrated=1
+Scripts by status: archived=1, uploaded=6, video_generated=1, images_generated=4, narrated=1
 Latest script: f86cea49 — narrated (0 clips)
