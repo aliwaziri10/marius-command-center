@@ -20,20 +20,12 @@ HEADERS = {
 }
 
 MAX_RETRIES = 4
-MIN_SHOTS = 35
-MAX_SHOTS = 55
+MIN_SHOTS = 60
+MAX_SHOTS = 85
 MAX_GENERATION_ATTEMPTS = 3
 MAX_HOOK_TEXT_CHARS = 40
-MAX_HOOK_TEXT_WORDS = 5  # researched YouTube best practice: top-performing
-                         # thumbnails consistently use 3-5 words - anything
-                         # longer stops being readable in a mobile-feed glance
+MAX_HOOK_TEXT_WORDS = 5
 
-# The exact example hook text shown in the prompt below. If the model ever
-# echoes this verbatim instead of writing a real one for the actual story,
-# validate_and_normalize() rejects it and generate_script() retries - this
-# is what caused a real video ("The Porter Who Carried Freedom") to get a
-# completely unrelated thumbnail hook ("312 DIARIES. ONE BOMB. GONE IN
-# SECONDS.") copied straight from the prompt's own example.
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 
 VALID_SHOT_TYPES = {
@@ -89,8 +81,6 @@ def call_openrouter(prompt):
 
 
 def extract_json(raw_text):
-    """Pull a JSON object out of model output even if it's wrapped in
-    markdown fences, extra commentary, or inconsistent formatting."""
     text = raw_text.strip()
 
     if "```" in text:
@@ -112,8 +102,6 @@ def extract_json(raw_text):
 
 
 def normalize_shot(shot, index):
-    """Fill in safe defaults for any missing/invalid fields so a flaky
-    free-model response never breaks video_generation.py downstream."""
     shot_type = shot.get("shot_type")
     if shot_type not in VALID_SHOT_TYPES:
         shot_type = "medium"
@@ -139,11 +127,6 @@ def normalize_shot(shot, index):
 
 
 def normalize_hook_text(result):
-    """hook_text is thumbnail copy, not narration - short, punchy, and
-    written to be read in under a second at thumbnail size. Falls back to
-    a trimmed version of the first shot's narration_excerpt if the model
-    didn't provide one, so downstream thumbnail generation always has
-    something usable."""
     hook_text = (result.get("hook_text") or "").strip()
     if hook_text:
         return hook_text[:MAX_HOOK_TEXT_CHARS].rstrip()
@@ -160,10 +143,6 @@ def normalize_hook_text(result):
 
 
 def hook_text_matches_prompt_example(hook_text):
-    """Catches the model copying the prompt's own 'Good' example verbatim
-    instead of writing a real hook for this story. Compares loosely
-    (lowercased, punctuation-insensitive) so minor formatting differences
-    from the model don't let a copy slip through."""
     def _simplify(s):
         return "".join(ch.lower() for ch in s if ch.isalnum())
 
@@ -171,20 +150,11 @@ def hook_text_matches_prompt_example(hook_text):
 
 
 def hook_text_too_long_to_glance(hook_text):
-    """A thumbnail gets about 2 seconds of attention while someone scrolls.
-    The character limit alone doesn't guarantee that - a dense 60-character
-    sentence can still be too slow to read at a glance. This checks word
-    count as a separate, stricter gate."""
     word_count = len(hook_text.split())
     return word_count > MAX_HOOK_TEXT_WORDS
 
 
 def hook_text_matches_story(hook_text, narration_text):
-    """Sanity check that the hook text is actually about this story, not a
-    leftover/copied line from a different one: requires at least one
-    meaningful (4+ letter) word from the hook to also appear in the
-    narration. A hook built from the story's own facts will always pass
-    this; a copied/hallucinated one almost never will."""
     if not hook_text or not narration_text:
         return False
 
@@ -193,13 +163,12 @@ def hook_text_matches_story(hook_text, narration_text):
     meaningful_words = [w for w in hook_words if len(w) >= 4]
 
     if not meaningful_words:
-        return True  # nothing meaningful to check, don't block on it
+        return True
 
     return any(w in narration_lower for w in meaningful_words)
 
 
 def validate_and_normalize(result):
-    """Returns (is_valid, normalized_result_or_error_reason)."""
     if "narration_text" not in result or not result["narration_text"].strip():
         return False, "missing narration_text"
 
@@ -270,12 +239,12 @@ and a reflective closing line.
 
 CALL TO ACTION: immediately after the emotional climax of the story and
 before the final reflective closing line, write one natural, in-voice
-sentence encouraging the viewer to like and subscribe so more of these
-erased stories get told. This must NOT be a generic "smash that like
-button" line - write it in the tone and voice of this specific episode,
-using imagery or phrasing that echoes the story just told, and vary the
-wording from episode to episode. It is part of the narration_text itself,
-not a separate field.
+sentence encouraging the viewer to like, subscribe, and share their own
+thoughts in the comments so more of these erased stories get told. This
+must NOT be a generic "smash that like button" line - write it in the
+tone and voice of this specific episode, using imagery or phrasing that
+echoes the story just told, and vary the wording from episode to episode.
+It is part of the narration_text itself, not a separate field.
 
 THUMBNAIL HOOK TEXT - separate from the narration, also write a short,
 punchy line of thumbnail cover text that would make someone scrolling
@@ -352,15 +321,6 @@ SOUND DESIGNER - audio requirements:
   sudden reveals, door slams, crowd roars). For all other shots, set
   "sfx_cue" to an empty string. Do not invent SFX for quiet or ordinary
   shots - use this field sparingly.
-
-  CALL TO ACTION: immediately after the emotional climax of the story and
-before the final reflective closing line, write one natural, in-voice
-sentence encouraging the viewer to like, subscribe, and share their own
-thoughts in the comments so more of these erased stories get told. This
-must NOT be a generic "smash that like button" line - write it in the
-tone and voice of this specific episode, using imagery or phrasing that
-echoes the story just told, and vary the wording from episode to episode.
-It is part of the narration_text itself, not a separate field.
 
 Return ONLY valid JSON, no other text, no markdown fences, in this exact
 format:
