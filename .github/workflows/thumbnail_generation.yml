@@ -6,6 +6,9 @@ on:
 concurrency:
   group: thumbnail-generation
   cancel-in-progress: false
+permissions:
+  contents: read
+  issues: write
 jobs:
   generate:
     runs-on: ubuntu-latest
@@ -29,3 +32,14 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: python scripts/thumbnail_generation.py
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "Thumbnail Generation workflow failed - run #${{ github.run_number }}" \
+            --body "The Thumbnail Generation workflow failed on $(date -u +%Y-%m-%dT%H:%M:%SZ).
+
+          Run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
