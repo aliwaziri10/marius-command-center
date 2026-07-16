@@ -460,4 +460,287 @@ def generate_background_music(prompt, duration, out_path):
             if result:
                 return result
         except Exception as e:
-            print(f"ACE Music generation raised an exception on {base}, trying next host
+            print(f"ACE Music generation raised an exception on {base}, trying next host: {e}")
+
+    print("Continuing without background music - every ACE Music host failed this run.")
+    return None
+
+
+def search_freesound_sfx(query, out_path):
+    """Finds and downloads a short SFX clip matching the cue. Returns None
+    (and logs) on any failure so a bad SFX cue never breaks the whole run."""
+    if not FREESOUND_API_KEY:
+        print("No FREESOUND_API_KEY set - skipping SFX for this cue.")
+        return None
+    try:
+        resp = requests.get(
+            "https://freesound.org/apiv2/search/text/",
+            params={
+                "query": query,
+                "token": FREESOUND_API_KEY,
+                "fields": "id,previews",
+                "filter": "duration:[0.1 TO 8]",
+                "sort": "score",
+                "page_size": 1,
+            },
+            timeout=30,
+        )
+        if resp.status_code >= 400:
+            print(f"FREESOUND ERROR {resp.status_code}: {resp.text}")
+            return None
+        results = resp.json().get("results", [])
+        if not results:
+            print(f"No Freesound results for cue: {query}")
+            return None
+        previews = results[0].get("previews", {})
+        preview_url = previews.get("preview-hq-mp3") or previews.get("preview-lq-mp3")
+        if not preview_url:
+            return None
+        download_file(preview_url, out_path)
+        return out_path
+    except Exception as e:
+        print(f"Freesound lookup failed for cue '{query}', skipping this SFX: {e}")
+        return None
+
+
+def apply_safety_limiter(audio_clip, ceiling=LIMITER_CEILING):
+    """Checks the TRUE peak of the fully mixed audio (narration + music +
+    SFX layers all summed together, as they'll actually play back) and
+    scales the whole mix down only if that peak would exceed `ceiling`.
+
+    Individual layer volumes staying under 1.0 does not guarantee the
+    combined mix does - if narration, music, and an SFX cue all happen to
+    peak at the same instant, their amplitudes add together and can exceed
+    1.0 even though no single layer does on its own. That overshoot is
+    exactly what causes audible clipping/distortion. This checks the real
+    rendered peak instead of trusting the individual volume constants, and
+    only scales down (never up) so quiet mixes are left untouched.
+
+    Uses fps=44100 (CD-quality) for the peak scan - accurate enough to
+    catch true peaks without being so high-resolution it meaningfully
+    slows down the run."""
+    samples = audio_clip.to_soundarray(fps=44100)
+    peak = float(np.max(np.abs(samples))) if samples.size else 0.0
+
+    if peak <= 0:
+        print("Safety limiter: mixed audio is silent, nothing to scale.")
+        return audio_clip
+    if peak <= ceiling:
+        print(f"Safety limiter: peak was {peak:.3f} (ceiling {ceiling}), no scaling needed.")
+        return audio_clip
+
+    scale = ceiling / peak
+    print(f"Safety limiter: peak was {peak:.3f}, exceeds ceiling {ceiling} - scaling whole mix by {scale:.3f} to prevent clipping.")
+    return audio_clip.with_volume_scaled(scale)
+
+
+def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration):
+    """Composites 3 audio layers: narration (full volume), looped background
+    score (ducked), and per-shot SFX placed at their exact timestamps."""
+    layers = [AudioFileClip(narration_path)]
+
+    if music_mood:
+        music_path = "/tmp/background_music.mp3"
+        if generate_background_music(music_mood, total_duration, music_path):
+            music_clip = AudioFileClip(music_path)
+            music_clip = fit_audio_to_duration(music_clip, total_duration)
+            music_clip = music_clip.with_volume_scaled(MUSIC_VOLUME)
+            layers.append(music_clip)
+
+    for i, shot in enumerate(shot_list):
+        cue = (shot.get("sfx_cue") or "").strip()
+        if not cue:
+            continue
+        sfx_path = f"/tmp/sfx_{i:03d}.mp3"
+        if search_freesound_sfx(cue, sfx_path):
+            sfx_clip = AudioFileClip(sfx_path)
+            max_len = shot_durations[i]
+            if sfx_clip.duration > max_len:
+                sfx_clip = sfx_clip.subclipped(0, max_len)
+            sfx_clip = sfx_clip.with_volume_scaled(SFX_VOLUME).with_start(shot_starts[i])
+            layers.append(sfx_clip)
+
+    mixed = CompositeAudioClip(layers)
+    return apply_safety_limiter(mixed)
+
+
+def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot_list, shot_durations, output_path):
+    clips = []
+    for i, url in enumerate(video_urls):
+        raw_path = f"/tmp/final_shot_{i:03d}.mp4"
+        download_file(url, raw_path)
+        clip = VideoFileClip(raw_path)
+        clip = clip.resized(new_size=(WIDTH, HEIGHT))
+        clip = fit_clip_to_duration(clip, shot_durations[i])
+        clips.append(clip)
+
+    total_duration = sum(shot_durations)
+    shot_starts = compute_shot_start_times(shot_durations)
+    final_audio = build_audio_mix(
+        narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration
+    )
+
+    final_audio = final_audio.with_effects(
+        [AudioFadeIn(FADE_IN_SECONDS), AudioFadeOut(FADE_OUT_SECONDS)]
+    )
+
+    final = concatenate_videoclips(clips, method="compose")
+    final = final.with_effects([FadeIn(FADE_IN_SECONDS), FadeOut(FADE_OUT_SECONDS)])
+    final = final.with_audio(final_audio)
+    target_bitrate = compute_target_bitrate(total_duration)
+    print(f"Target video bitrate: {target_bitrate} (duration {total_duration:.1f}s)")
+    final.write_videofile(
+        output_path,
+        fps=FRAME_RATE,
+        codec="libx264",
+        audio_codec="aac",
+        audio_bitrate="128k",
+        bitrate=target_bitrate,
+        threads=2,
+        logger=None,
+    )
+    return output_path
+
+
+def upload_video(script_id, file_path):
+    file_name = f"{script_id}.mp4"
+    file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    print(f"Final video size: {file_size_mb:.1f}MB")
+    with open(file_path, "rb") as f:
+        file_bytes = f.read()
+
+    resp = requests.put(
+        f"{SUPABASE_URL}/storage/v1/object/{VIDEO_BUCKET}/{file_name}",
+        headers={
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "video/mp4",
+        },
+        data=file_bytes,
+        timeout=300,
+    )
+    if resp.status_code >= 400:
+        print(f"Upload failed - status {resp.status_code}: {resp.text}")
+    resp.raise_for_status()
+    return f"{SUPABASE_URL}/storage/v1/object/public/{VIDEO_BUCKET}/{file_name}"
+
+
+def mark_video_generated(script_id, video_url):
+    resp = requests.patch(
+        f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
+        headers=HEADERS,
+        json={"status": "video_generated", "video_url": video_url},
+        timeout=30,
+    )
+    resp.raise_for_status()
+
+
+def main():
+    script = get_next_ready_script()
+    if not script:
+        print("No scripts with images ready for video generation. Nothing to do.")
+        return
+    if not script.get("narration_url"):
+        print("Script has no narration_url yet. Skipping.")
+        return
+
+    script_id = script["id"]
+    print(f"Working on script {script_id}")
+
+    shot_list = script["shot_list"]
+    if isinstance(shot_list, str):
+        shot_list = json.loads(shot_list)
+    total_shots = len(shot_list)
+    music_mood = script.get("music_mood") or ""
+
+    video_urls = script.get("video_urls") or []
+    next_index = script.get("video_next_index") or 0
+
+    verified_urls = []
+    for i, url in enumerate(video_urls):
+        verified = False
+        last_error = None
+        for attempt in range(CLIP_VERIFY_RETRIES):
+            try:
+                head = requests.head(url, timeout=30)
+                if head.status_code == 200:
+                    verified = True
+                    break
+                last_error = f"status {head.status_code}"
+            except requests.RequestException as e:
+                last_error = str(e)
+            if attempt < CLIP_VERIFY_RETRIES - 1:
+                time.sleep(CLIP_VERIFY_RETRY_WAIT)
+        if verified:
+            verified_urls.append(url)
+        else:
+            print(f"Clip {i} failed verification after {CLIP_VERIFY_RETRIES} attempts ({last_error}), will regenerate: {url}")
+            break
+
+    if len(verified_urls) != len(video_urls):
+        video_urls = verified_urls
+        next_index = len(verified_urls)
+        save_progress(script_id, video_urls, next_index)
+        print(f"Corrected progress after verification: {next_index}/{total_shots} shots actually confirmed done")
+
+    if next_index >= total_shots:
+        print(f"All {total_shots} shots already generated, video_urls has {len(video_urls)} entries. Skipping to assembly check.")
+    else:
+        audio_path = "/tmp/narration_audio"
+        audio_path += ".mp3" if script["narration_url"].endswith(".mp3") else ".wav"
+        download_file(script["narration_url"], audio_path)
+        audio_clip = AudioFileClip(audio_path)
+        shot_durations = compute_shot_durations(shot_list, audio_clip.duration)
+
+        batch_end = min(next_index + CLIP_BATCH_LIMIT, total_shots)
+        print(f"Resuming from shot {next_index + 1}/{total_shots} ({len(video_urls)} already done) - generating up to shot {batch_end} this run")
+
+        for i in range(next_index, batch_end):
+            shot = shot_list[i]
+            raw_path = f"/tmp/shot_{i:03d}.mp4"
+            print(f"Generating shot {i+1}/{total_shots} (~{shot_durations[i]:.1f}s)...")
+            try:
+                generate_shot_clip(shot, shot_durations[i], raw_path)
+            except ContentPolicyRejection as e:
+                mark_content_flagged(script_id, i, str(e))
+                print(f"Rejected visual_description: {shot.get('visual_description', '')!r}")
+                print(f"FIX: reword shot_list[{i}].visual_description for script {script_id} in the "
+                      f"scripts table, then reset status to 'images_generated' to resume from exactly "
+                      f"this shot. Moving on to the next-oldest eligible script for now.")
+                return
+
+            clip_url = upload_clip(script_id, i, raw_path)
+            video_urls.append(clip_url)
+            save_progress(script_id, video_urls, i + 1)
+            print(f"Saved progress: {i + 1}/{total_shots} shots done")
+
+            os.remove(raw_path)
+            time.sleep(4)
+
+        if batch_end < total_shots:
+            print(f"Batch limit reached ({CLIP_BATCH_LIMIT} clips this run). {total_shots - batch_end} shots remain - resuming on the next scheduled run.")
+            return
+
+    if len(video_urls) >= total_shots:
+        print("All shots done. Assembling final video...")
+        audio_path = "/tmp/narration_audio_final"
+        audio_path += ".mp3" if script["narration_url"].endswith(".mp3") else ".wav"
+        download_file(script["narration_url"], audio_path)
+        audio_clip = AudioFileClip(audio_path)
+        shot_durations = compute_shot_durations(shot_list, audio_clip.duration)
+        shot_durations[-1] += TRAIL_SECONDS  # hold the final shot a bit longer so
+                                              # the music/ambient bed fades out
+                                              # naturally instead of cutting off
+
+        output_path = "/tmp/final_video.mp4"
+        assemble_final_video(script_id, video_urls, audio_path, music_mood, shot_list, shot_durations, output_path)
+
+        video_url = upload_video(script_id, output_path)
+        print(f"Uploaded: {video_url}")
+
+        mark_video_generated(script_id, video_url)
+        print("Done.")
+
+
+if __name__ == "__main__":
+    main()
