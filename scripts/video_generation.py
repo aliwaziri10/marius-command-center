@@ -357,6 +357,25 @@ def compute_shot_durations(shot_list, total_duration):
     return [(weight / total_weight) * total_duration for weight in weights]
 
 
+def get_shot_durations(script, shot_list, audio_clip):
+    """Prefers the REAL per-shot durations already computed and saved by
+    narration.py in the shot_durations DB column (accurate to the actual
+    narration audio, so clip cuts land on sentence ends). Only falls back
+    to the old text-length-weighted estimate if shot_durations is missing
+    or doesn't match the current shot_list (e.g. older scripts generated
+    before this column existed)."""
+    stored = script.get("shot_durations")
+    if (
+        isinstance(stored, list)
+        and len(stored) == len(shot_list)
+        and all(isinstance(d, (int, float)) and d >= 0 for d in stored)
+    ):
+        print("Using real per-shot narration durations from shot_durations column.")
+        return list(stored)
+    print("shot_durations column missing/invalid for this script - falling back to text-length estimate.")
+    return compute_shot_durations(shot_list, audio_clip.duration)
+
+
 def compute_shot_start_times(shot_durations):
     starts = []
     t = 0.0
@@ -690,7 +709,7 @@ def main():
         audio_path += ".mp3" if script["narration_url"].endswith(".mp3") else ".wav"
         download_file(script["narration_url"], audio_path)
         audio_clip = AudioFileClip(audio_path)
-        shot_durations = compute_shot_durations(shot_list, audio_clip.duration)
+        shot_durations = get_shot_durations(script, shot_list, audio_clip)
 
         batch_end = min(next_index + CLIP_BATCH_LIMIT, total_shots)
         print(f"Resuming from shot {next_index + 1}/{total_shots} ({len(video_urls)} already done) - generating up to shot {batch_end} this run")
@@ -727,7 +746,7 @@ def main():
         audio_path += ".mp3" if script["narration_url"].endswith(".mp3") else ".wav"
         download_file(script["narration_url"], audio_path)
         audio_clip = AudioFileClip(audio_path)
-        shot_durations = compute_shot_durations(shot_list, audio_clip.duration)
+        shot_durations = get_shot_durations(script, shot_list, audio_clip)
         shot_durations[-1] += TRAIL_SECONDS  # hold the final shot a bit longer so
                                               # the music/ambient bed fades out
                                               # naturally instead of cutting off
