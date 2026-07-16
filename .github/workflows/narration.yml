@@ -5,6 +5,10 @@ on:
     - cron: "0 5,17 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   narrate:
     runs-on: ubuntu-latest
@@ -25,3 +29,15 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: python scripts/narration.py
+
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "Narration workflow failed - run #${{ github.run_number }}" \
+            --body "The Narration workflow failed on $(date -u +%Y-%m-%dT%H:%M:%SZ).
+
+          Run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
