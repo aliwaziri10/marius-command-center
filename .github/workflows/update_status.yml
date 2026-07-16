@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      issues: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -27,3 +28,14 @@ jobs:
           git add STATUS.md
           git diff --staged --quiet || git commit -m "update status"
           git push
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "Update Status workflow failed - run #${{ github.run_number }}" \
+            --body "The Update Status workflow failed on $(date -u +%Y-%m-%dT%H:%M:%SZ).
+
+          Run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
