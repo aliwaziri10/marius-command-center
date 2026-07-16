@@ -42,6 +42,7 @@ error.
 
 import os
 import json
+import math
 import time
 import base64
 import requests
@@ -95,6 +96,7 @@ WIDTH, HEIGHT = 1152, 768
 FRAME_RATE = 24
 MIN_FRAMES = 49   # 8*6+1, ~2s - Agnes requires num_frames = 8*n+1
 MAX_FRAMES = 169  # 8*21+1, ~7s
+MAX_CLIP_SECONDS = MAX_FRAMES / FRAME_RATE  # ~7.04s - hard cap per single Agnes generation
 
 CLIP_BATCH_LIMIT = 8  # max new clips generated per run - stay under Agnes's free-tier quota
 
@@ -257,12 +259,11 @@ def poll_agnes_task(video_id, max_wait=300, interval=10):
     raise RuntimeError(f"Agnes generation timed out after {max_wait}s for video_id {video_id}")
 
 
-def generate_shot_clip(shot, target_duration, out_path):
-    """Generates one shot's clip. On content-policy rejection, retries
-    ONCE with a generic fallback prompt (no freeform text) before giving
-    up - this recovers most false-positive rejections automatically
-    without ever touching the story/shot data."""
-    raw_frames = int(target_duration * FRAME_RATE)
+def _generate_one_segment(shot, segment_duration, out_path):
+    """Generates a single Agnes clip no longer than MAX_CLIP_SECONDS. On
+    content-policy rejection, retries ONCE with a generic fallback prompt
+    before giving up."""
+    raw_frames = int(segment_duration * FRAME_RATE)
     raw_frames = max(MIN_FRAMES, min(MAX_FRAMES, raw_frames))
     num_frames = round_to_valid_frames(raw_frames)
     num_frames = max(MIN_FRAMES, min(MAX_FRAMES, num_frames))
@@ -277,6 +278,42 @@ def generate_shot_clip(shot, target_duration, out_path):
 
     video_url = poll_agnes_task(video_id)
     download_file(video_url, out_path)
+    return out_path
+
+
+def generate_shot_clip(shot, target_duration, out_path):
+    """Generates a shot's full clip. Agnes hard-caps any single generation
+    at ~MAX_CLIP_SECONDS. Shots needing MORE than that are now split into
+    multiple back-to-back Agnes generations and stitched together with
+    concatenate_videoclips, instead of generating one short clip and
+    freezing the last frame to pad out the remaining time - eliminates
+    the multi-second freeze-frame stretches that were showing up on any
+    shot with longer narration."""
+    n_segments = max(1, math.ceil(target_duration / MAX_CLIP_SECONDS))
+    segment_duration = target_duration / n_segments
+
+    if n_segments == 1:
+        return _generate_one_segment(shot, segment_duration, out_path)
+
+    print(f"Shot needs {target_duration:.1f}s (over the ~{MAX_CLIP_SECONDS:.1f}s per-generation cap) - "
+          f"generating {n_segments} clips of ~{segment_duration:.1f}s each and stitching, instead of freezing.")
+
+    segment_paths = []
+    for seg in range(n_segments):
+        seg_path = out_path.replace(".mp4", f"_seg{seg}.mp4")
+        _generate_one_segment(shot, segment_duration, seg_path)
+        segment_paths.append(seg_path)
+        if seg < n_segments - 1:
+            time.sleep(4)  # brief pause between back-to-back submissions for the same shot
+
+    clips = [VideoFileClip(p) for p in segment_paths]
+    stitched = concatenate_videoclips(clips, method="compose")
+    stitched.write_videofile(out_path, fps=FRAME_RATE, codec="libx264", audio=False, threads=2, logger=None)
+    for c in clips:
+        c.close()
+    for p in segment_paths:
+        os.remove(p)
+
     return out_path
 
 
