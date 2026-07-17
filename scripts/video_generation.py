@@ -22,6 +22,14 @@ verification (HEAD checks on already-generated shots) also retries before
 concluding a shot is genuinely broken, so a single transient network
 blip doesn't discard already-finished work.
 
+OVERLOAD-RESILIENT: if Agnes is still failing after all retries (upstream
+load saturated) - either at task-creation time or while polling for
+completion - this now exits quietly (exit code 0, no crash, no GitHub
+issue opened) instead of raising and killing the whole run. Progress is
+already saved after every completed shot, so nothing is lost; the next
+scheduled run picks up exactly where this one stopped, typically ~20
+minutes later once Agnes's load has eased.
+
 CONTENT-POLICY-RESILIENT: if Agnes rejects a shot's prompt on content-
 policy grounds, this now auto-retries ONCE with a generic, stripped-down
 fallback prompt (shot_type/camera fields only, no freeform visual_description
@@ -125,6 +133,15 @@ class ContentPolicyRejection(Exception):
     pass
 
 
+class AgnesOverloadedError(Exception):
+    """Raised when Agnes is transiently overloaded and every retry inside
+    create_agnes_task/poll_agnes_task has been exhausted. Distinct from a
+    genuine bug so the caller can exit quietly (progress already saved)
+    instead of crashing the whole run and opening a GitHub issue for a
+    problem that will resolve itself on the next scheduled run."""
+    pass
+
+
 def round_to_valid_frames(num_frames):
     n = round((num_frames - 1) / 8)
     n = max(0, n)
@@ -182,7 +199,9 @@ def create_agnes_task(prompt, num_frames):
     503/504 server-side issues) with backoff before raising - one flaky
     response from Agnes should not kill the whole run and force a manual
     re-trigger. Raises ContentPolicyRejection distinctly (not retryable)
-    if Agnes rejects the prompt on content grounds."""
+    if Agnes rejects the prompt on content grounds. Raises
+    AgnesOverloadedError (also distinct, also not a bug) if every retry
+    is exhausted - the caller exits quietly on this instead of crashing."""
     last_error_text = None
 
     for attempt in range(AGNES_MAX_RETRIES):
@@ -217,7 +236,7 @@ def create_agnes_task(prompt, num_frames):
         data = resp.json()
         return data.get("video_id") or data.get("id") or data.get("task_id")
 
-    raise RuntimeError(f"Agnes still failing after {AGNES_MAX_RETRIES} attempts: {last_error_text}")
+    raise AgnesOverloadedError(f"Agnes still failing after {AGNES_MAX_RETRIES} attempts: {last_error_text}")
 
 
 def extract_video_url(data):
@@ -256,7 +275,7 @@ def poll_agnes_task(video_id, max_wait=300, interval=10):
             raise RuntimeError(f"Agnes generation failed: {data}")
         time.sleep(interval)
         waited += interval
-    raise RuntimeError(f"Agnes generation timed out after {max_wait}s for video_id {video_id}")
+    raise AgnesOverloadedError(f"Agnes generation timed out after {max_wait}s for video_id {video_id}")
 
 
 def _generate_one_segment(shot, segment_duration, out_path):
@@ -763,6 +782,12 @@ def main():
                 print(f"FIX: reword shot_list[{i}].visual_description for script {script_id} in the "
                       f"scripts table, then reset status to 'images_generated' to resume from exactly "
                       f"this shot. Moving on to the next-oldest eligible script for now.")
+                return
+            except AgnesOverloadedError as e:
+                print(f"Agnes appears overloaded (upstream load saturated) on shot {i+1}/{total_shots} after all retries: {e}")
+                print(f"Progress already saved through shot {i}/{total_shots} ({len(video_urls)} clips done). "
+                      f"Exiting quietly instead of crashing - the next scheduled run (~20 min) will pick up "
+                      f"right where this left off.")
                 return
 
             clip_url = upload_clip(script_id, i, raw_path)
