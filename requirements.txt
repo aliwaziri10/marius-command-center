@@ -4,3 +4,4 @@ soundfile
 supabase
 moviepy
 Pillow
+numpy
