@@ -108,6 +108,12 @@ MAX_CLIP_SECONDS = MAX_FRAMES / FRAME_RATE  # ~7.04s - hard cap per single Agnes
 
 CLIP_BATCH_LIMIT = 8  # max new clips generated per run - stay under Agnes's free-tier quota
 
+NARRATION_VOLUME = 0.70  # added per Zia's request - narration was playing at raw,
+                          # unscaled volume while music/SFX were already turned down,
+                          # so it drowned out the rest of the mix. 30% cut brings it
+                          # back in balance with MUSIC_VOLUME/SFX_VOLUME below. The
+                          # safety limiter still protects against clipping regardless
+                          # of this value.
 MUSIC_VOLUME = 0.34   # was 0.238 (+20% from 0.198 per Zarah's request) - bumped
                        # further per Zia's "louder ambient/music" request. Safe to
                        # push higher: apply_safety_limiter below auto-scales the
@@ -610,9 +616,10 @@ def apply_safety_limiter(audio_clip, ceiling=LIMITER_CEILING):
 
 
 def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration):
-    """Composites 3 audio layers: narration (full volume), looped background
-    score (ducked), and per-shot SFX placed at their exact timestamps."""
-    layers = [AudioFileClip(narration_path)]
+    """Composites 3 audio layers: narration (scaled to NARRATION_VOLUME),
+    looped background score (ducked), and per-shot SFX placed at their
+    exact timestamps."""
+    layers = [AudioFileClip(narration_path).with_volume_scaled(NARRATION_VOLUME)]
 
     if music_mood:
         music_path = "/tmp/background_music.mp3"
