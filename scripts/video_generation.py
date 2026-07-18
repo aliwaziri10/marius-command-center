@@ -63,6 +63,19 @@ a given video. build_audio_mix now returns pass/fail stats alongside the
 mixed audio, and mark_video_generated persists them to the scripts table
 (music_generated bool, sfx_applied_count int) so this is now a plain DB
 query instead of a log-hunting exercise.
+
+SUBTITLES (2026-07-19): added burned-in captions, one per shot, using each
+shot's own narration_excerpt (the same field narration.py already uses for
+per-shot audio, so captions are guaranteed to match what's actually being
+spoken - not a separate re-split of narration_text). Captions are timed to
+the exact same shot_starts/shot_durations already computed for audio sync,
+rendered as word-wrapped white text with a black outline on a semi-
+transparent bar near the bottom, and composited onto the video in
+assemble_final_video right before the fade effects are applied. Font is
+DejaVu Sans Bold (present on GitHub's Ubuntu runner images via
+fonts-dejavu-core); falls back to PIL's built-in default font if that
+path is ever missing, and a single bad caption never breaks the whole
+assembly (same fail-soft pattern as music/SFX in this file).
 """
 
 import os
@@ -72,10 +85,13 @@ import time
 import base64
 import requests
 import numpy as np
+from PIL import Image, ImageDraw, ImageFont
 from moviepy import (
     VideoFileClip,
     AudioFileClip,
+    ImageClip,
     CompositeAudioClip,
+    CompositeVideoClip,
     concatenate_videoclips,
     concatenate_audioclips,
 )
@@ -166,6 +182,21 @@ DARK_SCENE_KEYWORDS = (
     "candlelit", "moonlit", "underground", "cave", "storm", "eclipse",
     "blackout", "gloom",
 )
+
+# --- Subtitle/caption styling ---
+CAPTION_FONT_PATHS = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+]
+CAPTION_FONT_SIZE = 42
+CAPTION_MAX_WIDTH_RATIO = 0.86   # caption text block width as a fraction of video width
+CAPTION_BOTTOM_MARGIN = 60       # px from bottom of frame to the caption block
+CAPTION_LINE_SPACING = 10
+CAPTION_TEXT_COLOR = (255, 255, 255, 255)
+CAPTION_STROKE_COLOR = (0, 0, 0, 255)
+CAPTION_STROKE_WIDTH = 3
+CAPTION_BG_COLOR = (0, 0, 0, 140)  # semi-transparent bar behind the text
+CAPTION_BG_PADDING = 16
 
 
 class ContentPolicyRejection(Exception):
@@ -767,6 +798,132 @@ def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_
     return apply_safety_limiter(mixed), stats
 
 
+# ---------------------------------------------------------------------------
+# Subtitles: one burned-in caption per shot, from narration_excerpt
+# ---------------------------------------------------------------------------
+
+def _load_caption_font(size=CAPTION_FONT_SIZE):
+    """Loads DejaVu Sans Bold if present (it is, on GitHub's Ubuntu runner
+    images, via fonts-dejavu-core). Falls back to PIL's built-in default
+    font otherwise, so captions still render (just smaller/plainer)
+    instead of crashing the whole assembly over a missing font file."""
+    for path in CAPTION_FONT_PATHS:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, size)
+            except Exception:
+                continue
+    print("Caption font not found at any known path - falling back to PIL's default font (captions will be smaller/plainer).")
+    return ImageFont.load_default()
+
+
+def _wrap_caption_text(text, font, max_width, draw):
+    """Greedy word-wrap using actual rendered text width (not character
+    count), so lines fill the available width consistently regardless of
+    font metrics."""
+    words = text.split()
+    lines = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        bbox = draw.textbbox((0, 0), candidate, font=font)
+        if bbox[2] - bbox[0] <= max_width or not current:
+            current = candidate
+        else:
+            lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    return lines
+
+
+def render_caption_image(text, video_width=WIDTH, video_height=HEIGHT):
+    """Renders a single caption as a full-frame-sized RGBA PIL image:
+    word-wrapped white text with a black outline, centered near the
+    bottom of the frame on a semi-transparent bar - standard burned-in
+    subtitle style. Returns None if text is empty (no caption for that
+    shot, e.g. a shot with no narration_excerpt)."""
+    text = (text or "").strip()
+    if not text:
+        return None
+
+    font = _load_caption_font()
+    img = Image.new("RGBA", (video_width, video_height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    max_text_width = int(video_width * CAPTION_MAX_WIDTH_RATIO)
+    lines = _wrap_caption_text(text, font, max_text_width, draw)
+    if not lines:
+        return None
+
+    line_heights = []
+    line_widths = []
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        line_widths.append(bbox[2] - bbox[0])
+        line_heights.append(bbox[3] - bbox[1])
+
+    line_height = max(line_heights) if line_heights else CAPTION_FONT_SIZE
+    block_height = len(lines) * line_height + (len(lines) - 1) * CAPTION_LINE_SPACING
+    block_width = max(line_widths) if line_widths else 0
+
+    block_bottom = video_height - CAPTION_BOTTOM_MARGIN
+    block_top = block_bottom - block_height
+
+    bg_left = (video_width - block_width) // 2 - CAPTION_BG_PADDING
+    bg_right = (video_width + block_width) // 2 + CAPTION_BG_PADDING
+    bg_top = block_top - CAPTION_BG_PADDING
+    bg_bottom = block_bottom + CAPTION_BG_PADDING
+    draw.rounded_rectangle([bg_left, bg_top, bg_right, bg_bottom], radius=14, fill=CAPTION_BG_COLOR)
+
+    y = block_top
+    for line, lw in zip(lines, line_widths):
+        x = (video_width - lw) // 2
+        draw.text(
+            (x, y), line, font=font, fill=CAPTION_TEXT_COLOR,
+            stroke_width=CAPTION_STROKE_WIDTH, stroke_fill=CAPTION_STROKE_COLOR,
+        )
+        y += line_height + CAPTION_LINE_SPACING
+
+    return img
+
+
+def build_caption_clip(text, start, duration, video_width=WIDTH, video_height=HEIGHT):
+    """Builds one timed transparent ImageClip overlay for a single shot's
+    caption. Returns None (never raises) on empty text or any rendering
+    failure, so one bad caption can never break the whole assembly - same
+    fail-soft pattern used for music/SFX elsewhere in this file."""
+    try:
+        img = render_caption_image(text, video_width, video_height)
+        if img is None:
+            return None
+        frame = np.array(img)
+        clip = ImageClip(frame, transparent=True, duration=duration)
+        clip = clip.with_start(start)
+        return clip
+    except Exception as e:
+        print(f"Caption render failed for text {text[:60]!r}, skipping this caption: {e}")
+        return None
+
+
+def build_caption_clips(shot_list, shot_durations, shot_starts, video_width=WIDTH, video_height=HEIGHT):
+    """Builds one timed caption overlay clip per shot, using each shot's
+    own narration_excerpt (the exact text narration.py already used to
+    synthesize that shot's audio) and the same shot_starts/shot_durations
+    already computed for audio sync - so captions land on precisely the
+    same timeline as the narration and video clips they describe."""
+    caption_clips = []
+    for i, shot in enumerate(shot_list):
+        text = (shot.get("narration_excerpt") or "").strip()
+        if not text:
+            continue
+        clip = build_caption_clip(text, shot_starts[i], shot_durations[i], video_width, video_height)
+        if clip is not None:
+            caption_clips.append(clip)
+    print(f"Built {len(caption_clips)}/{len(shot_list)} caption overlays.")
+    return caption_clips
+
+
 def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot_list, shot_durations, output_path):
     clips = []
     for i, url in enumerate(video_urls):
@@ -788,6 +945,19 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
     )
 
     final = concatenate_videoclips(clips, method="compose")
+
+    # Burned-in subtitles: one caption per shot, timed to the exact same
+    # shot_starts/shot_durations used for audio sync, composited on top
+    # of the concatenated video before fades/audio are applied. Wrapped
+    # for resilience - a captioning failure never blocks the video itself
+    # from being assembled and uploaded.
+    try:
+        caption_clips = build_caption_clips(shot_list, shot_durations, shot_starts, WIDTH, HEIGHT)
+        if caption_clips:
+            final = CompositeVideoClip([final] + caption_clips, size=(WIDTH, HEIGHT))
+    except Exception as e:
+        print(f"Caption compositing failed, continuing without subtitles: {e}")
+
     final = final.with_effects([FadeIn(FADE_IN_SECONDS), FadeOut(FADE_OUT_SECONDS)])
     final = final.with_audio(final_audio)
     target_bitrate = compute_target_bitrate(total_duration)
