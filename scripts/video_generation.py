@@ -686,6 +686,8 @@ def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_
             stats["sfx_applied_count"] += 1
 
     mixed = CompositeAudioClip(layers)
+    if mixed.duration and mixed.duration > total_duration:
+        mixed = mixed.subclipped(0, total_duration)
     print(f"Audio mix stats: music_generated={stats['music_generated']}, "
           f"sfx_applied={stats['sfx_applied_count']}/{stats['sfx_cues_total']} cues")
     return apply_safety_limiter(mixed), stats
