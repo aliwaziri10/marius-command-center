@@ -93,6 +93,9 @@ SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
 AGNES_API_KEY = os.environ["AGNES_API_KEY"]
 FREESOUND_API_KEY = os.environ.get("FREESOUND_API_KEY")
 ACE_MUSIC_API_KEY = os.environ.get("ACE_MUSIC_API_KEY")
+HF_TOKEN = os.environ.get("HF_TOKEN")  # Hugging Face Inference API - free fallback
+                                        # for background music if every ACE Music
+                                        # host fails (added 2026-07-19)
 
 HEADERS = {
     "apikey": SUPABASE_KEY,
@@ -114,6 +117,13 @@ ACE_MUSIC_HEADERS = {
     "Authorization": f"Bearer {ACE_MUSIC_API_KEY}",
     "Content-Type": "application/json",
 }
+
+# Free fallback for background music if every ACE Music host fails. Uses
+# Hugging Face's free Serverless Inference API (facebook/musicgen-small) -
+# no cost, uses the HF_TOKEN secret that was already sitting unused in this
+# repo's GitHub Actions secrets. Rate-limited (~1000 free requests/day) and
+# slower/lower-fidelity than ACE Music, so it's a fallback, not a primary.
+HF_MUSICGEN_URL = "https://api-inference.huggingface.co/models/facebook/musicgen-small"
 
 VIDEO_BUCKET = "videos"
 CLIP_BUCKET = "video_clips"  # individual shot clips, kept until final assembly
@@ -577,8 +587,59 @@ def generate_background_music(prompt, duration, out_path):
         except Exception as e:
             print(f"ACE Music generation raised an exception on {base}, trying next host: {e}")
 
-    print("Continuing without background music - every ACE Music host failed this run.")
-    return None
+    print("Every ACE Music host failed - trying free Hugging Face MusicGen fallback.")
+    return generate_background_music_musicgen(prompt, duration, out_path)
+
+
+def generate_background_music_musicgen(prompt, duration, out_path):
+    """Fallback background-music generator using Hugging Face's free
+    Serverless Inference API (facebook/musicgen-small). Only called when
+    every ACE Music host has already failed. Uses the HF_TOKEN secret that
+    was already present in this repo's GitHub Actions secrets but unused
+    until now. Fails silently (returns None) just like generate_background_music
+    and search_freesound_sfx, so a bad response here never crashes a run -
+    the pipeline simply continues without music for this episode, same as
+    always."""
+    if not HF_TOKEN:
+        print("No HF_TOKEN set - skipping MusicGen fallback, continuing without background music.")
+        return None
+    try:
+        resp = requests.post(
+            HF_MUSICGEN_URL,
+            headers={"Authorization": f"Bearer {HF_TOKEN}"},
+            json={"inputs": prompt},
+            timeout=120,  # MusicGen cold starts can take 20-60s+ on the free tier
+        )
+        if resp.status_code == 503:
+            # Model is cold-loading on HF's shared infra - wait once and retry,
+            # rather than treating a cold start as a hard failure.
+            wait_for = 20
+            try:
+                wait_for = min(int(resp.json().get("estimated_time", 20)) + 2, 60)
+            except Exception:
+                pass
+            print(f"MusicGen is cold-loading on Hugging Face - waiting {wait_for}s and retrying once.")
+            time.sleep(wait_for)
+            resp = requests.post(
+                HF_MUSICGEN_URL,
+                headers={"Authorization": f"Bearer {HF_TOKEN}"},
+                json={"inputs": prompt},
+                timeout=120,
+            )
+        if resp.status_code >= 400:
+            print(f"MusicGen fallback failed ({resp.status_code}): {resp.text[:300]}")
+            return None
+        content_type = resp.headers.get("content-type", "")
+        if "audio" not in content_type:
+            print(f"MusicGen fallback returned unexpected content-type '{content_type}', skipping.")
+            return None
+        with open(out_path, "wb") as f:
+            f.write(resp.content)
+        print(f"MusicGen fallback succeeded - background music generated via Hugging Face free tier.")
+        return out_path
+    except Exception as e:
+        print(f"MusicGen fallback raised an exception, continuing without background music: {e}")
+        return None
 
 
 def search_freesound_sfx(query, out_path):
@@ -633,8 +694,21 @@ def apply_safety_limiter(audio_clip, ceiling=LIMITER_CEILING):
 
     Uses fps=44100 (CD-quality) for the peak scan - accurate enough to
     catch true peaks without being so high-resolution it meaningfully
-    slows down the run."""
-    samples = audio_clip.to_soundarray(fps=44100)
+    slows down the run.
+
+    RESILIENT (2026-07-19): source MP3s (narration especially) sometimes
+    report a duration slightly longer than the audio they actually contain
+    - a known ffmpeg/MP3 quirk. Reading right up to that reported edge asks
+    moviepy for audio that isn't really there, which previously crashed the
+    entire run with an IndexError instead of just skipping the peak check.
+    This is a non-essential safety pass, not core output, so like every
+    other resilience fix in this file it now fails gracefully - on any
+    error, this returns the mix unscaled instead of crashing the run."""
+    try:
+        samples = audio_clip.to_soundarray(fps=44100)
+    except Exception as e:
+        print(f"Safety limiter: could not analyze mixed audio ({e}) - skipping peak check, using mix as-is.")
+        return audio_clip
     peak = float(np.max(np.abs(samples))) if samples.size else 0.0
 
     if peak <= 0:
