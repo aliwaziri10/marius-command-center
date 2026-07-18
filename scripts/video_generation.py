@@ -46,6 +46,23 @@ reliability issues (endpoint 404s/502s). generate_background_music now
 tries every host in ACE_MUSIC_BASES in order and only skips background
 music entirely if all of them fail, instead of giving up on the first
 error.
+
+LIGHTING FIX (2026-07-19): Agnes prompts had no lighting/exposure cue at
+all, so the model defaulted to moody/underlit documentary-style footage
+on nearly every shot. build_agnes_prompt now appends a "well-lit, balanced
+exposure" cue automatically, UNLESS the shot's own visual_description
+already implies a deliberately dark scene (night, dusk, shadow, etc.) -
+in which case we leave it alone so genuinely dark scenes aren't forced
+bright.
+
+AUDIO-DIAGNOSTICS (2026-07-19): generate_background_music/search_freesound_sfx
+were designed to fail silently (print + continue) so a bad API response
+never crashes a run - but that also meant there was no way to tell,
+without reading raw Action logs, whether music/SFX actually made it into
+a given video. build_audio_mix now returns pass/fail stats alongside the
+mixed audio, and mark_video_generated persists them to the scripts table
+(music_generated bool, sfx_applied_count int) so this is now a plain DB
+query instead of a log-hunting exercise.
 """
 
 import os
@@ -131,6 +148,15 @@ AGNES_MAX_RETRIES = 4
 CLIP_VERIFY_RETRIES = 3
 CLIP_VERIFY_RETRY_WAIT = 5
 
+# Shot descriptions containing any of these words are assumed to be
+# deliberately dark/night scenes - skip the auto "well-lit" boost so we
+# don't wash out an intentionally moody shot.
+DARK_SCENE_KEYWORDS = (
+    "night", "dark", "dim", "shadow", "silhouette", "dusk", "twilight",
+    "candlelit", "moonlit", "underground", "cave", "storm", "eclipse",
+    "blackout", "gloom",
+)
+
 
 class ContentPolicyRejection(Exception):
     """Raised when Agnes rejects a shot's prompt on content-policy
@@ -178,6 +204,12 @@ def build_agnes_prompt(shot, use_fallback=False):
     into the Agnes prompt so the generated clip actually reflects the
     intended camera work, not just the raw visual description.
 
+    Also appends a "well-lit, balanced exposure" cue by default, since
+    Agnes otherwise defaults to noticeably dark/underlit footage on most
+    shots - unless the shot's own visual_description already implies a
+    deliberately dark scene (night, dusk, shadow, etc.), in which case we
+    leave the lighting alone.
+
     use_fallback=True builds a generic, content-safe prompt with NO
     freeform visual_description text at all - used as a one-time retry
     when the real prompt gets rejected on content-policy grounds, since
@@ -187,10 +219,12 @@ def build_agnes_prompt(shot, use_fallback=False):
     lens_effect = shot.get("lens_effect") or "none"
 
     if use_fallback:
-        parts = [f"{shot_type} cinematic documentary shot"]
+        parts = [f"{shot_type} cinematic documentary shot", "well-lit, balanced exposure"]
     else:
         visual = shot.get("visual_description", "").strip()
         parts = [visual, f"{shot_type} shot"]
+        if not any(kw in visual.lower() for kw in DARK_SCENE_KEYWORDS):
+            parts.append("well-lit, balanced natural exposure, clear visibility")
 
     if camera_movement != "static":
         parts.append(f"camera {camera_movement}")
@@ -618,8 +652,14 @@ def apply_safety_limiter(audio_clip, ceiling=LIMITER_CEILING):
 def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration):
     """Composites 3 audio layers: narration (scaled to NARRATION_VOLUME),
     looped background score (ducked), and per-shot SFX placed at their
-    exact timestamps."""
+    exact timestamps.
+
+    Returns (mixed_audio, stats) where stats is a dict of
+    {"music_generated": bool, "sfx_cues_total": int, "sfx_applied_count": int}
+    so callers can persist exactly what did/didn't make it into the mix,
+    without needing to dig through raw Action logs to find out."""
     layers = [AudioFileClip(narration_path).with_volume_scaled(NARRATION_VOLUME)]
+    stats = {"music_generated": False, "sfx_cues_total": 0, "sfx_applied_count": 0}
 
     if music_mood:
         music_path = "/tmp/background_music.mp3"
@@ -628,11 +668,13 @@ def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_
             music_clip = fit_audio_to_duration(music_clip, total_duration)
             music_clip = music_clip.with_volume_scaled(MUSIC_VOLUME)
             layers.append(music_clip)
+            stats["music_generated"] = True
 
     for i, shot in enumerate(shot_list):
         cue = (shot.get("sfx_cue") or "").strip()
         if not cue:
             continue
+        stats["sfx_cues_total"] += 1
         sfx_path = f"/tmp/sfx_{i:03d}.mp3"
         if search_freesound_sfx(cue, sfx_path):
             sfx_clip = AudioFileClip(sfx_path)
@@ -641,9 +683,12 @@ def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_
                 sfx_clip = sfx_clip.subclipped(0, max_len)
             sfx_clip = sfx_clip.with_volume_scaled(SFX_VOLUME).with_start(shot_starts[i])
             layers.append(sfx_clip)
+            stats["sfx_applied_count"] += 1
 
     mixed = CompositeAudioClip(layers)
-    return apply_safety_limiter(mixed)
+    print(f"Audio mix stats: music_generated={stats['music_generated']}, "
+          f"sfx_applied={stats['sfx_applied_count']}/{stats['sfx_cues_total']} cues")
+    return apply_safety_limiter(mixed), stats
 
 
 def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot_list, shot_durations, output_path):
@@ -658,7 +703,7 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
 
     total_duration = sum(shot_durations)
     shot_starts = compute_shot_start_times(shot_durations)
-    final_audio = build_audio_mix(
+    final_audio, audio_stats = build_audio_mix(
         narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration
     )
 
@@ -681,7 +726,7 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
         threads=2,
         logger=None,
     )
-    return output_path
+    return output_path, audio_stats
 
 
 def upload_video(script_id, file_path):
@@ -707,11 +752,15 @@ def upload_video(script_id, file_path):
     return f"{SUPABASE_URL}/storage/v1/object/public/{VIDEO_BUCKET}/{file_name}"
 
 
-def mark_video_generated(script_id, video_url):
+def mark_video_generated(script_id, video_url, audio_stats=None):
+    update = {"status": "video_generated", "video_url": video_url}
+    if audio_stats is not None:
+        update["music_generated"] = audio_stats.get("music_generated", False)
+        update["sfx_applied_count"] = audio_stats.get("sfx_applied_count", 0)
     resp = requests.patch(
         f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
         headers=HEADERS,
-        json={"status": "video_generated", "video_url": video_url},
+        json=update,
         timeout=30,
     )
     resp.raise_for_status()
@@ -821,12 +870,12 @@ def main():
                                               # naturally instead of cutting off
 
         output_path = "/tmp/final_video.mp4"
-        assemble_final_video(script_id, video_urls, audio_path, music_mood, shot_list, shot_durations, output_path)
+        output_path, audio_stats = assemble_final_video(script_id, video_urls, audio_path, music_mood, shot_list, shot_durations, output_path)
 
         video_url = upload_video(script_id, output_path)
         print(f"Uploaded: {video_url}")
 
-        mark_video_generated(script_id, video_url)
+        mark_video_generated(script_id, video_url, audio_stats)
         print("Done.")
 
 
