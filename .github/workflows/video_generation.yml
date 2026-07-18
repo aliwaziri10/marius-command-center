@@ -29,6 +29,7 @@ jobs:
           AGNES_API_KEY: ${{ secrets.AGNES_API_KEY }}
           ACE_MUSIC_API_KEY: ${{ secrets.ACE_MUSIC_API_KEY }}
           FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: python scripts/video_generation.py
       - name: Open issue on failure
         if: failure()
@@ -39,5 +40,4 @@ jobs:
             --repo "${{ github.repository }}" \
             --title "Video Generation workflow failed - run #${{ github.run_number }}" \
             --body "The Video Generation workflow failed on $(date -u +%Y-%m-%dT%H:%M:%SZ).
-
           Run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
