@@ -1,43 +1,4 @@
-name: Image Generation
-
-on:
-  schedule:
-    - cron: "0 */6 * * *"
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  issues: write
-
-jobs:
-  generate-images:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run image generation
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-        run: python scripts/image_generation.py
-
-      - name: Open issue on failure
-        if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh issue create \
-            --repo "${{ github.repository }}" \
-            --title "Image Generation workflow failed - run #${{ github.run_number }}" \
-            --body "The Image Generation workflow failed on $(date -u +%Y-%m-%dT%H:%M:%SZ).
-
-          Run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+# This workflow has been retired. image_generation.py was removed
+# 2026-07-20 - Agnes generates video directly from shot_list text,
+# it never used these still images. Narration now hands off straight
+# to status "images_generated" for video_generation.py to pick up.
