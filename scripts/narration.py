@@ -161,7 +161,10 @@ def main():
     public_url = supabase.storage.from_("narration").get_public_url(output_filename)
     print(f"Uploaded. Public URL: {public_url}")
 
-    # 5. Update script status, narration URL, and real per-shot timing
+    # 5. Update script status, narration URL, and real per-shot timing.
+    # Status goes straight to 'images_generated' (skipping the old,
+    # now-removed image_generation.py stage - Agnes generates video
+    # directly from shot_list text, it never used the still images).
     update_payload = {
         "status": "images_generated",
         "narration_url": public_url
@@ -169,7 +172,7 @@ def main():
     if shot_durations is not None:
         update_payload["shot_durations"] = shot_durations
     supabase.table("scripts").update(update_payload).eq("id", script_id).execute()
-    print("Script status updated to 'narrated'. Done.")
+    print("Script status updated to 'images_generated'. Done.")
 
 
 if __name__ == "__main__":
