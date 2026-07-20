@@ -163,7 +163,7 @@ def main():
 
     # 5. Update script status, narration URL, and real per-shot timing
     update_payload = {
-        "status": "narrated",
+        "status": "images_generated",
         "narration_url": public_url
     }
     if shot_durations is not None:
