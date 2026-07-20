@@ -76,6 +76,14 @@ DejaVu Sans Bold (present on GitHub's Ubuntu runner images via
 fonts-dejavu-core); falls back to PIL's built-in default font if that
 path is ever missing, and a single bad caption never breaks the whole
 assembly (same fail-soft pattern as music/SFX in this file).
+
+CAPTION SIZE FIX (2026-07-20): captions were rendering at font size 42
+across 86% of the frame width, which on longer narration_excerpt text
+wrapped into a tall multi-line block that visually covered close to half
+the screen - and since these are burned into the video pixels (not a real
+YouTube caption track), toggling CC did nothing. Font size dropped to 28
+and max width ratio dropped to 0.70 to bring this back to a normal
+subtitle-sized footprint near the bottom of the frame.
 """
 
 import os
@@ -188,8 +196,8 @@ CAPTION_FONT_PATHS = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
 ]
-CAPTION_FONT_SIZE = 42
-CAPTION_MAX_WIDTH_RATIO = 0.86   # caption text block width as a fraction of video width
+CAPTION_FONT_SIZE = 28
+CAPTION_MAX_WIDTH_RATIO = 0.70   # caption text block width as a fraction of video width
 CAPTION_BOTTOM_MARGIN = 60       # px from bottom of frame to the caption block
 CAPTION_LINE_SPACING = 10
 CAPTION_TEXT_COLOR = (255, 255, 255, 255)
@@ -642,8 +650,6 @@ def generate_background_music_musicgen(prompt, duration, out_path):
             timeout=120,  # MusicGen cold starts can take 20-60s+ on the free tier
         )
         if resp.status_code == 503:
-            # Model is cold-loading on HF's shared infra - wait once and retry,
-            # rather than treating a cold start as a hard failure.
             wait_for = 20
             try:
                 wait_for = min(int(resp.json().get("estimated_time", 20)) + 2, 60)
@@ -711,30 +717,9 @@ def search_freesound_sfx(query, out_path):
 
 
 def apply_safety_limiter(audio_clip, ceiling=LIMITER_CEILING):
-    """Checks the TRUE peak of the fully mixed audio (narration + music +
-    SFX layers all summed together, as they'll actually play back) and
-    scales the whole mix down only if that peak would exceed `ceiling`.
-
-    Individual layer volumes staying under 1.0 does not guarantee the
-    combined mix does - if narration, music, and an SFX cue all happen to
-    peak at the same instant, their amplitudes add together and can exceed
-    1.0 even though no single layer does on its own. That overshoot is
-    exactly what causes audible clipping/distortion. This checks the real
-    rendered peak instead of trusting the individual volume constants, and
-    only scales down (never up) so quiet mixes are left untouched.
-
-    Uses fps=44100 (CD-quality) for the peak scan - accurate enough to
-    catch true peaks without being so high-resolution it meaningfully
-    slows down the run.
-
-    RESILIENT (2026-07-19): source MP3s (narration especially) sometimes
-    report a duration slightly longer than the audio they actually contain
-    - a known ffmpeg/MP3 quirk. Reading right up to that reported edge asks
-    moviepy for audio that isn't really there, which previously crashed the
-    entire run with an IndexError instead of just skipping the peak check.
-    This is a non-essential safety pass, not core output, so like every
-    other resilience fix in this file it now fails gracefully - on any
-    error, this returns the mix unscaled instead of crashing the run."""
+    """Checks the TRUE peak of the fully mixed audio and scales the whole
+    mix down only if that peak would exceed `ceiling`. Fails gracefully -
+    on any error, returns the mix unscaled instead of crashing the run."""
     try:
         samples = audio_clip.to_soundarray(fps=44100)
     except Exception as e:
@@ -755,14 +740,9 @@ def apply_safety_limiter(audio_clip, ceiling=LIMITER_CEILING):
 
 
 def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration):
-    """Composites 3 audio layers: narration (scaled to NARRATION_VOLUME),
-    looped background score (ducked), and per-shot SFX placed at their
-    exact timestamps.
-
-    Returns (mixed_audio, stats) where stats is a dict of
-    {"music_generated": bool, "sfx_cues_total": int, "sfx_applied_count": int}
-    so callers can persist exactly what did/didn't make it into the mix,
-    without needing to dig through raw Action logs to find out."""
+    """Composites 3 audio layers: narration, looped background score, and
+    per-shot SFX placed at their exact timestamps. Returns (mixed_audio,
+    stats) so callers can persist exactly what did/didn't make it in."""
     layers = [AudioFileClip(narration_path).with_volume_scaled(NARRATION_VOLUME)]
     stats = {"music_generated": False, "sfx_cues_total": 0, "sfx_applied_count": 0}
 
@@ -803,10 +783,9 @@ def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_
 # ---------------------------------------------------------------------------
 
 def _load_caption_font(size=CAPTION_FONT_SIZE):
-    """Loads DejaVu Sans Bold if present (it is, on GitHub's Ubuntu runner
-    images, via fonts-dejavu-core). Falls back to PIL's built-in default
-    font otherwise, so captions still render (just smaller/plainer)
-    instead of crashing the whole assembly over a missing font file."""
+    """Loads DejaVu Sans Bold if present. Falls back to PIL's built-in
+    default font otherwise, so captions still render (just smaller/
+    plainer) instead of crashing the whole assembly over a missing font."""
     for path in CAPTION_FONT_PATHS:
         if os.path.exists(path):
             try:
@@ -818,9 +797,7 @@ def _load_caption_font(size=CAPTION_FONT_SIZE):
 
 
 def _wrap_caption_text(text, font, max_width, draw):
-    """Greedy word-wrap using actual rendered text width (not character
-    count), so lines fill the available width consistently regardless of
-    font metrics."""
+    """Greedy word-wrap using actual rendered text width."""
     words = text.split()
     lines = []
     current = ""
@@ -838,11 +815,7 @@ def _wrap_caption_text(text, font, max_width, draw):
 
 
 def render_caption_image(text, video_width=WIDTH, video_height=HEIGHT):
-    """Renders a single caption as a full-frame-sized RGBA PIL image:
-    word-wrapped white text with a black outline, centered near the
-    bottom of the frame on a semi-transparent bar - standard burned-in
-    subtitle style. Returns None if text is empty (no caption for that
-    shot, e.g. a shot with no narration_excerpt)."""
+    """Renders a single caption as a full-frame-sized RGBA PIL image."""
     text = (text or "").strip()
     if not text:
         return None
@@ -891,8 +864,7 @@ def render_caption_image(text, video_width=WIDTH, video_height=HEIGHT):
 def build_caption_clip(text, start, duration, video_width=WIDTH, video_height=HEIGHT):
     """Builds one timed transparent ImageClip overlay for a single shot's
     caption. Returns None (never raises) on empty text or any rendering
-    failure, so one bad caption can never break the whole assembly - same
-    fail-soft pattern used for music/SFX elsewhere in this file."""
+    failure."""
     try:
         img = render_caption_image(text, video_width, video_height)
         if img is None:
@@ -907,11 +879,7 @@ def build_caption_clip(text, start, duration, video_width=WIDTH, video_height=HE
 
 
 def build_caption_clips(shot_list, shot_durations, shot_starts, video_width=WIDTH, video_height=HEIGHT):
-    """Builds one timed caption overlay clip per shot, using each shot's
-    own narration_excerpt (the exact text narration.py already used to
-    synthesize that shot's audio) and the same shot_starts/shot_durations
-    already computed for audio sync - so captions land on precisely the
-    same timeline as the narration and video clips they describe."""
+    """Builds one timed caption overlay clip per shot."""
     caption_clips = []
     for i, shot in enumerate(shot_list):
         text = (shot.get("narration_excerpt") or "").strip()
@@ -946,11 +914,6 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
 
     final = concatenate_videoclips(clips, method="compose")
 
-    # Burned-in subtitles: one caption per shot, timed to the exact same
-    # shot_starts/shot_durations used for audio sync, composited on top
-    # of the concatenated video before fades/audio are applied. Wrapped
-    # for resilience - a captioning failure never blocks the video itself
-    # from being assembled and uploaded.
     try:
         caption_clips = build_caption_clips(shot_list, shot_durations, shot_starts, WIDTH, HEIGHT)
         if caption_clips:
@@ -1111,9 +1074,7 @@ def main():
         download_file(script["narration_url"], audio_path)
         audio_clip = AudioFileClip(audio_path)
         shot_durations = get_shot_durations(script, shot_list, audio_clip)
-        shot_durations[-1] += TRAIL_SECONDS  # hold the final shot a bit longer so
-                                              # the music/ambient bed fades out
-                                              # naturally instead of cutting off
+        shot_durations[-1] += TRAIL_SECONDS
 
         output_path = "/tmp/final_video.mp4"
         output_path, audio_stats = assemble_final_video(script_id, video_urls, audio_path, music_mood, shot_list, shot_durations, output_path)
