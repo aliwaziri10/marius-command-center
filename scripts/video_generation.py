@@ -2,8 +2,8 @@
 Marius Command Center - Video Generation Agent
 Takes the oldest script with images generated and generates one real AI
 video clip per shot using Agnes AI, sized to match narration timing, then
-assembles the final video with a 3-layer audio mix: narration, background
-score, and SFX.
+assembles the final video with a 4-layer audio mix: original shot-clip
+ambience, narration, background score, and SFX.
 
 RESUME-SAFE: generated clips are uploaded to storage and recorded in
 video_urls/video_next_index after every single shot, so a run that gets
@@ -84,6 +84,21 @@ the screen - and since these are burned into the video pixels (not a real
 YouTube caption track), toggling CC did nothing. Font size dropped to 28
 and max width ratio dropped to 0.70 to bring this back to a normal
 subtitle-sized footprint near the bottom of the frame.
+
+ORIGINAL-CLIP-AUDIO FIX (2026-07-20): individual shot clips downloaded
+straight from Agnes/storage already contain usable ambience/music baked
+in by the video model itself - confirmed by listening to pre-stitch
+clips directly in Supabase Storage. But assemble_final_video was calling
+concatenate_videoclips(clips) (which keeps that original audio) and then
+immediately final.with_audio(final_audio) - and with_audio() REPLACES a
+clip's audio track rather than layering onto it. So the good original
+per-clip audio was being silently discarded and replaced by only
+narration+music+SFX every single time, regardless of whether that
+generated music/SFX mix succeeded or came back empty. build_audio_mix now
+also accepts and mixes in the original per-shot audio (extracted from the
+same downloaded shot clips already used for video) as its 4th layer,
+volume-matched below narration/music via ORIGINAL_CLIP_AUDIO_VOLUME, so
+the ambience you already confirmed sounds right is no longer thrown away.
 """
 
 import os
@@ -108,18 +123,14 @@ from moviepy.audio.fx import AudioFadeIn, AudioFadeOut
 
 FADE_IN_SECONDS = 0.75
 FADE_OUT_SECONDS = 1.5
-TRAIL_SECONDS = 3.0  # extra hold at the very end so ambient/music keeps
-                      # breathing and fades out naturally instead of
-                      # cutting hard the instant narration ends
+TRAIL_SECONDS = 3.0
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
 AGNES_API_KEY = os.environ["AGNES_API_KEY"]
 FREESOUND_API_KEY = os.environ.get("FREESOUND_API_KEY")
 ACE_MUSIC_API_KEY = os.environ.get("ACE_MUSIC_API_KEY")
-HF_TOKEN = os.environ.get("HF_TOKEN")  # Hugging Face Inference API - free fallback
-                                        # for background music if every ACE Music
-                                        # host fails (added 2026-07-19)
+HF_TOKEN = os.environ.get("HF_TOKEN")
 
 HEADERS = {
     "apikey": SUPABASE_KEY,
@@ -134,47 +145,29 @@ AGNES_HEADERS = {
     "Content-Type": "application/json",
 }
 
-# Try both known ACE Music hosts in order; only give up on background
-# music if every host in this list fails.
 ACE_MUSIC_BASES = ["https://api.acemusic.ai", "https://ai.acemusic.ai"]
 ACE_MUSIC_HEADERS = {
     "Authorization": f"Bearer {ACE_MUSIC_API_KEY}",
     "Content-Type": "application/json",
 }
 
-# Free fallback for background music if every ACE Music host fails. Uses
-# Hugging Face's free Serverless Inference API (facebook/musicgen-small) -
-# no cost, uses the HF_TOKEN secret that was already sitting unused in this
-# repo's GitHub Actions secrets. Rate-limited (~1000 free requests/day) and
-# slower/lower-fidelity than ACE Music, so it's a fallback, not a primary.
 HF_MUSICGEN_URL = "https://api-inference.huggingface.co/models/facebook/musicgen-small"
 
 VIDEO_BUCKET = "videos"
-CLIP_BUCKET = "video_clips"  # individual shot clips, kept until final assembly
+CLIP_BUCKET = "video_clips"
 WIDTH, HEIGHT = 1152, 768
 FRAME_RATE = 24
-MIN_FRAMES = 49   # 8*6+1, ~2s - Agnes requires num_frames = 8*n+1
-MAX_FRAMES = 169  # 8*21+1, ~7s
-MAX_CLIP_SECONDS = MAX_FRAMES / FRAME_RATE  # ~7.04s - hard cap per single Agnes generation
+MIN_FRAMES = 49
+MAX_FRAMES = 169
+MAX_CLIP_SECONDS = MAX_FRAMES / FRAME_RATE
 
-CLIP_BATCH_LIMIT = 8  # max new clips generated per run - stay under Agnes's free-tier quota
+CLIP_BATCH_LIMIT = 8
 
-NARRATION_VOLUME = 0.70  # added per Zia's request - narration was playing at raw,
-                          # unscaled volume while music/SFX were already turned down,
-                          # so it drowned out the rest of the mix. 30% cut brings it
-                          # back in balance with MUSIC_VOLUME/SFX_VOLUME below. The
-                          # safety limiter still protects against clipping regardless
-                          # of this value.
-MUSIC_VOLUME = 0.34   # was 0.238 (+20% from 0.198 per Zarah's request) - bumped
-                       # further per Zia's "louder ambient/music" request. Safe to
-                       # push higher: apply_safety_limiter below auto-scales the
-                       # WHOLE mix down if the true peak would exceed LIMITER_CEILING,
-                       # so this cannot cause clipping even at this level.
-SFX_VOLUME = 1.0      # capped at source loudness - 0.935+20% would exceed 1.0 and risk clipping/distortion
-LIMITER_CEILING = 0.98  # safety cap on the fully mixed audio (narration + music + SFX
-                         # combined) - individual layer volumes staying under 1.0 doesn't
-                         # guarantee the mix does when loud moments overlap, so this checks
-                         # the actual mixed peak and scales down only if it would clip
+NARRATION_VOLUME = 0.70
+MUSIC_VOLUME = 0.34
+SFX_VOLUME = 1.0
+ORIGINAL_CLIP_AUDIO_VOLUME = 0.30
+LIMITER_CEILING = 0.98
 
 AGNES_RETRYABLE_CODES = {429, 500, 502, 503, 504}
 AGNES_MAX_RETRIES = 4
@@ -182,44 +175,32 @@ AGNES_MAX_RETRIES = 4
 CLIP_VERIFY_RETRIES = 3
 CLIP_VERIFY_RETRY_WAIT = 5
 
-# Shot descriptions containing any of these words are assumed to be
-# deliberately dark/night scenes - skip the auto "well-lit" boost so we
-# don't wash out an intentionally moody shot.
 DARK_SCENE_KEYWORDS = (
     "night", "dark", "dim", "shadow", "silhouette", "dusk", "twilight",
     "candlelit", "moonlit", "underground", "cave", "storm", "eclipse",
     "blackout", "gloom",
 )
 
-# --- Subtitle/caption styling ---
 CAPTION_FONT_PATHS = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
 ]
 CAPTION_FONT_SIZE = 28
-CAPTION_MAX_WIDTH_RATIO = 0.70   # caption text block width as a fraction of video width
-CAPTION_BOTTOM_MARGIN = 60       # px from bottom of frame to the caption block
+CAPTION_MAX_WIDTH_RATIO = 0.70
+CAPTION_BOTTOM_MARGIN = 60
 CAPTION_LINE_SPACING = 10
 CAPTION_TEXT_COLOR = (255, 255, 255, 255)
 CAPTION_STROKE_COLOR = (0, 0, 0, 255)
 CAPTION_STROKE_WIDTH = 3
-CAPTION_BG_COLOR = (0, 0, 0, 140)  # semi-transparent bar behind the text
+CAPTION_BG_COLOR = (0, 0, 0, 140)
 CAPTION_BG_PADDING = 16
 
 
 class ContentPolicyRejection(Exception):
-    """Raised when Agnes rejects a shot's prompt on content-policy
-    grounds, so the caller can print a clear, actionable message instead
-    of letting a raw HTTPError/traceback be the only signal."""
     pass
 
 
 class AgnesOverloadedError(Exception):
-    """Raised when Agnes is transiently overloaded and every retry inside
-    create_agnes_task/poll_agnes_task has been exhausted. Distinct from a
-    genuine bug so the caller can exit quietly (progress already saved)
-    instead of crashing the whole run and opening a GitHub issue for a
-    problem that will resolve itself on the next scheduled run."""
     pass
 
 
@@ -249,20 +230,6 @@ def download_file(url, out_path):
 
 
 def build_agnes_prompt(shot, use_fallback=False):
-    """Fold the Cinematic Director's shot_type/camera_movement/lens_effect
-    into the Agnes prompt so the generated clip actually reflects the
-    intended camera work, not just the raw visual description.
-
-    Also appends a "well-lit, balanced exposure" cue by default, since
-    Agnes otherwise defaults to noticeably dark/underlit footage on most
-    shots - unless the shot's own visual_description already implies a
-    deliberately dark scene (night, dusk, shadow, etc.), in which case we
-    leave the lighting alone.
-
-    use_fallback=True builds a generic, content-safe prompt with NO
-    freeform visual_description text at all - used as a one-time retry
-    when the real prompt gets rejected on content-policy grounds, since
-    we can't know in advance which word/phrase triggered the rejection."""
     shot_type = (shot.get("shot_type") or "medium").replace("_", " ")
     camera_movement = (shot.get("camera_movement") or "static").replace("_", " ")
     lens_effect = shot.get("lens_effect") or "none"
@@ -284,13 +251,6 @@ def build_agnes_prompt(shot, use_fallback=False):
 
 
 def create_agnes_task(prompt, num_frames):
-    """Retries on transient Agnes/backend errors (429 rate limit, 500/502/
-    503/504 server-side issues) with backoff before raising - one flaky
-    response from Agnes should not kill the whole run and force a manual
-    re-trigger. Raises ContentPolicyRejection distinctly (not retryable)
-    if Agnes rejects the prompt on content grounds. Raises
-    AgnesOverloadedError (also distinct, also not a bug) if every retry
-    is exhausted - the caller exits quietly on this instead of crashing."""
     last_error_text = None
 
     for attempt in range(AGNES_MAX_RETRIES):
@@ -368,9 +328,6 @@ def poll_agnes_task(video_id, max_wait=300, interval=10):
 
 
 def _generate_one_segment(shot, segment_duration, out_path):
-    """Generates a single Agnes clip no longer than MAX_CLIP_SECONDS. On
-    content-policy rejection, retries ONCE with a generic fallback prompt
-    before giving up."""
     raw_frames = int(segment_duration * FRAME_RATE)
     raw_frames = max(MIN_FRAMES, min(MAX_FRAMES, raw_frames))
     num_frames = round_to_valid_frames(raw_frames)
@@ -382,7 +339,7 @@ def _generate_one_segment(shot, segment_duration, out_path):
     except ContentPolicyRejection:
         print("Content policy rejection on primary prompt - retrying once with a generic fallback prompt...")
         fallback_prompt = build_agnes_prompt(shot, use_fallback=True)
-        video_id = create_agnes_task(fallback_prompt, num_frames)  # let this one raise if it also fails
+        video_id = create_agnes_task(fallback_prompt, num_frames)
 
     video_url = poll_agnes_task(video_id)
     download_file(video_url, out_path)
@@ -390,13 +347,6 @@ def _generate_one_segment(shot, segment_duration, out_path):
 
 
 def generate_shot_clip(shot, target_duration, out_path):
-    """Generates a shot's full clip. Agnes hard-caps any single generation
-    at ~MAX_CLIP_SECONDS. Shots needing MORE than that are now split into
-    multiple back-to-back Agnes generations and stitched together with
-    concatenate_videoclips, instead of generating one short clip and
-    freezing the last frame to pad out the remaining time - eliminates
-    the multi-second freeze-frame stretches that were showing up on any
-    shot with longer narration."""
     n_segments = max(1, math.ceil(target_duration / MAX_CLIP_SECONDS))
     segment_duration = target_duration / n_segments
 
@@ -412,7 +362,7 @@ def generate_shot_clip(shot, target_duration, out_path):
         _generate_one_segment(shot, segment_duration, seg_path)
         segment_paths.append(seg_path)
         if seg < n_segments - 1:
-            time.sleep(4)  # brief pause between back-to-back submissions for the same shot
+            time.sleep(4)
 
     clips = [VideoFileClip(p) for p in segment_paths]
     stitched = concatenate_videoclips(clips, method="compose")
@@ -426,12 +376,6 @@ def generate_shot_clip(shot, target_duration, out_path):
 
 
 def fit_clip_to_duration(clip, target):
-    """Fits a generated clip to its target duration. If the clip is
-    already long enough, trims it. If it's shorter, extends it by
-    freezing the last frame and holding it for the remaining time -
-    NOT by looping/repeating the clip from the start, which reads as an
-    obvious, jarring restart. A held final frame is invisible to the
-    viewer."""
     if clip.duration >= target:
         return clip.subclipped(0, target)
 
@@ -480,12 +424,6 @@ def save_progress(script_id, video_urls, next_index):
 
 
 def mark_content_flagged(script_id, shot_index, reason):
-    """Marks a script content_flagged instead of leaving it at
-    images_generated, so get_next_ready_script skips it on all future
-    runs and moves on to the next-oldest eligible script instead of
-    crash-looping on the same blocked script forever. Zia (or Claude)
-    reviews shot_list, rewords the offending shot, then manually resets
-    status back to 'images_generated' to resume it."""
     resp = requests.patch(
         f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
         headers=HEADERS,
@@ -503,12 +441,6 @@ def compute_shot_durations(shot_list, total_duration):
 
 
 def get_shot_durations(script, shot_list, audio_clip):
-    """Prefers the REAL per-shot durations already computed and saved by
-    narration.py in the shot_durations DB column (accurate to the actual
-    narration audio, so clip cuts land on sentence ends). Only falls back
-    to the old text-length-weighted estimate if shot_durations is missing
-    or doesn't match the current shot_list (e.g. older scripts generated
-    before this column existed)."""
     stored = script.get("shot_durations")
     if (
         isinstance(stored, list)
@@ -531,27 +463,13 @@ def compute_shot_start_times(shot_durations):
 
 
 def compute_target_bitrate(duration_seconds, target_mb=42, audio_kbps=128):
-    """Pick a video bitrate so the final file lands under the 50MB
-    Supabase free-tier cap, leaving 8MB headroom, regardless of length."""
     target_bits = target_mb * 8 * 1024 * 1024
     audio_bits = audio_kbps * 1000 * duration_seconds
     video_bits = max(target_bits - audio_bits, 300_000 * duration_seconds)
     return f"{int(video_bits / duration_seconds / 1000)}k"
 
 
-# ---------------------------------------------------------------------------
-# Sound Designer: background score (ACE Music) + SFX (Freesound)
-# ---------------------------------------------------------------------------
-
 def poll_ace_music_task(task_id, out_path, base_url=None, max_wait=180, interval=8):
-    """Polls ACE Music task status via POST /query_result, per the real
-    ACE-Step API (a task created by POST /release_task returns a task_id,
-    queried via POST task_id_list - not GET /v1/jobs/{job_id}).
-
-    base_url must be the same host that /release_task was called on -
-    passed in explicitly since generate_background_music now tries
-    multiple hosts and must poll/download from whichever one accepted
-    the task."""
     waited = 0
     while waited < max_wait:
         resp = requests.post(
@@ -591,12 +509,6 @@ def poll_ace_music_task(task_id, out_path, base_url=None, max_wait=180, interval
 
 
 def generate_background_music(prompt, duration, out_path):
-    """Generates the episode's background score via POST /release_task,
-    polled via POST /query_result. Tries every host in ACE_MUSIC_BASES in
-    order and only gives up (returns None, skipping music for this
-    episode) if every host fails - ACE Music's free hosted API has had
-    reported reliability issues on individual hosts, so a single 404/502
-    on one host should not silently kill background music forever."""
     if not ACE_MUSIC_API_KEY:
         print("No ACE_MUSIC_API_KEY set - skipping background music.")
         return None
@@ -631,14 +543,6 @@ def generate_background_music(prompt, duration, out_path):
 
 
 def generate_background_music_musicgen(prompt, duration, out_path):
-    """Fallback background-music generator using Hugging Face's free
-    Serverless Inference API (facebook/musicgen-small). Only called when
-    every ACE Music host has already failed. Uses the HF_TOKEN secret that
-    was already present in this repo's GitHub Actions secrets but unused
-    until now. Fails silently (returns None) just like generate_background_music
-    and search_freesound_sfx, so a bad response here never crashes a run -
-    the pipeline simply continues without music for this episode, same as
-    always."""
     if not HF_TOKEN:
         print("No HF_TOKEN set - skipping MusicGen fallback, continuing without background music.")
         return None
@@ -647,7 +551,7 @@ def generate_background_music_musicgen(prompt, duration, out_path):
             HF_MUSICGEN_URL,
             headers={"Authorization": f"Bearer {HF_TOKEN}"},
             json={"inputs": prompt},
-            timeout=120,  # MusicGen cold starts can take 20-60s+ on the free tier
+            timeout=120,
         )
         if resp.status_code == 503:
             wait_for = 20
@@ -680,8 +584,6 @@ def generate_background_music_musicgen(prompt, duration, out_path):
 
 
 def search_freesound_sfx(query, out_path):
-    """Finds and downloads a short SFX clip matching the cue. Returns None
-    (and logs) on any failure so a bad SFX cue never breaks the whole run."""
     if not FREESOUND_API_KEY:
         print("No FREESOUND_API_KEY set - skipping SFX for this cue.")
         return None
@@ -717,9 +619,6 @@ def search_freesound_sfx(query, out_path):
 
 
 def apply_safety_limiter(audio_clip, ceiling=LIMITER_CEILING):
-    """Checks the TRUE peak of the fully mixed audio and scales the whole
-    mix down only if that peak would exceed `ceiling`. Fails gracefully -
-    on any error, returns the mix unscaled instead of crashing the run."""
     try:
         samples = audio_clip.to_soundarray(fps=44100)
     except Exception as e:
@@ -739,12 +638,29 @@ def apply_safety_limiter(audio_clip, ceiling=LIMITER_CEILING):
     return audio_clip.with_volume_scaled(scale)
 
 
-def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration):
-    """Composites 3 audio layers: narration, looped background score, and
-    per-shot SFX placed at their exact timestamps. Returns (mixed_audio,
-    stats) so callers can persist exactly what did/didn't make it in."""
+def extract_original_clip_audio(video_clips, shot_durations, shot_starts, total_duration):
+    layers = []
+    for i, clip in enumerate(video_clips):
+        try:
+            if clip.audio is None:
+                continue
+            seg_audio = clip.audio
+            max_len = shot_durations[i]
+            if seg_audio.duration and seg_audio.duration > max_len:
+                seg_audio = seg_audio.subclipped(0, max_len)
+            seg_audio = seg_audio.with_volume_scaled(ORIGINAL_CLIP_AUDIO_VOLUME).with_start(shot_starts[i])
+            layers.append(seg_audio)
+        except Exception as e:
+            print(f"Could not extract original audio from shot {i}, skipping that layer: {e}")
+    return layers
+
+
+def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration, original_clip_audio_layers=None):
     layers = [AudioFileClip(narration_path).with_volume_scaled(NARRATION_VOLUME)]
     stats = {"music_generated": False, "sfx_cues_total": 0, "sfx_applied_count": 0}
+
+    if original_clip_audio_layers:
+        layers.extend(original_clip_audio_layers)
 
     if music_mood:
         music_path = "/tmp/background_music.mp3"
@@ -774,18 +690,12 @@ def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_
     if mixed.duration and mixed.duration > total_duration:
         mixed = mixed.subclipped(0, total_duration)
     print(f"Audio mix stats: music_generated={stats['music_generated']}, "
-          f"sfx_applied={stats['sfx_applied_count']}/{stats['sfx_cues_total']} cues")
+          f"sfx_applied={stats['sfx_applied_count']}/{stats['sfx_cues_total']} cues, "
+          f"original_clip_audio_layers={len(original_clip_audio_layers or [])}")
     return apply_safety_limiter(mixed), stats
 
 
-# ---------------------------------------------------------------------------
-# Subtitles: one burned-in caption per shot, from narration_excerpt
-# ---------------------------------------------------------------------------
-
 def _load_caption_font(size=CAPTION_FONT_SIZE):
-    """Loads DejaVu Sans Bold if present. Falls back to PIL's built-in
-    default font otherwise, so captions still render (just smaller/
-    plainer) instead of crashing the whole assembly over a missing font."""
     for path in CAPTION_FONT_PATHS:
         if os.path.exists(path):
             try:
@@ -797,7 +707,6 @@ def _load_caption_font(size=CAPTION_FONT_SIZE):
 
 
 def _wrap_caption_text(text, font, max_width, draw):
-    """Greedy word-wrap using actual rendered text width."""
     words = text.split()
     lines = []
     current = ""
@@ -815,7 +724,6 @@ def _wrap_caption_text(text, font, max_width, draw):
 
 
 def render_caption_image(text, video_width=WIDTH, video_height=HEIGHT):
-    """Renders a single caption as a full-frame-sized RGBA PIL image."""
     text = (text or "").strip()
     if not text:
         return None
@@ -862,9 +770,6 @@ def render_caption_image(text, video_width=WIDTH, video_height=HEIGHT):
 
 
 def build_caption_clip(text, start, duration, video_width=WIDTH, video_height=HEIGHT):
-    """Builds one timed transparent ImageClip overlay for a single shot's
-    caption. Returns None (never raises) on empty text or any rendering
-    failure."""
     try:
         img = render_caption_image(text, video_width, video_height)
         if img is None:
@@ -879,7 +784,6 @@ def build_caption_clip(text, start, duration, video_width=WIDTH, video_height=HE
 
 
 def build_caption_clips(shot_list, shot_durations, shot_starts, video_width=WIDTH, video_height=HEIGHT):
-    """Builds one timed caption overlay clip per shot."""
     caption_clips = []
     for i, shot in enumerate(shot_list):
         text = (shot.get("narration_excerpt") or "").strip()
@@ -904,8 +808,12 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
 
     total_duration = sum(shot_durations)
     shot_starts = compute_shot_start_times(shot_durations)
+
+    original_clip_audio_layers = extract_original_clip_audio(clips, shot_durations, shot_starts, total_duration)
+
     final_audio, audio_stats = build_audio_mix(
-        narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration
+        narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration,
+        original_clip_audio_layers=original_clip_audio_layers,
     )
 
     final_audio = final_audio.with_effects(
