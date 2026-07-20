@@ -1,70 +1,91 @@
 # Marius Command Center — Handoff Sheet
-Written: 2026-07-12 (later same day), by Claude, verified live against Supabase and GitHub at time of writing.
+Written: 2026-07-20, by Claude, verified live against Supabase and GitHub at time of writing.
 
 ## ⚠️ STANDING RULE — READ THIS FIRST
-**Do not trust this document at face value.** Before acting on ANY claim below, re-verify it against live Supabase data (project `swnjzzejsuupecdgbzzf`) and/or the live GitHub repo (`aliwaziri10/marius-command-center`). This has caught real false claims in prior handoffs — trust the database and the actual repo files, never a previous session's notes, including this one.
+**Do not trust this document at face value.** Before acting on ANY claim below, re-verify it against live Supabase data (project `swnjzzejsuupecdgbzzf`) and/or the live GitHub repo (`aliwaziri10/marius-command-center`). Prior handoffs have gone stale within days — trust the database and the actual repo files, never a previous session's notes, including this one.
 
 ## User workflow preferences (apply every time, no exceptions)
-- Every path/URL goes in its own fenced code block (so the copy button appears).
-- Every script/code change: give the path first, then paste the FULL file content directly in a fenced code block in the chat message itself — never as a downloadable file. User selects-all-deletes-pastes into GitHub and commits.
-- Zia is a non-coder: no diffs, full-file replacement only. Max 3-4 steps per message.
-- Do not ask for permission/confirmation on routine execution steps once a plan is clear — only check in when a decision genuinely needs Zia's input. Just proceed and report what was done.
-- After every meaningful change, update this handoff doc (`docs/marius-handoff.md` in the repo — always commit it here, never a local/sandbox path) with exact verified values so the next session doesn't have to re-derive anything.
-- **GitHub write access**: Claude's GitHub connector is currently read-only (confirmed via a 403 "Resource not accessible by integration" error when attempting `create_or_update_file`). All code/workflow changes must still go through Zia pasting into the GitHub UI. Zia has been told how to upgrade this (GitHub → Settings → Applications → Installed GitHub Apps → set Contents to Read and write) but has NOT done so as of this writing — re-check by attempting a small write before assuming this has changed.
+- Every path/URL goes in its own fenced code block (copy button).
+- Every script/code change: give the path first, then the FULL file content in a separate fenced code block in chat. Zia selects-all, deletes, pastes, commits. Never diffs, never "find this line."
+- Zia is a non-coder, works via browser only (GitHub web editor, Supabase dashboard, Render/Google Cloud Console), no terminal.
+- One step at a time for multi-step instructions.
+- Terse, action-only replies — no preamble/rationale unless safety-critical.
+- After meaningful changes, update this doc with exact live-verified values.
+- GitHub `create_or_update_file` returns 403 every session — Claude's write access is read-only in practice. All code changes go through Zia pasting into the GitHub web UI.
+- Branch protection on `main`: no direct commits — but Zia has been committing directly via the web editor successfully this session, so protection may not be active or applies only to the API path. Re-verify if a future commit is rejected.
 
 ## Reusable references
 - Supabase project ID: `swnjzzejsuupecdgbzzf`
 - GitHub repo: `https://github.com/aliwaziri10/marius-command-center`
 - GitHub Actions: `https://github.com/aliwaziri10/marius-command-center/actions`
-- Storage buckets (all public): `narration`, `images`, `video_clips`, `videos`, `thumbnails`
-- `CLIP_BATCH_LIMIT = 8` in `video_generation.py` — each run only generates up to 8 new clips (Agnes free-tier quota), resumes next run.
-- `image_generation.py` has NO batch limit — one run processes the entire script's shot list in one continuous execution.
-- Claude's tools cannot fetch/render images from `swnjzzejsuupecdgbzzf.supabase.co` — visual checks of thumbnails must be done by Zia directly.
-- Claude DOES have a working GitHub connector for reads (`GitHub:get_file_contents`, etc.) — use this instead of `raw.githubusercontent.com` fetches where convenient, it's authenticated and not rate-limited the same way.
+- Storage buckets: `narration`, `video_clips`, `videos`, `thumbnails` (`images` bucket now unused — see pipeline change below)
+- Secret naming for Marius (distinct from Nova's `YT_*` convention): `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REFRESH_TOKEN`
+- `CLIP_BATCH_LIMIT = 8` in `video_generation.py` — max 8 new clips per scheduled run (Agnes free-tier quota), resumes automatically next run. A 45-shot script takes ~6 runs to fully clip.
+- `AgnesOverloadedError` in `video_generation.py` exits quietly (exit 0, no GitHub issue) on transient Agnes overload — by design, so normal overload doesn't spam issues. Means a stalled script won't always show up as a failed run; check `video_next_index` in Supabase directly to confirm real progress vs. silent stall.
 
-## Full pipeline map (all 8 workflows, verified live 2026-07-12)
-| Workflow | Schedule | Does |
+## Pipeline structure change — 2026-07-20 (dead code removed)
+`image_generation.py` and its workflow (`image_generation.yml`) generated a still image per shot via Pollinations and wrote `image_urls` + status `images_generated` — but `video_generation.py` never read `image_urls`; it always generated video clips directly from `shot_list` text via Agnes. This was confirmed dead code (the repo's own `PLAYBOOK.md` already called `image_urls` "legacy/unused for new scripts").
+
+**Removed:**
+- `scripts/image_generation.py` — deleted.
+- `.github/workflows/image_generation.yml` — content replaced with a retirement comment (left in place, disabled).
+
+**Changed:**
+- `scripts/narration.py` — final status changed from `"narrated"` to `"images_generated"` directly, so `video_generation.py` (which queries on that exact status string) picks it up with no gap. Log message updated to match.
+
+**New pipeline flow:** `topic_research` → `script_writing` → `narration` (now sets `images_generated` directly) → `video_generation` → `thumbnail_generation` / `youtube_upload`.
+
+The `images_generated` status name is now historical/misleading (no images involved) but left as-is since every downstream script (`video_generation.py`, `youtube_upload.py`, dashboards) keys off that exact string — renaming it would require touching every query, not worth the risk for a cosmetic fix.
+
+## Fixes made 2026-07-20 (all confirmed live)
+
+### 1. YouTube OAuth `invalid_grant` — FIXED
+Root cause: refresh token had expired (Google OAuth consent screen constraint). Fixed by:
+- Generating a new Client Secret in Google Cloud Console (old one couldn't be retrieved — Google no longer allows viewing existing secrets).
+- Regenerating the refresh token via OAuth Playground with the new credentials.
+- Updated GitHub secrets: `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REFRESH_TOKEN`.
+- Confirmed fixed: manual `youtube_upload.yml` run completed cleanly (no `invalid_grant`), correctly reported "No videos ready" since nothing was at `video_generated` status yet at the time.
+- Publishing status checked: consent screen is in **Production** (not Testing), so this should not require re-doing every 7 days going forward.
+
+### 2. Oversized burned-in captions — FIXED
+Captions were rendering at font size 42 across 86% of frame width, wrapping into a block covering nearly half the screen on longer narration excerpts. In `scripts/video_generation.py`:
+- `CAPTION_FONT_SIZE`: 42 → 28
+- `CAPTION_MAX_WIDTH_RATIO`: 0.86 → 0.70
+This is a constant change, applies to all future videos, not a one-off patch.
+
+### 3. Original clip audio being discarded — FIXED
+`assemble_final_video` was concatenating shot clips (which already carried usable ambience/music baked in by Agnes) via `concatenate_videoclips`, then calling `.with_audio(final_audio)` — which **replaces** a clip's audio track rather than layering onto it. The original per-clip audio was being silently thrown away every time, regardless of whether the generated music/SFX mix succeeded.
+- Added `extract_original_clip_audio()` — pulls each shot's original audio track, volume-matched via new constant `ORIGINAL_CLIP_AUDIO_VOLUME = 0.30`.
+- `build_audio_mix()` now takes this as an optional 4th layer alongside narration/music/SFX.
+- Audio mix is now: narration + original clip ambience + background score + SFX, all through the existing safety limiter (`LIMITER_CEILING = 0.98`) so this can't cause clipping.
+
+## Verified live pipeline state (queried directly, 2026-07-20 — RE-VERIFY before trusting)
+
+| Status | Count |
+|---|---|
+| `archived` | 1 |
+| `images_generated` | 9 |
+| `uploaded` | 10 |
+
+Topics in queue: 93.
+
+### Scripts at `images_generated` (waiting on Video Generation), oldest first:
+| Script ID | Clips done | Created |
 |---|---|---|
-| Topic Research | every 6h | generates new topics |
-| Script Writing | 03:00, 15:00 | writes script + `hook_text` from oldest pending topic |
-| Narration | 05:00, 17:00 | narrates oldest pending script, writes `shot_durations` |
-| Image Generation | every 6h | ALL shots in one run (no batch limit) |
-| Video Generation | every 20 min | 8 clips/run, auto-assembles once all clips done |
-| Thumbnail Generation | every 10 min | picks oldest script missing a thumbnail; also pushes directly to YouTube if script already `uploaded` (see Code changes below) |
-| YouTube Upload | every 30 min | uploads oldest `video_generated` script, sets thumbnail if one exists yet |
-| Update Status | on completion of the above | keeps `STATUS.md` current |
+| `e6de21d1-36f1-4723-880f-c8900b3522b4` | 32/45 | 2026-07-15 |
+| `f86cea49-f741-40b2-8712-ea8aaed13442` | 0 | 2026-07-16 |
+| `58f75bf2-e7ea-47fa-b34b-8705af1e49c2` | 0 | 2026-07-16 |
+| `f53f3cc0-be59-41d5-8cc1-4d93bb257f0a` | 0 | 2026-07-16 |
+| `78011fa8-7ce7-49f4-8443-2998afdc1fce` | 0 | 2026-07-17 |
+| `d4015715-a3bd-4231-a1e7-0d405b6bedbf` | 0 | 2026-07-18 |
+| `c34406d6-5123-41f9-807c-5758d9d83ad2` | 0 | 2026-07-18 |
+| `c6d245b1-49a9-4a19-8c89-8f4a80c6d389` | 0 | 2026-07-19 |
+| `3ad85abb-1719-4e4b-9480-7fae986209d3` | 0 | 2026-07-19 |
 
-All cron schedules and concurrency groups confirmed correct — no structural pipeline issues found in this audit.
+Video Generation only works the single oldest script at a time (8 clips/run); the rest queue behind it in order — this is normal, not stalled. `e6de21d1` (45 shots) has ~2 runs left before it moves to assembly/upload, then `f86cea49` starts.
 
-## Verified script pipeline state (queried directly, 2026-07-12, RE-VERIFY before trusting)
-
-| Script ID | Status | Images | Clips | Notes |
-|---|---|---|---|---|
-| `8688e753-a000-419c-8250-a1294cb12a75` | `pending` | 0 | 0 | **New, generated this session by the live pipeline** — hook_text is `"400 PAGES. ONE CHEST."`, confirming the `script_writing.py` hook_text fix works end-to-end on a real new script. |
-| `1cb89fbe-d7aa-41ab-90d8-0d1cd1fbfd62` | `images_generated` | 55/55 | 0 | Has real `shot_durations` (new sync fix). Ready for Video Generation, will pick up automatically. |
-| `a2e22bd4-f418-4d53-8d5e-40bee1203760` | `video_generated` | 43 | 43/43 | Old narration (no `shot_durations`). Fully assembled, waiting for Thumbnail Generation + YouTube Upload to pick it up on their next scheduled ticks — good real-world test of the new thumbnail-push code path once it goes through. |
-| `ae2507cb-e06f-4884-954e-ea7870707636` | `uploaded` | 38 | 38/38 | Live YouTube ID `ZzoWqHRgb80`. hook_text `"VERDUN: THE FORGOTTEN ARMY"`. Thumbnail exists in Supabase. **Zia manually uploaded a custom thumbnail via YouTube Studio for this video already** (had no thumbnail because it was uploaded before the thumbnail pipeline existed). |
-| `8c626aa5-672b-4fda-82aa-c9ef2bbe82d6` | `uploaded` | 42 | 42/42 | Live YouTube ID `FUykoQjdyg8`. hook_text is now `"SECRET LEDGER"` (changed by an external/unknown process after Claude set it to `"312 DIARIES..."` earlier — unexplained, not investigated). **Zia manually uploaded a custom thumbnail via YouTube Studio for this video too**, same reason as above. |
-| `d615192e-8707-4c1d-8f62-8f6b84e3d51e` | `archived` | 23 | 0 | Still untouched, still not discussed with Zia. Ask her directly. |
-
-## Code changes made 2026-07-12 (all confirmed live in repo)
-1. **`scripts/thumbnail_generation.py`** — multiple rounds this session, final confirmed state (333 lines, syntax-checked):
-   - Auto-shrinking font (`fit_text_to_frame`, 88px down to 40px floor) so hook text can never overflow/get cut off at the edges.
-   - Stroke-aware bounding box math (`_line_bbox` includes `stroke_width`) for accurate centering.
-   - Yellow text `(255, 214, 0)` instead of white.
-   - Vivid/saturated background image prompt instead of "moody, film grain" (better YouTube CTR).
-   - `resize_to_canvas()` cover-crop — added by a **different session** working on the same repo in parallel (confirmed compatible, not a conflict) — force-fits Pollinations.ai output to the exact 1280x720 canvas before text layout, since Pollinations doesn't always honor requested dimensions.
-   - **NEW this round**: `push_thumbnail_to_youtube()` — when this script generates/regenerates a thumbnail for a script that's already `status = 'uploaded'` (has a `youtube_video_id`), it now pushes the thumbnail directly to the live YouTube video via `thumbnails.set`, not just to Supabase. This closes a real gap: previously, any post-upload thumbnail regeneration sat unused in Supabase forever since `youtube_upload.py` only calls `thumbnails.set` once, at original upload time. Requires `YOUTUBE_CLIENT_ID`/`YOUTUBE_CLIENT_SECRET`/`YOUTUBE_REFRESH_TOKEN` env vars (added to the workflow, see below) — if missing, the push step just logs and skips, doesn't fail the run.
-2. **`.github/workflows/thumbnail_generation.yml`** — updated to pass `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REFRESH_TOKEN` as env vars (same secrets `youtube_upload.yml` already uses), required for the push above to work.
-3. **`scripts/script_writing.py`** — adds a real `hook_text` field to the generation prompt/schema (`normalize_hook_text()`), confirmed working on a real new script (`8688e753`, see table above).
-4. **Database**: `8c626aa5` had `hook_text` set (later changed externally, see table) and `thumbnail_url` reset to null earlier this session to force a regen with the fixed code.
-
-**NOT YET TESTED end-to-end**: the `push_thumbnail_to_youtube` path has not yet fired for real, since no script has both (a) been freshly uploaded AND (b) had its thumbnail regenerated *after* upload since this code went live. The next natural test is if `a2e22bd4` or `1cb89fbe` get uploaded and something later triggers a thumbnail regen on them — or a manual test by nulling `thumbnail_url` on `ae2507cb` or `8c626aa5` and watching the next Thumbnail Generation run's logs.
-
-## Open items / next steps (in order) — RE-VERIFY EACH BEFORE ACTING
-1. Watch `a2e22bd4` go through Thumbnail Generation + YouTube Upload on its own (should happen automatically within the hour) — first real end-to-end test of the fixed thumbnail pipeline on a brand-new upload.
-2. Trigger or wait for Video Generation on `1cb89fbe` (55 shots, needs ~7 runs at 8 clips/run).
-3. Ask Zia about `d615192e` — still unresolved.
-4. Consider testing `push_thumbnail_to_youtube` deliberately (null out `thumbnail_url` for an already-`uploaded` script, watch the next Thumbnail Generation run push it live) to confirm the new capability actually works before relying on it.
-5. GitHub secrets page not independently re-checked — only investigate if a run logs "not set" again.
-6. Optional: ask Zia if she wants to grant Claude's GitHub connector write access (Contents: Read and write) to skip the copy-paste step for future code changes — she was informed but hadn't decided as of this writing.
+## Open items / next steps — RE-VERIFY EACH BEFORE ACTING
+1. Let `e6de21d1` finish clipping (13 shots left as of this writing) — should auto-assemble and flow to Thumbnail Generation + YouTube Upload once done.
+2. Confirm the OAuth fix holds past the next natural token cycle — if `invalid_grant` recurs, check Production/Testing status first (already confirmed Production as of today, but re-verify).
+3. Structural cleanup not yet done: `video_generation.py` is 1,100+ lines doing generation, audio mixing, captioning, and assembly all in one file — candidate for splitting into separate modules if Zia wants to revisit "code structure" further.
+4. `d615192e-8707-4c1d-8f62-8f6b84e3d51e` (`archived` status) — still unresolved from a prior session, never discussed with Zia. Ask her directly if it matters.
