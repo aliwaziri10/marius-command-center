@@ -22,7 +22,7 @@ HEADERS = {
 MAX_RETRIES = 4
 MIN_SHOTS = 60
 MAX_SHOTS = 85
-MAX_GENERATION_ATTEMPTS = 3
+MAX_GENERATION_ATTEMPTS = 5
 MAX_HOOK_TEXT_CHARS = 40
 MAX_HOOK_TEXT_WORDS = 5
 
@@ -40,6 +40,10 @@ VALID_CAMERA_MOVEMENTS = {
 VALID_LENS_EFFECTS = {
     "shallow_depth_of_field", "lens_flare", "film_grain", "none"
 }
+
+ZOOM_FAMILY_MOVEMENTS = {"push_in", "crash_zoom", "zoom_in", "snap_zoom"}
+MAX_ZOOM_SHOT_RATIO = 0.32
+MAX_CONSECUTIVE_ZOOM_SHOTS = 2
 
 
 def get_next_pending_topic():
@@ -181,6 +185,32 @@ def validate_and_normalize(result):
 
     normalized_shots = [normalize_shot(s, i) for i, s in enumerate(shot_list)]
 
+    zoom_count = sum(
+        1 for s in normalized_shots
+        if s["camera_movement"] in ZOOM_FAMILY_MOVEMENTS or s["shot_type"] == "extreme_close_up"
+    )
+    zoom_ratio = zoom_count / len(normalized_shots)
+    if zoom_ratio > MAX_ZOOM_SHOT_RATIO:
+        return False, (
+            f"too many zoomed-in shots: {zoom_count}/{len(normalized_shots)} "
+            f"({zoom_ratio:.0%}) use a zoom-in-family movement or extreme_close_up, "
+            f"over the {MAX_ZOOM_SHOT_RATIO:.0%} ceiling - spread in more wide/establishing shots"
+        )
+
+    consecutive_zoom = 0
+    max_consecutive_zoom = 0
+    for s in normalized_shots:
+        if s["camera_movement"] in ZOOM_FAMILY_MOVEMENTS:
+            consecutive_zoom += 1
+            max_consecutive_zoom = max(max_consecutive_zoom, consecutive_zoom)
+        else:
+            consecutive_zoom = 0
+    if max_consecutive_zoom > MAX_CONSECUTIVE_ZOOM_SHOTS:
+        return False, (
+            f"{max_consecutive_zoom} zoom-in-family shots in a row (max {MAX_CONSECUTIVE_ZOOM_SHOTS}) "
+            f"- too claustrophobic back to back, spread zoom movements out through the episode"
+        )
+
     result["shot_list"] = normalized_shots
     result["music_mood"] = result.get("music_mood", "").strip() or (
         "Tense cinematic thriller score, sparse low piano and rising strings "
@@ -301,9 +331,25 @@ PACING RHYTHM (Gen Z attention span - keep it moving):
   emotional gut-punch, to let it land. These held shots should be rare -
   most of the episode should feel fast-cut.
 - Vary shot_type, camera_movement, and lens_effect constantly - never repeat
-  the same camera_movement more than twice in a row. Favor the more dynamic
-  movements (push_in, crash_zoom, whip_pan, orbit, drone_rise, speed_ramp)
-  over plain static/pan shots to match the energy of premium AI video tools.
+  the same camera_movement more than twice in a row.
+
+ZOOM DISCIPLINE (avoid an all-close-up, all-zoomed-in episode): push_in,
+crash_zoom, zoom_in, snap_zoom, and extreme_close_up all tighten the frame.
+Used too often, back-to-back, the whole episode feels claustrophobic and
+zoomed-in with no sense of place - this has been a real problem, so treat
+this as a hard budget, not a suggestion:
+- At most 1 in 4 shots may use a zoom-in-family movement (push_in,
+  crash_zoom, zoom_in, snap_zoom) or an extreme_close_up shot_type. Never
+  use two zoom-in-family movements back to back.
+- At least 1 in 4 shots must be "wide" or "establishing" shot_type, spread
+  through the episode (not clustered only at the start), so the viewer
+  keeps a sense of location and space between tight moments.
+- For the remaining shots, favor movements that add energy WITHOUT
+  tightening the frame: pan_left, pan_right, tilt_up, tilt_down, tracking,
+  dolly_in, dolly_out, whip_pan, orbit, drone_rise, drone_descend,
+  parallax, handheld_shake, dutch_angle, speed_ramp, pull_out, zoom_out.
+  These give the same fast-cut, premium-AI-video energy without the
+  claustrophobic zoomed-in feel.
 
 SOUND DESIGNER - audio requirements:
 - At the top level, include "music_mood": a single descriptive prompt (for
@@ -393,6 +439,20 @@ def mark_topic_scripted(topic_id):
     resp.raise_for_status()
 
 
+def mark_topic_generation_failed(topic_id, reason):
+    resp = requests.patch(
+        f"{SUPABASE_URL}/rest/v1/topics?id=eq.{topic_id}",
+        headers=HEADERS,
+        json={"status": "generation_failed"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    print(f"Topic {topic_id} marked generation_failed - will be skipped by future runs until manually "
+          f"reset. Last reason: {reason}")
+    print(f"FIX: review/reword the topic's title or angle in the topics table for {topic_id}, then "
+          f"reset status back to 'pending' to retry it.")
+
+
 def main():
     topic = get_next_pending_topic()
     if not topic:
@@ -400,7 +460,12 @@ def main():
         return
 
     print(f"Writing script for: {topic['title']}")
-    result = generate_script(topic["title"], topic["angle"])
+    try:
+        result = generate_script(topic["title"], topic["angle"])
+    except RuntimeError as e:
+        mark_topic_generation_failed(topic["id"], str(e))
+        return
+
     save_script(
         topic["id"],
         result["narration_text"],
