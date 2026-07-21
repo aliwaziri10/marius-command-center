@@ -99,6 +99,29 @@ also accepts and mixes in the original per-shot audio (extracted from the
 same downloaded shot clips already used for video) as its 4th layer,
 volume-matched below narration/music via ORIGINAL_CLIP_AUDIO_VOLUME, so
 the ambience you already confirmed sounds right is no longer thrown away.
+
+MULTI-CANDIDATE / HEAD-OF-LINE-BLOCKING FIX (2026-07-21): main() used to
+fetch only the single oldest 'images_generated' script and hard-return the
+instant it hit AgnesOverloadedError, even with zero progress made this
+run. Because the queue is strict oldest-first, one episode stuck on a
+single overloaded shot silently blocked every newer script behind it
+indefinitely - confirmed in production: one script sat at 8/53 shots for
+5 days while 8 fully-scripted episodes behind it never got touched. main()
+now pulls the CANDIDATE_POOL_SIZE oldest ready scripts and works through
+them in order within the same run: a script that makes zero progress this
+run (overloaded on its very first attempted shot, or content-flagged) is
+skipped in favor of the next-oldest candidate instead of ending the run.
+The first candidate that completes at least one shot (or finishes
+assembly) ends the run there, preserving the original one-unit-of-
+real-work-per-run budget - this only fixes head-of-line blocking, it
+doesn't turn each run into a multi-script batch job.
+
+CAPTIONS REMOVED (2026-07-21): burned-in narration captions were showing up
+on screen over the finished video ("The Courier of the Siege" upload) -
+Zia wants video only, no visible script text. assemble_final_video no
+longer composites caption_clips onto the final video. The caption-building
+functions are left in place, just unused, in case this is wanted back in
+a different form later.
 """
 
 import os
@@ -162,6 +185,7 @@ MAX_FRAMES = 169
 MAX_CLIP_SECONDS = MAX_FRAMES / FRAME_RATE
 
 CLIP_BATCH_LIMIT = 8
+CANDIDATE_POOL_SIZE = 5
 
 NARRATION_VOLUME = 0.70
 MUSIC_VOLUME = 0.34
@@ -210,15 +234,14 @@ def round_to_valid_frames(num_frames):
     return 8 * n + 1
 
 
-def get_next_ready_script():
+def get_ready_scripts(limit=CANDIDATE_POOL_SIZE):
     resp = requests.get(
-        f"{SUPABASE_URL}/rest/v1/scripts?status=eq.images_generated&order=created_at.asc&limit=1",
+        f"{SUPABASE_URL}/rest/v1/scripts?status=eq.images_generated&order=created_at.asc&limit={limit}",
         headers=HEADERS,
         timeout=30,
     )
     resp.raise_for_status()
-    rows = resp.json()
-    return rows[0] if rows else None
+    return resp.json()
 
 
 def download_file(url, out_path):
@@ -822,12 +845,11 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
 
     final = concatenate_videoclips(clips, method="compose")
 
-    try:
-        caption_clips = build_caption_clips(shot_list, shot_durations, shot_starts, WIDTH, HEIGHT)
-        if caption_clips:
-            final = CompositeVideoClip([final] + caption_clips, size=(WIDTH, HEIGHT))
-    except Exception as e:
-        print(f"Caption compositing failed, continuing without subtitles: {e}")
+    # CAPTIONS DISABLED (2026-07-21): burned-in narration captions were showing
+    # up over the video and Zia does not want them - video should be visual
+    # only, no on-screen script text. build_caption_clips/build_caption_clip
+    # are left defined above (harmless, unused) in case captions are wanted
+    # back in some different form later; this just stops compositing them in.
 
     final = final.with_effects([FadeIn(FADE_IN_SECONDS), FadeOut(FADE_OUT_SECONDS)])
     final = final.with_audio(final_audio)
@@ -883,16 +905,22 @@ def mark_video_generated(script_id, video_url, audio_stats=None):
     resp.raise_for_status()
 
 
-def main():
-    script = get_next_ready_script()
-    if not script:
-        print("No scripts with images ready for video generation. Nothing to do.")
-        return
-    if not script.get("narration_url"):
-        print("Script has no narration_url yet. Skipping.")
-        return
-
+def process_script(script):
+    """
+    Attempts one unit of work on a single candidate script.
+    Returns True if real progress happened this run (at least one shot
+    generated, or final assembly completed) - the caller should stop after
+    a True result, same one-unit-of-work-per-run budget as before.
+    Returns False if this script made ZERO progress this run (overloaded
+    on its very first attempted shot, content-flagged, or not ready yet) -
+    the caller should move on to the next-oldest candidate instead of
+    ending the run.
+    """
     script_id = script["id"]
+    if not script.get("narration_url"):
+        print(f"Script {script_id} has no narration_url yet. Skipping.")
+        return False
+
     print(f"Working on script {script_id}")
 
     shot_list = script["shot_list"]
@@ -931,6 +959,8 @@ def main():
         save_progress(script_id, video_urls, next_index)
         print(f"Corrected progress after verification: {next_index}/{total_shots} shots actually confirmed done")
 
+    made_progress = False
+
     if next_index >= total_shots:
         print(f"All {total_shots} shots already generated, video_urls has {len(video_urls)} entries. Skipping to assembly check.")
     else:
@@ -954,18 +984,23 @@ def main():
                 print(f"Rejected visual_description: {shot.get('visual_description', '')!r}")
                 print(f"FIX: reword shot_list[{i}].visual_description for script {script_id} in the "
                       f"scripts table, then reset status to 'images_generated' to resume from exactly "
-                      f"this shot. Moving on to the next-oldest eligible script for now.")
-                return
+                      f"this shot. Moving on to the next-oldest eligible candidate for now.")
+                return made_progress
             except AgnesOverloadedError as e:
                 print(f"Agnes appears overloaded (upstream load saturated) on shot {i+1}/{total_shots} after all retries: {e}")
-                print(f"Progress already saved through shot {i}/{total_shots} ({len(video_urls)} clips done). "
-                      f"Exiting quietly instead of crashing - the next scheduled run (~20 min) will pick up "
-                      f"right where this left off.")
-                return
+                if made_progress:
+                    print(f"Progress already saved through shot {i}/{total_shots} ({len(video_urls)} clips done) "
+                          f"this run - stopping here instead of crashing; next scheduled run resumes from here.")
+                else:
+                    print(f"Zero progress made on this script this run - moving on to the next-oldest "
+                          f"eligible candidate instead of ending the run. This script's own turn will "
+                          f"come back around once Agnes's load eases.")
+                return made_progress
 
             clip_url = upload_clip(script_id, i, raw_path)
             video_urls.append(clip_url)
             save_progress(script_id, video_urls, i + 1)
+            made_progress = True
             print(f"Saved progress: {i + 1}/{total_shots} shots done")
 
             os.remove(raw_path)
@@ -973,7 +1008,7 @@ def main():
 
         if batch_end < total_shots:
             print(f"Batch limit reached ({CLIP_BATCH_LIMIT} clips this run). {total_shots - batch_end} shots remain - resuming on the next scheduled run.")
-            return
+            return made_progress
 
     if len(video_urls) >= total_shots:
         print("All shots done. Assembling final video...")
@@ -992,6 +1027,27 @@ def main():
 
         mark_video_generated(script_id, video_url, audio_stats)
         print("Done.")
+        made_progress = True
+
+    return made_progress
+
+
+def main():
+    candidates = get_ready_scripts(CANDIDATE_POOL_SIZE)
+    if not candidates:
+        print("No scripts with images ready for video generation. Nothing to do.")
+        return
+
+    for idx, script in enumerate(candidates):
+        if process_script(script):
+            return
+        remaining = len(candidates) - idx - 1
+        if remaining:
+            print(f"No progress on script {script['id']} this run - trying the next-oldest "
+                  f"of {remaining} remaining candidate(s).")
+
+    print(f"No progress possible on any of the {len(candidates)} candidate scripts this run "
+          f"(all stalled or not ready) - next scheduled run will retry.")
 
 
 if __name__ == "__main__":
