@@ -78,37 +78,110 @@ def synthesize_with_pauses(kokoro, narration_text, voice, lang, sample_rate_hint
     return np.concatenate(audio_chunks), sample_rate
 
 
-def synthesize_per_shot(kokoro, shot_list, voice, lang, sample_rate_hint=24000):
-    """Synthesizes narration one shot at a time using each shot's own
-    narration_excerpt (guaranteed 1:1 with shot_list, unlike a separate
-    regex re-split of the full narration_text). Records each shot's real
-    audio duration - INCLUDING its trailing pause - so video generation
-    can size clips to true narration timing instead of estimating from
-    character count, which ignores the 1-2s silence gap inserted after
-    every sentence and drifts further out of sync as the script goes on."""
+def _assign_shots_to_sentences(sentences, shot_list):
+    """Maps each shot's narration_excerpt onto the real sentence(s) it
+    falls inside, using word-position overlap (not per-shot TTS).
+
+    Shots are sub-sentence fragments by design (script_writing.py splits
+    one sentence across 2-3 shots for fast-cut editing) - this function
+    figures out, for each shot, which sentence(s) its words came from and
+    how many words it contributed to each, so a sentence's single real
+    audio duration can later be split proportionally across its shots.
+
+    Returns (contributions, sentence_word_bounds) or None if no shot has
+    usable narration_excerpt text at all.
+    """
+    sentence_word_counts = [max(len(s.split()), 1) for s in sentences]
+    shot_word_counts = [
+        len((shot.get("narration_excerpt") or "").split()) for shot in shot_list
+    ]
+
+    total_sentence_words = sum(sentence_word_counts)
+    total_shot_words = sum(shot_word_counts)
+    if total_shot_words == 0:
+        return None
+
+    # Shots rarely tile the narration_text with perfect word-for-word
+    # coverage (minor rewording/punctuation differences from the model).
+    # Scale shot-word-space onto sentence-word-space so the two line up
+    # proportionally end-to-end rather than drifting apart.
+    scale = total_sentence_words / total_shot_words
+
+    sentence_bounds = []
+    running = 0
+    for wc in sentence_word_counts:
+        sentence_bounds.append((running, running + wc))
+        running += wc
+
+    contributions = []
+    running_shot_pos = 0.0
+    for wc in shot_word_counts:
+        start = running_shot_pos * scale
+        end = (running_shot_pos + wc) * scale
+        running_shot_pos += wc
+
+        shot_contribs = []
+        for s_idx, (s_start, s_end) in enumerate(sentence_bounds):
+            overlap = min(end, s_end) - max(start, s_start)
+            if overlap > 0:
+                shot_contribs.append((s_idx, overlap))
+        contributions.append(shot_contribs)
+
+    return contributions, sentence_bounds
+
+
+def synthesize_per_sentence_with_shot_durations(
+    kokoro, narration_text, shot_list, voice, lang, sample_rate_hint=24000
+):
+    """Synthesizes narration one real SENTENCE at a time - this is the
+    fix for the choppy, sub-sentence-fragment narration bug. Each full
+    sentence gets ONE natural TTS call (correct prosody/intonation, no
+    mid-sentence resets), with a real 1-2s pause only at real sentence
+    boundaries.
+
+    Per-shot video-sync timing still works: each sentence's single real
+    measured audio duration is distributed across the shots that fall
+    inside it, proportional to word count, instead of generating audio
+    separately per shot fragment.
+    """
+    sentences = split_into_segments(narration_text)
+    print(f"Narration split into {len(sentences)} real sentence(s) for natural TTS.")
+
     audio_chunks = []
-    shot_durations = []
+    sentence_durations = []
     sample_rate = sample_rate_hint
 
-    for i, shot in enumerate(shot_list):
-        text = (shot.get("narration_excerpt") or "").strip()
-        if not text:
-            shot_durations.append(0.0)
-            continue
-
-        samples, sample_rate = kokoro.create(text, voice=voice, speed=1.0, lang=lang)
+    for i, sentence in enumerate(sentences):
+        samples, sample_rate = kokoro.create(sentence, voice=voice, speed=1.0, lang=lang)
         audio_chunks.append(samples)
-        shot_seconds = len(samples) / sample_rate
+        sentence_durations.append(len(samples) / sample_rate)
 
-        if i < len(shot_list) - 1:
+        if i < len(sentences) - 1:
             pause_len = PAUSE_SECONDS_MIN if i % 2 == 0 else PAUSE_SECONDS_MAX
             silence = np.zeros(int(pause_len * sample_rate), dtype=samples.dtype)
             audio_chunks.append(silence)
-            shot_seconds += pause_len
+            # The pause belongs to the sentence right before it timing-wise.
+            sentence_durations[-1] += pause_len
 
-        shot_durations.append(shot_seconds)
+    full_audio = np.concatenate(audio_chunks)
 
-    return np.concatenate(audio_chunks), sample_rate, shot_durations
+    shot_durations = [0.0] * len(shot_list)
+    result = _assign_shots_to_sentences(sentences, shot_list)
+    if result is None:
+        # No shot has usable narration_excerpt text - split total time evenly
+        # across shots as a last-resort fallback.
+        even_share = sum(sentence_durations) / max(len(shot_list), 1)
+        shot_durations = [even_share] * len(shot_list)
+    else:
+        contributions, sentence_bounds = result
+        for shot_idx, shot_contribs in enumerate(contributions):
+            for s_idx, words in shot_contribs:
+                s_start, s_end = sentence_bounds[s_idx]
+                sentence_word_span = max(s_end - s_start, 1)
+                share = (words / sentence_word_span) * sentence_durations[s_idx]
+                shot_durations[shot_idx] += share
+
+    return full_audio, sample_rate, shot_durations
 
 
 def main():
@@ -132,15 +205,18 @@ def main():
     download_if_missing(MODEL_URL, MODEL_PATH)
     download_if_missing(VOICES_URL, VOICES_PATH)
 
-    # 3. Generate narration audio. If shot_list is available, synthesize
-    # per-shot so each shot's real spoken duration (plus its trailing
-    # pause) is known exactly - this is what video generation uses for
-    # true narration-synced timing. Falls back to the old whole-text
-    # sentence-split method if shot_list isn't available yet.
+    # 3. Generate narration audio, one real sentence at a time (natural
+    # prosody, no mid-sentence fragment resets). If shot_list is available,
+    # each sentence's real measured duration is distributed across the
+    # shots inside it for accurate video-sync timing. Falls back to the
+    # old whole-text sentence-split method (no shot durations) if
+    # shot_list isn't available yet.
     kokoro = Kokoro(MODEL_PATH, VOICES_PATH)
     shot_durations = None
     if shot_list:
-        samples, sample_rate, shot_durations = synthesize_per_shot(kokoro, shot_list, VOICE_NAME, LANG)
+        samples, sample_rate, shot_durations = synthesize_per_sentence_with_shot_durations(
+            kokoro, narration_text, shot_list, VOICE_NAME, LANG
+        )
     else:
         samples, sample_rate = synthesize_with_pauses(kokoro, narration_text, VOICE_NAME, LANG)
 
