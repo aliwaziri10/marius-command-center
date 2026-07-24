@@ -9,6 +9,10 @@ between sentences, so pacing comes from pauses (matching how Kokoro's
 paragraph-break pauses already work in the live pipeline) rather than
 from slowing down speech itself.
 
+UPDATE (2026-07-25): Narration still finished 4-5s ahead of video with a
+450ms sentence pause. Raised pause to 650ms to add ~4.6s across a typical
+23-gap/24-sentence script and close that gap.
+
 SAFETY GUARANTEES (same as prior tests):
 - Only ever SELECTs from the scripts table - never UPDATEs or INSERTs.
 - Only reads a script that is ALREADY status='uploaded' (fully published,
@@ -56,7 +60,7 @@ RATE = "-5%"
 
 # Silence inserted between sentences, in milliseconds. Adjust this up
 # or down between test runs to dial in sync with the video.
-SENTENCE_PAUSE_MS = 450
+SENTENCE_PAUSE_MS = 650
 
 
 def get_sample_script():
