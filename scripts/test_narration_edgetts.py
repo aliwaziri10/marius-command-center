@@ -10,9 +10,8 @@ narration onto the real published video so it can be watched and heard
 together, not just listened to as a bare audio file.
 
 UPDATE (2026-07-24): edge-tts confirmed "much, much better" and "more
-expressive" than Kokoro. -15% rate came back too slow. Trying -5% now.
-Also adding a second, female voice for comparison, since the female
-voice used on the Tech Pulse project was noted as much more expressive.
+expressive" than Kokoro. -15% rate came back too slow. -5% ran too fast
+(narration drifted 2-3 scenes ahead of video). Trying -10% now.
 
 SAFETY GUARANTEES (same as prior tests):
 - Only ever SELECTs from the scripts table - never UPDATEs or INSERTs.
@@ -55,9 +54,9 @@ VOICES = [
     {"label": "female", "voice": "en-US-AriaNeural"},
 ]
 
-# First run: too fast (default). Second run: -15% too slow. Trying a
-# smaller adjustment this round for both voices.
-RATE = "-5%"
+# First run: too fast (default). Second run: -15% too slow. Third run:
+# -5% still too fast (drifted 2-3 scenes ahead). Trying -10% now.
+RATE = "-10%"
 
 
 def get_sample_script():
