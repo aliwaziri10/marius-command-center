@@ -7,8 +7,9 @@ than the current local Kokoro engine, using a real 5-7 minute Erased
 narration as the test text.
 
 UPDATE (2026-07-24): first test run confirmed edge-tts sounds "much, much
-better" and "more expressive" than Kokoro, but paced too fast. RATE below
-slows it down ~15% for a more deliberate documentary-narrator pace.
+better" and "more expressive" than Kokoro. Rate -15% was tried next and
+came back too slow. Trying -5% now as a smaller adjustment from the
+original (too-fast) default pace.
 
 SAFETY GUARANTEES (same as the FreeLLMAPI test):
 - Only ever SELECTs from the scripts table - never UPDATEs or INSERTs.
@@ -43,10 +44,9 @@ HEADERS = {
 # via `edge-tts --list-voices` if a different tone is wanted later.
 VOICE = "en-US-GuyNeural"
 
-# First test run (2026-07-24) came back "much better" but too fast.
-# Slowing down ~15% for a more deliberate documentary pace. Adjust this
-# single value to re-tune further (e.g. "-20%" for even slower).
-RATE = "-15%"
+# Second test run (2026-07-24) at -15% came back too slow. Trying a
+# smaller adjustment. Adjust this single value to re-tune further.
+RATE = "-5%"
 
 
 def get_sample_script():
@@ -70,7 +70,7 @@ async def synthesize(text, out_path):
 
 
 def upload_test_audio(script_id, local_path):
-    filename = f"TEST_EDGE_SLOWED_{script_id}.mp3"
+    filename = f"TEST_EDGE_5PCT_{script_id}.mp3"
     with open(local_path, "rb") as f:
         audio_bytes = f.read()
     resp = requests.post(
@@ -100,7 +100,7 @@ def main():
     print(f"Rate adjustment: {RATE}")
     print("This script is already published and live on YouTube - reading its text changes nothing about it.\n")
 
-    local_path = "/tmp/test_edge_narration_slowed.mp3"
+    local_path = "/tmp/test_edge_narration_5pct.mp3"
     start = time.time()
     try:
         asyncio.run(synthesize(narration_text, local_path))
