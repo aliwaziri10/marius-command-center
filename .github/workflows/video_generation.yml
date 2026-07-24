@@ -2,7 +2,7 @@ name: Video Generation
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/20 * * * *'
+    - cron: '*/40 * * * *'
 concurrency:
   group: video-generation
   cancel-in-progress: false
