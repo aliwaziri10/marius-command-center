@@ -9,9 +9,18 @@ between sentences, so pacing comes from pauses (matching how Kokoro's
 paragraph-break pauses already work in the live pipeline) rather than
 from slowing down speech itself.
 
-UPDATE (2026-07-25): Narration still finished 4-5s ahead of video with a
-450ms sentence pause. Raised pause to 650ms to add ~4.6s across a typical
-23-gap/24-sentence script and close that gap.
+UPDATE (2026-07-25, first pass): Narration still finished 4-5s ahead of
+video with a 450ms sentence pause. Raised pause to 650ms to add ~4.6s
+across a typical 23-gap/24-sentence script.
+
+UPDATE (2026-07-25, second pass): A flat pause only fixes the TOTAL
+length - it drifted badly mid-script (9s off partway through), because
+Edge TTS doesn't take the same time per sentence that Kokoro did when
+the video's shots were originally cut. Replaced the fixed pause with
+per-sentence padding: shot_durations for this video are split into
+equal chunks (one chunk per sentence), and each sentence's audio is
+padded with silence up to the sum of its chunk's shot durations. This
+locks sync at every sentence boundary instead of only at the end.
 
 SAFETY GUARANTEES (same as prior tests):
 - Only ever SELECTs from the scripts table - never UPDATEs or INSERTs.
@@ -53,25 +62,24 @@ VOICES = [
     {"label": "female", "voice": "en-US-AriaNeural"},
 ]
 
-# Speech rate per sentence - kept near-natural since pacing is now
-# controlled by SENTENCE_PAUSE_MS between sentences, not by slowing
-# down the words themselves.
+# Speech rate per sentence - pacing now comes from per-sentence silence
+# padding against the video's own shot_durations, not from this rate.
 RATE = "-5%"
 
-# Silence inserted between sentences, in milliseconds. Adjust this up
-# or down between test runs to dial in sync with the video.
-SENTENCE_PAUSE_MS = 650
+# Minimum silence gap enforced between sentences even when a sentence's
+# own shots leave no slack (so words never run together).
+MIN_GAP_MS = 150
 
 
 def get_sample_script():
     """Pulls ONE already-published script (status='uploaded') to use as
-    realistic test narration text, plus its already-live video_url so
-    the new narration can be muxed onto a copy of the real video.
-    Read-only - SELECT only."""
+    realistic test narration text, plus its already-live video_url and
+    shot_durations so the new narration can be paced to match the real
+    video's cut points. Read-only - SELECT only."""
     resp = requests.get(
         f"{SUPABASE_URL}/rest/v1/scripts"
         f"?status=eq.uploaded&order=created_at.desc&limit=1"
-        f"&select=id,narration_text,video_url",
+        f"&select=id,narration_text,video_url,shot_durations",
         headers=HEADERS,
         timeout=30,
     )
@@ -82,6 +90,8 @@ def get_sample_script():
     row = rows[0]
     if not row.get("video_url"):
         raise RuntimeError(f"Script {row['id']} has no video_url - can't mux a preview.")
+    if not row.get("shot_durations"):
+        raise RuntimeError(f"Script {row['id']} has no shot_durations - can't pace against video.")
     return row
 
 
@@ -98,24 +108,53 @@ def split_sentences(text):
     return [s.strip() for s in sentences if s.strip()]
 
 
+def chunk_shot_durations(shot_durations, n_sentences):
+    """Splits the video's per-shot durations into n_sentences groups, in
+    order, distributing any remainder shots across the first groups.
+    Returns a list of target durations in ms, one per sentence."""
+    n_shots = len(shot_durations)
+    base = n_shots // n_sentences
+    remainder = n_shots % n_sentences
+
+    targets_ms = []
+    idx = 0
+    for i in range(n_sentences):
+        take = base + (1 if i < remainder else 0)
+        chunk = shot_durations[idx:idx + take]
+        idx += take
+        targets_ms.append(sum(chunk) * 1000)
+    return targets_ms
+
+
 async def synthesize(text, voice, rate, out_path):
     communicate = edge_tts.Communicate(text, voice, rate=rate)
     await communicate.save(out_path)
 
 
-def build_paced_narration(text, voice, rate, out_path, tmp_dir, label):
-    """Synthesizes each sentence separately, then concatenates them with
-    a fixed silence gap between sentences."""
+def build_paced_narration(text, voice, rate, shot_durations, out_path, tmp_dir, label):
+    """Synthesizes each sentence separately, then pads each one with
+    silence up to that sentence's share of the video's actual shot
+    durations - so audio and video stay locked at every sentence
+    boundary, not just at the very end."""
     sentences = split_sentences(text)
-    silence = AudioSegment.silent(duration=SENTENCE_PAUSE_MS)
+    targets_ms = chunk_shot_durations(shot_durations, len(sentences))
     combined = AudioSegment.silent(duration=0)
 
     for i, sentence in enumerate(sentences):
         clip_path = f"{tmp_dir}/sent_{label}_{i}.mp3"
         asyncio.run(synthesize(sentence, voice, rate, clip_path))
-        combined += AudioSegment.from_file(clip_path)
+        speech = AudioSegment.from_file(clip_path)
+
+        target_ms = targets_ms[i]
+        pad_ms = target_ms - len(speech)
+        if pad_ms < MIN_GAP_MS:
+            print(f"  [sentence {i}] speech {len(speech)}ms >= target {target_ms:.0f}ms "
+                  f"- overran its shots by {abs(pad_ms):.0f}ms, using minimum gap instead.")
+            pad_ms = MIN_GAP_MS
+
+        combined += speech
         if i != len(sentences) - 1:
-            combined += silence
+            combined += AudioSegment.silent(duration=pad_ms)
 
     combined.export(out_path, format="mp3")
     return len(sentences)
@@ -168,9 +207,10 @@ def main():
     script_id = script["id"]
     narration_text = script["narration_text"]
     video_url = script["video_url"]
+    shot_durations = script["shot_durations"]
 
     print(f"Using script id={script_id} as test text ({len(narration_text)} chars, {len(narration_text.split())} words).")
-    print(f"Rate: {RATE} | Sentence pause: {SENTENCE_PAUSE_MS}ms")
+    print(f"Rate: {RATE} | Pacing: per-sentence, matched to {len(shot_durations)} shot durations")
     print(f"Source video (copy will be made, original untouched): {video_url}")
     print("This script is already published and live on YouTube - reading its text changes nothing about it.\n")
 
@@ -189,7 +229,7 @@ def main():
         audio_path = f"/tmp/test_edge_paced_{label}.mp3"
         start = time.time()
         try:
-            n_sentences = build_paced_narration(narration_text, voice, RATE, audio_path, "/tmp", label)
+            n_sentences = build_paced_narration(narration_text, voice, RATE, shot_durations, audio_path, "/tmp", label)
         except Exception as e:
             print(f"FAILED to synthesize {label} voice: {e}")
             continue
