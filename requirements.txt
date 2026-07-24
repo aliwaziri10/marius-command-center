@@ -1,7 +1,8 @@
 requests
-kokoro-onnx
 soundfile
 supabase
 moviepy
 Pillow
 numpy
+edge-tts
+pydub
