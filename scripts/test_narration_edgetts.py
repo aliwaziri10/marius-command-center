@@ -1,17 +1,13 @@
 """
-Marius Command Center - Narration Engine TEST #3: edge-tts, two voices,
-muxed into the real video (standalone, non-destructive)
+Marius Command Center - Narration Engine TEST #4: edge-tts, per-sentence
+synthesis with inserted pauses, muxed into the real video
 
-Purpose: test whether Microsoft Edge's free TTS engine (via the edge-tts
-library - no API key, no signup, no rate limit) sounds more expressive
-than the current local Kokoro engine, using a real 5-7 minute Erased
-narration as the test text - and this time, actually mux the new
-narration onto the real published video so it can be watched and heard
-together, not just listened to as a bare audio file.
-
-UPDATE (2026-07-24): edge-tts confirmed "much, much better" and "more
-expressive" than Kokoro. -15% rate came back too slow. -5% ran too fast
-(narration drifted 2-3 scenes ahead of video). Trying -10% now.
+UPDATE (2026-07-24): Global rate slowdown (-5%, -10%) still left narration
+running ahead of video-locked shot timing. Switching approach: synthesize
+each sentence separately, then concatenate with a fixed silence gap
+between sentences, so pacing comes from pauses (matching how Kokoro's
+paragraph-break pauses already work in the live pipeline) rather than
+from slowing down speech itself.
 
 SAFETY GUARANTEES (same as prior tests):
 - Only ever SELECTs from the scripts table - never UPDATEs or INSERTs.
@@ -31,12 +27,13 @@ SAFETY GUARANTEES (same as prior tests):
 """
 
 import os
-import sys
+import re
 import time
 import asyncio
 import subprocess
 import requests
 import edge_tts
+from pydub import AudioSegment
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
@@ -47,16 +44,19 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-# Two voices to compare this round. Add/swap freely - full list via
-# `edge-tts --list-voices`.
 VOICES = [
     {"label": "male", "voice": "en-US-GuyNeural"},
     {"label": "female", "voice": "en-US-AriaNeural"},
 ]
 
-# First run: too fast (default). Second run: -15% too slow. Third run:
-# -5% still too fast (drifted 2-3 scenes ahead). Trying -10% now.
-RATE = "-10%"
+# Speech rate per sentence - kept near-natural since pacing is now
+# controlled by SENTENCE_PAUSE_MS between sentences, not by slowing
+# down the words themselves.
+RATE = "-5%"
+
+# Silence inserted between sentences, in milliseconds. Adjust this up
+# or down between test runs to dial in sync with the video.
+SENTENCE_PAUSE_MS = 450
 
 
 def get_sample_script():
@@ -89,9 +89,32 @@ def download_video(video_url, out_path):
             f.write(chunk)
 
 
+def split_sentences(text):
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    return [s.strip() for s in sentences if s.strip()]
+
+
 async def synthesize(text, voice, rate, out_path):
     communicate = edge_tts.Communicate(text, voice, rate=rate)
     await communicate.save(out_path)
+
+
+def build_paced_narration(text, voice, rate, out_path, tmp_dir, label):
+    """Synthesizes each sentence separately, then concatenates them with
+    a fixed silence gap between sentences."""
+    sentences = split_sentences(text)
+    silence = AudioSegment.silent(duration=SENTENCE_PAUSE_MS)
+    combined = AudioSegment.silent(duration=0)
+
+    for i, sentence in enumerate(sentences):
+        clip_path = f"{tmp_dir}/sent_{label}_{i}.mp3"
+        asyncio.run(synthesize(sentence, voice, rate, clip_path))
+        combined += AudioSegment.from_file(clip_path)
+        if i != len(sentences) - 1:
+            combined += silence
+
+    combined.export(out_path, format="mp3")
+    return len(sentences)
 
 
 def mux_audio_onto_video(video_path, audio_path, out_path):
@@ -143,7 +166,7 @@ def main():
     video_url = script["video_url"]
 
     print(f"Using script id={script_id} as test text ({len(narration_text)} chars, {len(narration_text.split())} words).")
-    print(f"Rate adjustment: {RATE}")
+    print(f"Rate: {RATE} | Sentence pause: {SENTENCE_PAUSE_MS}ms")
     print(f"Source video (copy will be made, original untouched): {video_url}")
     print("This script is already published and live on YouTube - reading its text changes nothing about it.\n")
 
@@ -159,15 +182,15 @@ def main():
         voice = entry["voice"]
         print(f"--- Voice: {label} ({voice}) ---")
 
-        audio_path = f"/tmp/test_edge_{label}.mp3"
+        audio_path = f"/tmp/test_edge_paced_{label}.mp3"
         start = time.time()
         try:
-            asyncio.run(synthesize(narration_text, voice, RATE, audio_path))
+            n_sentences = build_paced_narration(narration_text, voice, RATE, audio_path, "/tmp", label)
         except Exception as e:
             print(f"FAILED to synthesize {label} voice: {e}")
             continue
         elapsed = time.time() - start
-        print(f"Synthesized in {elapsed:.1f}s.")
+        print(f"Synthesized {n_sentences} sentences in {elapsed:.1f}s.")
 
         mixed_path = f"/tmp/test_edge_mixed_{label}.mp4"
         try:
