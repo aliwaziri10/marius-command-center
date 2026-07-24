@@ -1,0 +1,20 @@
+name: TEST - FreeLLMAPI Narration (manual only)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  test-narration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install requests
+      - run: python scripts/test_narration_freellm.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          FREELLM_API_URL: ${{ secrets.FREELLM_API_URL }}
+          FREELLM_API_KEY: ${{ secrets.FREELLM_API_KEY }}
