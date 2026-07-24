@@ -6,6 +6,10 @@ library - no API key, no signup, no rate limit) sounds more expressive
 than the current local Kokoro engine, using a real 5-7 minute Erased
 narration as the test text.
 
+UPDATE (2026-07-24): first test run confirmed edge-tts sounds "much, much
+better" and "more expressive" than Kokoro, but paced too fast. RATE below
+slows it down ~15% for a more deliberate documentary-narrator pace.
+
 SAFETY GUARANTEES (same as the FreeLLMAPI test):
 - Only ever SELECTs from the scripts table - never UPDATEs or INSERTs.
 - Only reads a script that is ALREADY status='uploaded' (fully published,
@@ -39,6 +43,11 @@ HEADERS = {
 # via `edge-tts --list-voices` if a different tone is wanted later.
 VOICE = "en-US-GuyNeural"
 
+# First test run (2026-07-24) came back "much better" but too fast.
+# Slowing down ~15% for a more deliberate documentary pace. Adjust this
+# single value to re-tune further (e.g. "-20%" for even slower).
+RATE = "-15%"
+
 
 def get_sample_script():
     """Pulls ONE already-published script (status='uploaded') to use as
@@ -56,12 +65,12 @@ def get_sample_script():
 
 
 async def synthesize(text, out_path):
-    communicate = edge_tts.Communicate(text, VOICE)
+    communicate = edge_tts.Communicate(text, VOICE, rate=RATE)
     await communicate.save(out_path)
 
 
 def upload_test_audio(script_id, local_path):
-    filename = f"TEST_EDGE_{script_id}.mp3"
+    filename = f"TEST_EDGE_SLOWED_{script_id}.mp3"
     with open(local_path, "rb") as f:
         audio_bytes = f.read()
     resp = requests.post(
@@ -88,9 +97,10 @@ def main():
     narration_text = script["narration_text"]
 
     print(f"Using script id={script_id} as test text ({len(narration_text)} chars, {len(narration_text.split())} words).")
+    print(f"Rate adjustment: {RATE}")
     print("This script is already published and live on YouTube - reading its text changes nothing about it.\n")
 
-    local_path = "/tmp/test_edge_narration.mp3"
+    local_path = "/tmp/test_edge_narration_slowed.mp3"
     start = time.time()
     try:
         asyncio.run(synthesize(narration_text, local_path))
@@ -108,7 +118,7 @@ def main():
 
     print("\n=== TEST RESULT: SUCCESS ===")
     print(f"Time taken: {elapsed:.1f} seconds")
-    print(f"Voice used: {VOICE}")
+    print(f"Voice used: {VOICE}, rate: {RATE}")
     if public_url:
         print(f"Listen to the test audio here: {public_url}")
     print("\nCurrent Kokoro-based narration.py is UNCHANGED and remains the active engine.")
