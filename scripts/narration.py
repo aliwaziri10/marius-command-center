@@ -2,47 +2,28 @@ import os
 import re
 import sys
 import json
+import asyncio
 import requests
 import numpy as np
 from supabase import create_client
-from kokoro_onnx import Kokoro
-import soundfile as sf
+import edge_tts
+from pydub import AudioSegment
+from pydub.effects import normalize as pydub_normalize
 
 # --- Config from GitHub Actions secrets ---
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SECRET_KEY = os.environ["SUPABASE_SECRET_KEY"]
 
-MODEL_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx"
-VOICES_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.bin"
-MODEL_PATH = "kokoro-v0_19.onnx"
-VOICES_PATH = "voices.bin"
-VOICE_NAME = "am_adam"
-LANG = "en-us"
+# Edge TTS - replaces Kokoro. Chosen for more natural/expressive prosody.
+# Male voice picked for this documentary/history-storytelling niche.
+VOICE_NAME = "en-US-GuyNeural"
+RATE = "-5%"
 
 # Pause after EVERY sentence, per Zia's explicit instruction - not just
 # paragraph breaks. 1-2s per pause (reduced from an earlier 4-5s, which
 # would have added ~3 extra minutes of silence across a 40+ sentence script).
 PAUSE_SECONDS_MIN = 1.0
 PAUSE_SECONDS_MAX = 2.0
-
-
-def download_if_missing(url, path):
-    if not os.path.exists(path):
-        print(f"Downloading {path} ...")
-        r = requests.get(url, timeout=120)
-        r.raise_for_status()
-        with open(path, "wb") as f:
-            f.write(r.content)
-        print(f"Saved {path}")
-    else:
-        print(f"{path} already present, skipping download")
-
-
-def normalize_volume(samples, target_peak=0.95):
-    peak = np.max(np.abs(samples))
-    if peak == 0:
-        return samples
-    return samples * (target_peak / peak)
 
 
 def split_into_segments(narration_text):
@@ -56,26 +37,35 @@ def split_into_segments(narration_text):
     return segments if segments else [narration_text.strip()]
 
 
-def synthesize_with_pauses(kokoro, narration_text, voice, lang, sample_rate_hint=24000):
+async def _synthesize_sentence(text, voice, rate, out_path):
+    communicate = edge_tts.Communicate(text, voice, rate=rate)
+    await communicate.save(out_path)
+
+
+def synthesize_sentence(text, voice, rate, tmp_path):
+    """One real TTS call per full sentence - correct prosody/intonation,
+    no mid-sentence resets (this was the fix for the choppy,
+    sub-sentence-fragment narration bug). Returns a pydub AudioSegment."""
+    asyncio.run(_synthesize_sentence(text, voice, rate, tmp_path))
+    return AudioSegment.from_file(tmp_path)
+
+
+def synthesize_with_pauses(narration_text, voice, rate):
     """Synthesizes narration sentence-by-sentence and concatenates them
-    with a real silence gap (1-2s) after every sentence, instead of one
-    continuous kokoro.create() call with no pauses at all."""
+    with a real silence gap (1-2s) after every sentence. Used only when
+    no shot_list is available yet (fallback path)."""
     segments = split_into_segments(narration_text)
     print(f"Narration split into {len(segments)} sentence(s) for pause insertion.")
 
-    audio_chunks = []
-    sample_rate = sample_rate_hint
-
+    combined = AudioSegment.silent(duration=0)
     for i, segment in enumerate(segments):
-        samples, sample_rate = kokoro.create(segment, voice=voice, speed=1.0, lang=lang)
-        audio_chunks.append(samples)
-
+        clip = synthesize_sentence(segment, voice, rate, f"/tmp/sent_{i}.mp3")
+        combined += clip
         if i < len(segments) - 1:
             pause_len = PAUSE_SECONDS_MIN if i % 2 == 0 else PAUSE_SECONDS_MAX
-            silence = np.zeros(int(pause_len * sample_rate), dtype=audio_chunks[-1].dtype)
-            audio_chunks.append(silence)
+            combined += AudioSegment.silent(duration=int(pause_len * 1000))
 
-    return np.concatenate(audio_chunks), sample_rate
+    return combined
 
 
 def _assign_shots_to_sentences(sentences, shot_list):
@@ -130,14 +120,12 @@ def _assign_shots_to_sentences(sentences, shot_list):
     return contributions, sentence_bounds
 
 
-def synthesize_per_sentence_with_shot_durations(
-    kokoro, narration_text, shot_list, voice, lang, sample_rate_hint=24000
-):
-    """Synthesizes narration one real SENTENCE at a time - this is the
-    fix for the choppy, sub-sentence-fragment narration bug. Each full
-    sentence gets ONE natural TTS call (correct prosody/intonation, no
-    mid-sentence resets), with a real 1-2s pause only at real sentence
-    boundaries.
+def synthesize_per_sentence_with_shot_durations(narration_text, shot_list, voice, rate):
+    """Synthesizes narration one real SENTENCE at a time via Edge TTS -
+    this is the fix for the choppy, sub-sentence-fragment narration bug.
+    Each full sentence gets ONE natural TTS call (correct prosody/
+    intonation, no mid-sentence resets), with a real 1-2s pause only at
+    real sentence boundaries.
 
     Per-shot video-sync timing still works: each sentence's single real
     measured audio duration is distributed across the shots that fall
@@ -147,23 +135,19 @@ def synthesize_per_sentence_with_shot_durations(
     sentences = split_into_segments(narration_text)
     print(f"Narration split into {len(sentences)} real sentence(s) for natural TTS.")
 
-    audio_chunks = []
+    combined = AudioSegment.silent(duration=0)
     sentence_durations = []
-    sample_rate = sample_rate_hint
 
     for i, sentence in enumerate(sentences):
-        samples, sample_rate = kokoro.create(sentence, voice=voice, speed=1.0, lang=lang)
-        audio_chunks.append(samples)
-        sentence_durations.append(len(samples) / sample_rate)
+        clip = synthesize_sentence(sentence, voice, rate, f"/tmp/sent_{i}.mp3")
+        combined += clip
+        sentence_durations.append(len(clip) / 1000.0)
 
         if i < len(sentences) - 1:
             pause_len = PAUSE_SECONDS_MIN if i % 2 == 0 else PAUSE_SECONDS_MAX
-            silence = np.zeros(int(pause_len * sample_rate), dtype=samples.dtype)
-            audio_chunks.append(silence)
+            combined += AudioSegment.silent(duration=int(pause_len * 1000))
             # The pause belongs to the sentence right before it timing-wise.
             sentence_durations[-1] += pause_len
-
-    full_audio = np.concatenate(audio_chunks)
 
     shot_durations = [0.0] * len(shot_list)
     result = _assign_shots_to_sentences(sentences, shot_list)
@@ -181,7 +165,7 @@ def synthesize_per_sentence_with_shot_durations(
                 share = (words / sentence_word_span) * sentence_durations[s_idx]
                 shot_durations[shot_idx] += share
 
-    return full_audio, sample_rate, shot_durations
+    return combined, shot_durations
 
 
 def main():
@@ -201,33 +185,28 @@ def main():
         shot_list = json.loads(shot_list)
     print(f"Narrating script id={script_id}, length={len(narration_text)} chars, {len(shot_list or [])} shots")
 
-    # 2. Download Kokoro model files if not cached
-    download_if_missing(MODEL_URL, MODEL_PATH)
-    download_if_missing(VOICES_URL, VOICES_PATH)
-
-    # 3. Generate narration audio, one real sentence at a time (natural
-    # prosody, no mid-sentence fragment resets). If shot_list is available,
-    # each sentence's real measured duration is distributed across the
-    # shots inside it for accurate video-sync timing. Falls back to the
-    # old whole-text sentence-split method (no shot durations) if
-    # shot_list isn't available yet.
-    kokoro = Kokoro(MODEL_PATH, VOICES_PATH)
+    # 2. Generate narration audio via Edge TTS, one real sentence at a
+    # time (natural prosody, no mid-sentence fragment resets). If
+    # shot_list is available, each sentence's real measured duration is
+    # distributed across the shots inside it for accurate video-sync
+    # timing. Falls back to the whole-text sentence-split method (no
+    # shot durations) if shot_list isn't available yet.
     shot_durations = None
     if shot_list:
-        samples, sample_rate, shot_durations = synthesize_per_sentence_with_shot_durations(
-            kokoro, narration_text, shot_list, VOICE_NAME, LANG
+        combined_audio, shot_durations = synthesize_per_sentence_with_shot_durations(
+            narration_text, shot_list, VOICE_NAME, RATE
         )
     else:
-        samples, sample_rate = synthesize_with_pauses(kokoro, narration_text, VOICE_NAME, LANG)
+        combined_audio = synthesize_with_pauses(narration_text, VOICE_NAME, RATE)
 
-    # 3b. Boost volume to a normal loudness
-    samples = normalize_volume(samples, target_peak=0.95)
+    # 2b. Normalize loudness to a consistent, normal level.
+    combined_audio = pydub_normalize(combined_audio)
 
     output_filename = f"narration_{script_id}.wav"
-    sf.write(output_filename, samples, sample_rate)
+    combined_audio.export(output_filename, format="wav")
     print(f"Audio written to {output_filename}")
 
-    # 4. Upload to Supabase storage bucket 'narration'
+    # 3. Upload to Supabase storage bucket 'narration'
     with open(output_filename, "rb") as f:
         supabase.storage.from_("narration").upload(
             output_filename,
@@ -237,7 +216,7 @@ def main():
     public_url = supabase.storage.from_("narration").get_public_url(output_filename)
     print(f"Uploaded. Public URL: {public_url}")
 
-    # 5. Update script status, narration URL, and real per-shot timing.
+    # 4. Update script status, narration URL, and real per-shot timing.
     # Status goes straight to 'images_generated' (skipping the old,
     # now-removed image_generation.py stage - Agnes generates video
     # directly from shot_list text, it never used the still images).
