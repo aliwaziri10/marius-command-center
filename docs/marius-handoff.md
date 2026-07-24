@@ -1,5 +1,5 @@
 # Marius Command Center — Handoff Sheet
-Written: 2026-07-20, by Claude, verified live against Supabase and GitHub at time of writing.
+Written: 2026-07-20, updated 2026-07-25, by Claude, verified live against Supabase and GitHub at time of writing.
 
 ## ⚠️ STANDING RULE — READ THIS FIRST
 **Do not trust this document at face value.** Before acting on ANY claim below, re-verify it against live Supabase data (project `swnjzzejsuupecdgbzzf`) and/or the live GitHub repo (`aliwaziri10/marius-command-center`). Prior handoffs have gone stale within days — trust the database and the actual repo files, never a previous session's notes, including this one.
@@ -22,6 +22,33 @@ Written: 2026-07-20, by Claude, verified live against Supabase and GitHub at tim
 - Secret naming for Marius (distinct from Nova's `YT_*` convention): `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REFRESH_TOKEN`
 - `CLIP_BATCH_LIMIT = 8` in `video_generation.py` — max 8 new clips per scheduled run (Agnes free-tier quota), resumes automatically next run. A 45-shot script takes ~6 runs to fully clip.
 - `AgnesOverloadedError` in `video_generation.py` exits quietly (exit 0, no GitHub issue) on transient Agnes overload — by design, so normal overload doesn't spam issues. Means a stalled script won't always show up as a failed run; check `video_next_index` in Supabase directly to confirm real progress vs. silent stall.
+
+## Narration engine change — 2026-07-25 (Kokoro → Edge TTS) — ⚠️ NOT YET CONFIRMED LIVE
+**Status as of writing: full-file replacements have been GIVEN to Zia for manual paste+commit. Re-check the actual repo files and a fresh workflow run before assuming any of this is live.**
+
+### Why
+Kokoro narration (voice `am_adam`) was flagged as sounding less natural/expressive than desired. Separately (and unrelated to voice quality), an older bug where narration was synthesized per-shot instead of per-sentence — causing audio to pause mid-sentence at every scene cut — was already fixed in a prior session (see `synthesize_per_sentence_with_shot_durations` in `narration.py`, which synthesizes one full sentence per TTS call and proportionally distributes that sentence's real duration across the shots inside it). That per-sentence fix is preserved as-is in the Edge TTS version below — it was never a Kokoro-specific fix.
+
+### What changed
+Three files, all given to Zia as full-file replacements on 2026-07-25:
+1. **`scripts/narration.py`** — Kokoro (`kokoro_onnx`, local ONNX model, voice `am_adam`) replaced with Edge TTS (`edge-tts` package, voice `en-US-GuyNeural`, male, rate `-5%`). Same per-sentence-call + proportional-shot-duration architecture kept unchanged; only the actual TTS call and audio-handling library changed (numpy/soundfile → pydub, since edge-tts outputs mp3 and pydub handles concatenation/silence-padding/export-to-wav/loudness-normalization more directly for that format).
+2. **`requirements.txt`** — removed `kokoro-onnx`, added `edge-tts` and `pydub`. Kept `soundfile`/`numpy` in case other scripts in the repo still import them (not exhaustively checked).
+3. **`.github/workflows/narration.yml`** — added a `sudo apt-get install -y ffmpeg` step before `pip install -r requirements.txt`, since pydub needs ffmpeg on the runner (mirrors what `.github/workflows/test-narration-edge.yml` already did for the test version).
+
+### Voice choice rationale
+Chose male (`en-US-GuyNeural`) over female based on quick research: general explainer-video studies favor female voices for trust/friendliness, but niche guidance for documentary/history-storytelling content specifically favors an authoritative male voice for trust and watch-time in narration-heavy content. Not a rigorous A/B test — if retention data later suggests otherwise, revisit.
+
+### Testing history that led here (all via `scripts/test_narration_edgetts.py`, `.github/workflows/test-narration-edge.yml` — test-only, never touched the live engine)
+- v1 (450ms fixed pause between sentences): narration finished 4-5s ahead of (shorter than) the video.
+- v2 (650ms fixed pause): closed the total gap, but a fixed pause can't fix drift that isn't uniform — one specific sentence ("Elsa the seamstress") was found 9s out of sync mid-script, because Edge TTS doesn't take the same time per sentence Kokoro did when the video's shots were originally cut.
+- v3 (current test approach, not yet ported to live narration.py's fallback path): per-sentence silence padding, where each sentence's audio is padded with silence up to the sum of the shot durations assigned to it (video's `shot_durations` split into N equal-ish chunks for N sentences). This locks sync at every sentence boundary. **Note:** this v3 padding-to-existing-video-durations approach only matters when muxing new audio onto an *already-rendered* video (which is what the test script does, reusing a published video). It is NOT the same problem as the live pipeline, where narration.py generates shot_durations first and video_generation.py cuts new clips to match — so the live `narration.py` given above does not need the v3 padding logic, only the per-sentence-call fix it already had.
+
+### Before trusting this is live, verify:
+1. Open `https://github.com/aliwaziri10/marius-command-center/blob/main/scripts/narration.py` and confirm it imports `edge_tts` and `pydub`, not `kokoro_onnx`.
+2. Open `requirements.txt` and confirm `edge-tts`/`pydub` are listed, `kokoro-onnx` is not.
+3. Open `.github/workflows/narration.yml` and confirm the ffmpeg install step is present.
+4. Run the Narration workflow manually once (`workflow_dispatch`) and check the run log for errors, then check Supabase `scripts` table for a new row with a fresh `narration_url` and confirm it's a normal-length `.wav`.
+5. Listen to the actual output before assuming voice quality/pacing is resolved — it was not verified live before this doc entry was written.
 
 ## Pipeline structure change — 2026-07-20 (dead code removed)
 `image_generation.py` and its workflow (`image_generation.yml`) generated a still image per shot via Pollinations and wrote `image_urls` + status `images_generated` — but `video_generation.py` never read `image_urls`; it always generated video clips directly from `shot_list` text via Agnes. This was confirmed dead code (the repo's own `PLAYBOOK.md` already called `image_urls` "legacy/unused for new scripts").
@@ -74,18 +101,4 @@ Topics in queue: 93.
 |---|---|---|
 | `e6de21d1-36f1-4723-880f-c8900b3522b4` | 32/45 | 2026-07-15 |
 | `f86cea49-f741-40b2-8712-ea8aaed13442` | 0 | 2026-07-16 |
-| `58f75bf2-e7ea-47fa-b34b-8705af1e49c2` | 0 | 2026-07-16 |
-| `f53f3cc0-be59-41d5-8cc1-4d93bb257f0a` | 0 | 2026-07-16 |
-| `78011fa8-7ce7-49f4-8443-2998afdc1fce` | 0 | 2026-07-17 |
-| `d4015715-a3bd-4231-a1e7-0d405b6bedbf` | 0 | 2026-07-18 |
-| `c34406d6-5123-41f9-807c-5758d9d83ad2` | 0 | 2026-07-18 |
-| `c6d245b1-49a9-4a19-8c89-8f4a80c6d389` | 0 | 2026-07-19 |
-| `3ad85abb-1719-4e4b-9480-7fae986209d3` | 0 | 2026-07-19 |
-
-Video Generation only works the single oldest script at a time (8 clips/run); the rest queue behind it in order — this is normal, not stalled. `e6de21d1` (45 shots) has ~2 runs left before it moves to assembly/upload, then `f86cea49` starts.
-
-## Open items / next steps — RE-VERIFY EACH BEFORE ACTING
-1. Let `e6de21d1` finish clipping (13 shots left as of this writing) — should auto-assemble and flow to Thumbnail Generation + YouTube Upload once done.
-2. Confirm the OAuth fix holds past the next natural token cycle — if `invalid_grant` recurs, check Production/Testing status first (already confirmed Production as of today, but re-verify).
-3. Structural cleanup not yet done: `video_generation.py` is 1,100+ lines doing generation, audio mixing, captioning, and assembly all in one file — candidate for splitting into separate modules if Zia wants to revisit "code structure" further.
-4. `d615192e-8707-4c1d-8f62-8f6b84e3d51e` (`archived` status) — still unresolved from a prior session, never discussed with Zia. Ask her directly if it matters.
+|
