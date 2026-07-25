@@ -12,8 +12,8 @@ on the next run instead of regenerating finished shots.
 
 QUOTA-SAFE: Agnes's free tier appears to silently repeat/stale past a
 per-run quota ceiling, so each run generates at most CLIP_BATCH_LIMIT new
-clips then stops cleanly. The resume logic above picks up the rest on the
-next scheduled run.
+clips total across all candidates combined, then stops cleanly. The
+resume logic above picks up the rest on the next scheduled run.
 
 RETRY-SAFE: create_agnes_task retries transient backend errors (429 rate
 limit, 500/502/503/504 server-side issues) with backoff before giving up,
@@ -108,13 +108,7 @@ single overloaded shot silently blocked every newer script behind it
 indefinitely - confirmed in production: one script sat at 8/53 shots for
 5 days while 8 fully-scripted episodes behind it never got touched. main()
 now pulls the CANDIDATE_POOL_SIZE oldest ready scripts and works through
-them in order within the same run: a script that makes zero progress this
-run (overloaded on its very first attempted shot, or content-flagged) is
-skipped in favor of the next-oldest candidate instead of ending the run.
-The first candidate that completes at least one shot (or finishes
-assembly) ends the run there, preserving the original one-unit-of-
-real-work-per-run budget - this only fixes head-of-line blocking, it
-doesn't turn each run into a multi-script batch job.
+them in order within the same run.
 
 CAPTIONS REMOVED (2026-07-21): burned-in narration captions were showing up
 on screen over the finished video ("The Courier of the Siege" upload) -
@@ -122,6 +116,26 @@ Zia wants video only, no visible script text. assemble_final_video no
 longer composites caption_clips onto the final video. The caption-building
 functions are left in place, just unused, in case this is wanted back in
 a different form later.
+
+RUN-MONOPOLIZATION FIX (2026-07-25): the 2026-07-21 fix only helped when a
+candidate made ZERO progress (fully overloaded on its first shot). It did
+NOT help when a candidate was healthy and slowly working - process_script
+used to return as soon as ANY shot succeeded, taking a full CLIP_BATCH_LIMIT
+batch (up to 8 shots) from whichever script was oldest, then main() stopped
+the entire run right there. Confirmed in production: "The Laundress of
+Lawrence" (63 shots, oldest ready script) consumed every single run's full
+shot budget for over a week straight, while 13 other fully-scripted episodes
+behind it sat at 0/N shots the entire time - a slow-but-working script
+starved everything else just as badly as a fully-stalled one did.
+process_script now takes a shot_limit argument and returns the number of
+shots it actually generated (not a bool), and main() round-robins the same
+total per-run Agnes-quota budget (CLIP_BATCH_LIMIT) across every candidate
+in the pool each run, moving to the next candidate as soon as one either
+runs out of its slice of the budget or hits a wall - so every stuck script
+gets at least a little progress every run instead of one script hogging
+the whole budget for hours. CANDIDATE_POOL_SIZE also raised from 5 to 15 so
+every currently-stuck script is in the rotation from the very next run,
+not just the 5 oldest.
 """
 
 import os
@@ -184,8 +198,8 @@ MIN_FRAMES = 49
 MAX_FRAMES = 169
 MAX_CLIP_SECONDS = MAX_FRAMES / FRAME_RATE
 
-CLIP_BATCH_LIMIT = 8
-CANDIDATE_POOL_SIZE = 5
+CLIP_BATCH_LIMIT = 8          # total shots generated per run, across ALL candidates combined
+CANDIDATE_POOL_SIZE = 15      # raised from 5 (2026-07-25) so every currently-stuck script is in rotation
 
 NARRATION_VOLUME = 0.70
 MUSIC_VOLUME = 0.34
@@ -905,21 +919,30 @@ def mark_video_generated(script_id, video_url, audio_stats=None):
     resp.raise_for_status()
 
 
-def process_script(script):
+def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
     """
-    Attempts one unit of work on a single candidate script.
-    Returns True if real progress happened this run (at least one shot
-    generated, or final assembly completed) - the caller should stop after
-    a True result, same one-unit-of-work-per-run budget as before.
-    Returns False if this script made ZERO progress this run (overloaded
-    on its very first attempted shot, content-flagged, or not ready yet) -
-    the caller should move on to the next-oldest candidate instead of
-    ending the run.
+    Attempts up to shot_limit new shot generations on a single candidate
+    script (plus final assembly if this call completes the last shot, or
+    the script was already fully shot coming in).
+
+    ROUND-ROBIN FIX (2026-07-25): shot_limit represents the REMAINING
+    per-run Agnes-quota budget as passed down by main(), not a fixed
+    per-script batch size - this lets main() spread one run's total shot
+    budget across several candidate scripts instead of one script
+    consuming the whole thing every time (see file header for the
+    production incident this fixes).
+
+    Returns the number of NEW shots actually generated this call (0 if
+    none - overloaded on the first attempted shot, content-flagged, no
+    budget left, or already fully generated coming in). Final video
+    assembly always runs when all shots are done, regardless of
+    shot_limit, since assembly does not call Agnes and does not consume
+    the per-run generation quota.
     """
     script_id = script["id"]
     if not script.get("narration_url"):
         print(f"Script {script_id} has no narration_url yet. Skipping.")
-        return False
+        return 0
 
     print(f"Working on script {script_id}")
 
@@ -959,10 +982,13 @@ def process_script(script):
         save_progress(script_id, video_urls, next_index)
         print(f"Corrected progress after verification: {next_index}/{total_shots} shots actually confirmed done")
 
-    made_progress = False
+    shots_used = 0
 
     if next_index >= total_shots:
         print(f"All {total_shots} shots already generated, video_urls has {len(video_urls)} entries. Skipping to assembly check.")
+    elif shot_limit <= 0:
+        print(f"No shot budget remaining this run for script {script_id} - will get a turn on the next scheduled run.")
+        return 0
     else:
         audio_path = "/tmp/narration_audio"
         audio_path += ".mp3" if script["narration_url"].endswith(".mp3") else ".wav"
@@ -970,8 +996,8 @@ def process_script(script):
         audio_clip = AudioFileClip(audio_path)
         shot_durations = get_shot_durations(script, shot_list, audio_clip)
 
-        batch_end = min(next_index + CLIP_BATCH_LIMIT, total_shots)
-        print(f"Resuming from shot {next_index + 1}/{total_shots} ({len(video_urls)} already done) - generating up to shot {batch_end} this run")
+        batch_end = min(next_index + shot_limit, total_shots)
+        print(f"Resuming from shot {next_index + 1}/{total_shots} ({len(video_urls)} already done) - generating up to shot {batch_end} this run (budget this call: {shot_limit})")
 
         for i in range(next_index, batch_end):
             shot = shot_list[i]
@@ -985,30 +1011,30 @@ def process_script(script):
                 print(f"FIX: reword shot_list[{i}].visual_description for script {script_id} in the "
                       f"scripts table, then reset status to 'images_generated' to resume from exactly "
                       f"this shot. Moving on to the next-oldest eligible candidate for now.")
-                return made_progress
+                return shots_used
             except AgnesOverloadedError as e:
                 print(f"Agnes appears overloaded (upstream load saturated) on shot {i+1}/{total_shots} after all retries: {e}")
-                if made_progress:
+                if shots_used:
                     print(f"Progress already saved through shot {i}/{total_shots} ({len(video_urls)} clips done) "
                           f"this run - stopping here instead of crashing; next scheduled run resumes from here.")
                 else:
                     print(f"Zero progress made on this script this run - moving on to the next-oldest "
                           f"eligible candidate instead of ending the run. This script's own turn will "
                           f"come back around once Agnes's load eases.")
-                return made_progress
+                return shots_used
 
             clip_url = upload_clip(script_id, i, raw_path)
             video_urls.append(clip_url)
             save_progress(script_id, video_urls, i + 1)
-            made_progress = True
+            shots_used += 1
             print(f"Saved progress: {i + 1}/{total_shots} shots done")
 
             os.remove(raw_path)
             time.sleep(4)
 
         if batch_end < total_shots:
-            print(f"Batch limit reached ({CLIP_BATCH_LIMIT} clips this run). {total_shots - batch_end} shots remain - resuming on the next scheduled run.")
-            return made_progress
+            print(f"Shot budget for this candidate used up this run ({shots_used} shots). {total_shots - batch_end} shots remain - resuming on a future run.")
+            return shots_used
 
     if len(video_urls) >= total_shots:
         print("All shots done. Assembling final video...")
@@ -1027,9 +1053,8 @@ def process_script(script):
 
         mark_video_generated(script_id, video_url, audio_stats)
         print("Done.")
-        made_progress = True
 
-    return made_progress
+    return shots_used
 
 
 def main():
@@ -1038,16 +1063,27 @@ def main():
         print("No scripts with images ready for video generation. Nothing to do.")
         return
 
-    for idx, script in enumerate(candidates):
-        if process_script(script):
-            return
-        remaining = len(candidates) - idx - 1
-        if remaining:
-            print(f"No progress on script {script['id']} this run - trying the next-oldest "
-                  f"of {remaining} remaining candidate(s).")
+    remaining_budget = CLIP_BATCH_LIMIT
+    any_progress = False
 
-    print(f"No progress possible on any of the {len(candidates)} candidate scripts this run "
-          f"(all stalled or not ready) - next scheduled run will retry.")
+    for script in candidates:
+        if remaining_budget <= 0:
+            print(f"Per-run shot budget ({CLIP_BATCH_LIMIT}) fully used - stopping here to respect Agnes's "
+                  f"quota ceiling. Remaining candidates get their turn on the next scheduled run.")
+            break
+
+        shots_used = process_script(script, shot_limit=remaining_budget)
+        if shots_used > 0:
+            any_progress = True
+            remaining_budget -= shots_used
+            print(f"Script {script['id']} used {shots_used} shot(s) this run - {remaining_budget} left in this run's shared budget.")
+        else:
+            print(f"No progress on script {script['id']} this run (overloaded, content-flagged, or already "
+                  f"fully assembled) - trying the next candidate with the same remaining budget.")
+
+    if not any_progress:
+        print(f"No progress possible on any of the {len(candidates)} candidate scripts this run "
+              f"(all stalled or not ready) - next scheduled run will retry.")
 
 
 if __name__ == "__main__":
