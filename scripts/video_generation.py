@@ -1,7 +1,366 @@
 """
 Marius Command Center - Video Generation Agent
 Takes the oldest script with images generated and generates one real AI
+video clip pe"""
+Marius Command Center - Video Generation Agent
+Takes the oldest script with images generated and generates one real AI
 video clip per shot using Agnes AI, sized to match narration timing, then
+assembles the final video with a 4-layer audio mix: original shot-clip
+ambience, narration, background score, and SFX.
+
+RESUME-SAFE: generated clips are uploaded to storage and recorded in
+video_urls/video_next_index after every single shot, so a run that gets
+cut off (timeout, crash, manual stop) picks up exactly where it left off
+on the next run instead of regenerating finished shots.
+
+QUOTA-SAFE: Agnes's free tier appears to silently repeat/stale past a
+per-run quota ceiling, so each run generates at most CLIP_BATCH_LIMIT new
+clips total across all candidates combined, then stops cleanly. The
+resume logic above picks up the rest on the next scheduled run.
+
+RETRY-SAFE: create_agnes_task retries transient backend errors (429 rate
+limit, 500/502/503/504 server-side issues) with backoff before giving up,
+so a single flaky Agnes response doesn't kill the whole run. Clip
+verification (HEAD checks on already-generated shots) also retries before
+concluding a shot is genuinely broken, so a single transient network
+blip doesn't discard already-finished work.
+
+OVERLOAD-RESILIENT: if Agnes is still failing after all retries (upstream
+load saturated) - either at task-creation time or while polling for
+completion - this now exits quietly (exit code 0, no crash, no GitHub
+issue opened) instead of raising and killing the whole run. Progress is
+already saved after every completed shot, so nothing is lost; the next
+scheduled run picks up exactly where this one stopped, typically ~20
+minutes later once Agnes's load has eased.
+
+CONTENT-POLICY-RESILIENT: if Agnes rejects a shot's prompt on content-
+policy grounds, this now auto-retries ONCE with a generic, stripped-down
+fallback prompt (shot_type/camera fields only, no freeform visual_description
+text) before giving up on the shot. If the fallback is ALSO rejected, the
+script is marked status='content_flagged' (not left at 'images_generated')
+and the run moves on to the next-oldest eligible script instead of crash-
+looping on the same one forever. A flagged script is invisible to future
+runs until its status is manually changed back - review shot_list in the
+scripts table, reword the offending shot, and reset status to
+'images_generated' to resume it.
+
+ACE-MUSIC-RESILIENT: ACE Music's free hosted API has had reported
+reliability issues (endpoint 404s/502s). generate_background_music now
+tries every host in ACE_MUSIC_BASES in order and only skips background
+music entirely if all of them fail, instead of giving up on the first
+error.
+
+LIGHTING FIX (2026-07-19): Agnes prompts had no lighting/exposure cue at
+all, so the model defaulted to moody/underlit documentary-style footage
+on nearly every shot. build_agnes_prompt now appends a "well-lit, balanced
+exposure" cue automatically, UNLESS the shot's own visual_description
+already implies a deliberately dark scene (night, dusk, shadow, etc.) -
+in which case we leave it alone so genuinely dark scenes aren't forced
+bright.
+
+AUDIO-DIAGNOSTICS (2026-07-19): generate_background_music/search_freesound_sfx
+were designed to fail silently (print + continue) so a bad API response
+never crashes a run - but that also meant there was no way to tell,
+without reading raw Action logs, whether music/SFX actually made it into
+a given video. build_audio_mix now returns pass/fail stats alongside the
+mixed audio, and mark_video_generated persists them to the scripts table
+(music_generated bool, sfx_applied_count int) so this is now a plain DB
+query instead of a log-hunting exercise.
+
+SUBTITLES (2026-07-19): added burned-in captions, one per shot, using each
+shot's own narration_excerpt (the same field narration.py already uses for
+per-shot audio, so captions are guaranteed to match what's actually being
+spoken - not a separate re-split of narration_text). Captions are timed to
+the exact same shot_starts/shot_durations already computed for audio sync,
+rendered as word-wrapped white text with a black outline on a semi-
+transparent bar near the bottom, and composited onto the video in
+assemble_final_video right before the fade effects are applied. Font is
+DejaVu Sans Bold (present on GitHub's Ubuntu runner images via
+fonts-dejavu-core); falls back to PIL's built-in default font if that
+path is ever missing, and a single bad caption never breaks the whole
+assembly (same fail-soft pattern as music/SFX in this file).
+
+CAPTION SIZE FIX (2026-07-20): captions were rendering at font size 42
+across 86% of the frame width, which on longer narration_excerpt text
+wrapped into a tall multi-line block that visually covered close to half
+the screen - and since these are burned into the video pixels (not a real
+YouTube caption track), toggling CC did nothing. Font size dropped to 28
+and max width ratio dropped to 0.70 to bring this back to a normal
+subtitle-sized footprint near the bottom of the frame.
+
+ORIGINAL-CLIP-AUDIO FIX (2026-07-20): individual shot clips downloaded
+straight from Agnes/storage already contain usable ambience/music baked
+in by the video model itself - confirmed by listening to pre-stitch
+clips directly in Supabase Storage. But assemble_final_video was calling
+concatenate_videoclips(clips) (which keeps that original audio) and then
+immediately final.with_audio(final_audio) - and with_audio() REPLACES a
+clip's audio track rather than layering onto it. So the good original
+per-clip audio was being silently discarded and replaced by only
+narration+music+SFX every single time, regardless of whether that
+generated music/SFX mix succeeded or came back empty. build_audio_mix now
+also accepts and mixes in the original per-shot audio (extracted from the
+same downloaded shot clips already used for video) as its 4th layer,
+volume-matched below narration/music via ORIGINAL_CLIP_AUDIO_VOLUME, so
+the ambience you already confirmed sounds right is no longer thrown away.
+
+MULTI-CANDIDATE / HEAD-OF-LINE-BLOCKING FIX (2026-07-21): main() used to
+fetch only the single oldest 'images_generated' script and hard-return the
+instant it hit AgnesOverloadedError, even with zero progress made this
+run. Because the queue is strict oldest-first, one episode stuck on a
+single overloaded shot silently blocked every newer script behind it
+indefinitely - confirmed in production: one script sat at 8/53 shots for
+5 days while 8 fully-scripted episodes behind it never got touched. main()
+now pulls the CANDIDATE_POOL_SIZE oldest ready scripts and works through
+them in order within the same run.
+
+CAPTIONS REMOVED (2026-07-21): burned-in narration captions were showing up
+on screen over the finished video ("The Courier of the Siege" upload) -
+Zia wants video only, no visible script text. assemble_final_video no
+longer composites caption_clips onto the final video. The caption-building
+functions are left in place, just unused, in case this is wanted back in
+a different form later.
+
+RUN-MONOPOLIZATION FIX (2026-07-25): the 2026-07-21 fix only helped when a
+candidate made ZERO progress (fully overloaded on its first shot). It did
+NOT help when a candidate was healthy and slowly working - process_script
+used to return as soon as ANY shot succeeded, taking a full CLIP_BATCH_LIMIT
+batch (up to 8 shots) from whichever script was oldest, then main() stopped
+the entire run right there. Confirmed in production: "The Laundress of
+Lawrence" (63 shots, oldest ready script) consumed every single run's full
+shot budget for over a week straight, while 13 other fully-scripted episodes
+behind it sat at 0/N shots the entire time - a slow-but-working script
+starved everything else just as badly as a fully-stalled one did.
+process_script now takes a shot_limit argument and returns the number of
+shots it actually generated (not a bool), and main() round-robins the same
+total per-run Agnes-quota budget (CLIP_BATCH_LIMIT) across every candidate
+in the pool each run, moving to the next candidate as soon as one either
+runs out of its slice of the budget or hits a wall - so every stuck script
+gets at least a little progress every run instead of one script hogging
+the whole budget for hours. CANDIDATE_POOL_SIZE also raised from 5 to 15 so
+every currently-stuck script is in the rotation from the very next run,
+not just the 5 oldest.
+
+AUDIO BALANCE FIX (2026-07-29): NARRATION_VOLUME/MUSIC_VOLUME/SFX_VOLUME had
+drifted away from the documented spec (narration full, music ducked to 0.18,
+SFX at 0.85) to 0.70/0.34/1.0 - narration was turned down while music and
+SFX were turned up, so music was drowning out narration in every video.
+Restored to spec: NARRATION_VOLUME=1.0, MUSIC_VOLUME=0.18, SFX_VOLUME=0.85.
+
+LIGHTING FIX PART 2 (2026-07-29): the 2026-07-19 lighting fix appended
+"well-lit, balanced exposure" at the END of the prompt, after the full
+visual_description. Video generation models weight earlier tokens more
+heavily, so a long moody documentary-style description up front (fog,
+smoke, archives, etc. - none of which trip DARK_SCENE_KEYWORDS but still
+read as visually dark) was drowning out a lighting cue tacked on at the
+back, and nearly every shot was still rendering underlit. build_agnes_prompt
+now puts a stronger "bright natural daylight, high-key lighting,
+well-exposed, vivid colors" cue FIRST in the prompt instead of last,
+for shots that don't already imply a deliberately dark scene.
+"""
+
+import os
+import json
+import math
+import time
+import base64
+import requests
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+from moviepy import (
+    VideoFileClip,
+    AudioFileClip,
+    ImageClip,
+    CompositeAudioClip,
+    CompositeVideoClip,
+    concatenate_videoclips,
+    concatenate_audioclips,
+)
+from moviepy.video.fx import FadeIn, FadeOut
+from moviepy.audio.fx import AudioFadeIn, AudioFadeOut
+
+FADE_IN_SECONDS = 0.75
+FADE_OUT_SECONDS = 1.5
+TRAIL_SECONDS = 3.0
+
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
+AGNES_API_KEY = os.environ["AGNES_API_KEY"]
+FREESOUND_API_KEY = os.environ.get("FREESOUND_API_KEY")
+ACE_MUSIC_API_KEY = os.environ.get("ACE_MUSIC_API_KEY")
+HF_TOKEN = os.environ.get("HF_TOKEN")
+
+HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+}
+
+AGNES_BASE = "https://apihub.agnes-ai.com/v1"
+AGNES_POLL_URL = "https://apihub.agnes-ai.com/agnesapi"
+AGNES_HEADERS = {
+    "Authorization": f"Bearer {AGNES_API_KEY}",
+    "Content-Type": "application/json",
+}
+
+ACE_MUSIC_BASES = ["https://api.acemusic.ai", "https://ai.acemusic.ai"]
+ACE_MUSIC_HEADERS = {
+    "Authorization": f"Bearer {ACE_MUSIC_API_KEY}",
+    "Content-Type": "application/json",
+}
+
+HF_MUSICGEN_URL = "https://api-inference.huggingface.co/models/facebook/musicgen-small"
+
+VIDEO_BUCKET = "videos"
+CLIP_BUCKET = "video_clips"
+WIDTH, HEIGHT = 1152, 768
+FRAME_RATE = 24
+MIN_FRAMES = 49
+MAX_FRAMES = 169
+MAX_CLIP_SECONDS = MAX_FRAMES / FRAME_RATE
+
+CLIP_BATCH_LIMIT = 8          # total shots generated per run, across ALL candidates combined
+CANDIDATE_POOL_SIZE = 15      # raised from 5 (2026-07-25) so every currently-stuck script is in rotation
+
+NARRATION_VOLUME = 1.0
+MUSIC_VOLUME = 0.18
+SFX_VOLUME = 0.85
+ORIGINAL_CLIP_AUDIO_VOLUME = 0.30
+LIMITER_CEILING = 0.98
+
+AGNES_RETRYABLE_CODES = {429, 500, 502, 503, 504}
+AGNES_MAX_RETRIES = 4
+
+CLIP_VERIFY_RETRIES = 3
+CLIP_VERIFY_RETRY_WAIT = 5
+
+DARK_SCENE_KEYWORDS = (
+    "night", "dark", "dim", "shadow", "silhouette", "dusk", "twilight",
+    "candlelit", "moonlit", "underground", "cave", "storm", "eclipse",
+    "blackout", "gloom",
+)
+
+CAPTION_FONT_PATHS = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+]
+CAPTION_FONT_SIZE = 28
+CAPTION_MAX_WIDTH_RATIO = 0.70
+CAPTION_BOTTOM_MARGIN = 60
+CAPTION_LINE_SPACING = 10
+CAPTION_TEXT_COLOR = (255, 255, 255, 255)
+CAPTION_STROKE_COLOR = (0, 0, 0, 255)
+CAPTION_STROKE_WIDTH = 3
+CAPTION_BG_COLOR = (0, 0, 0, 140)
+CAPTION_BG_PADDING = 16
+
+
+class ContentPolicyRejection(Exception):
+    pass
+
+
+class AgnesOverloadedError(Exception):
+    pass
+
+
+def round_to_valid_frames(num_frames):
+    n = round((num_frames - 1) / 8)
+    n = max(0, n)
+    return 8 * n + 1
+
+
+def get_ready_scripts(limit=CANDIDATE_POOL_SIZE):
+    resp = requests.get(
+        f"{SUPABASE_URL}/rest/v1/scripts?status=eq.images_generated&order=created_at.asc&limit={limit}",
+        headers=HEADERS,
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def download_file(url, out_path):
+    r = requests.get(url, timeout=120)
+    r.raise_for_status()
+    with open(out_path, "wb") as f:
+        f.write(r.content)
+    return out_path
+
+
+def build_agnes_prompt(shot, use_fallback=False):
+    shot_type = (shot.get("shot_type") or "medium").replace("_", " ")
+    camera_movement = (shot.get("camera_movement") or "static").replace("_", " ")
+    lens_effect = shot.get("lens_effect") or "none"
+
+    if use_fallback:
+        parts = ["bright natural daylight, high-key lighting, well-exposed", f"{shot_type} cinematic documentary shot"]
+    else:
+        visual = shot.get("visual_description", "").strip()
+        if any(kw in visual.lower() for kw in DARK_SCENE_KEYWORDS):
+            parts = [visual, f"{shot_type} shot"]
+        else:
+            parts = ["bright natural daylight, high-key lighting, well-exposed, vivid colors", visual, f"{shot_type} shot"]
+
+    if camera_movement != "static":
+        parts.append(f"camera {camera_movement}")
+    if lens_effect != "none":
+        parts.append(lens_effect.replace("_", " "))
+
+    return ", ".join(p for p in parts if p)
+
+
+def create_agnes_task(prompt, num_frames):
+    last_error_text = None
+
+    for attempt in range(AGNES_MAX_RETRIES):
+        resp = requests.post(
+            f"{AGNES_BASE}/videos",
+            headers=AGNES_HEADERS,
+            json={
+                "model": "agnes-video-v2.0",
+                "prompt": prompt,
+                "height": HEIGHT,
+                "width": WIDTH,
+                "num_frames": num_frames,
+                "frame_rate": FRAME_RATE,
+            },
+            timeout=60,
+        )
+
+        if resp.status_code == 400 and "content_policy_violation" in resp.text:
+            raise ContentPolicyRejection(resp.text)
+
+        if resp.status_code in AGNES_RETRYABLE_CODES:
+            last_error_text = resp.text
+            wait = 20 * (attempt + 1)
+            print(f"AGNES transient error {resp.status_code} (attempt {attempt + 1}/{AGNES_MAX_RETRIES}): {resp.text}")
+            print(f"Retrying in {wait}s...")
+            time.sleep(wait)
+            continue
+
+        if resp.status_code >= 400:
+            print(f"AGNES ERROR {resp.status_code}: {resp.text}")
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("video_id") or data.get("id") or data.get("task_id")
+
+    raise AgnesOverloadedError(f"Agnes still failing after {AGNES_MAX_RETRIES} attempts: {last_error_text}")
+
+
+def extract_video_url(data):
+    for key in ("video_url", "url", "remixed_from_video_id"):
+        val = data.get(key)
+        if isinstance(val, str) and val.startswith("http"):
+            return val
+    for val in data.values():
+        if isinstance(val, str) and val.startswith("http") and val.endswith(".mp4"):
+            return val
+    return None
+
+
+def poll_agnes_task(video_id, max_wait=300, interval=10):
+    waited = 0
+    while waited < max_wait:
+        resp =r shot using Agnes AI, sized to match narration timing, then
 assembles the final video with a 4-layer audio mix: original shot-clip
 ambience, narration, background score, and SFX.
 
