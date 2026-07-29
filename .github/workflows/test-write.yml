@@ -1,0 +1,19 @@
+name: Test Write Access
+on: workflow_dispatch
+
+jobs:
+  test-write:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_WRITE_TOKEN }}
+      - name: Create test file
+        run: echo "write test $(date)" > write-test.txt
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add write-test.txt
+          git commit -m "test: confirm write token works"
+          git push
