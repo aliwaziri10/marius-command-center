@@ -2,6 +2,20 @@
 Marius Command Center - Script Writing Agent
 Takes the oldest pending topic and turns it into a full narration script
 plus a shot-by-shot visual production plan for "Erased."
+
+SETTING/CHARACTER CONSISTENCY (2026-07-29): shots were drifting visually -
+wrong ethnicity/location shown for a scene (e.g. a story set in Gambia
+showing Chinese faces and Chinese military troops), and recurring people
+(e.g. "the mother") changing appearance between shots with no visual
+anchor tying them together. Root cause: each shot's visual_description was
+generated independently with no persistent reference for what the real-world
+setting looks like or what recurring characters look like. Added a new
+top-level "setting_and_characters" field: a short paragraph fixing the
+real-world location/era/ethnicity of the story and describing the physical
+appearance of every recurring named person, generated once per episode and
+required to be respected by every shot. video_generation.py now injects
+this into every single shot's Agnes prompt so the anchor is never lost or
+forgotten partway through the episode.
 """
 
 import os
@@ -25,6 +39,8 @@ MAX_SHOTS = 85
 MAX_GENERATION_ATTEMPTS = 5
 MAX_HOOK_TEXT_CHARS = 40
 MAX_HOOK_TEXT_WORDS = 5
+MIN_SETTING_CHARS = 40
+MAX_SETTING_CHARS = 900
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 
@@ -176,6 +192,16 @@ def validate_and_normalize(result):
     if "narration_text" not in result or not result["narration_text"].strip():
         return False, "missing narration_text"
 
+    setting_and_characters = (result.get("setting_and_characters") or "").strip()
+    if len(setting_and_characters) < MIN_SETTING_CHARS:
+        return False, (
+            f"setting_and_characters missing or too short "
+            f"({len(setting_and_characters)} chars, need at least {MIN_SETTING_CHARS}) - "
+            f"must fix the real-world location/era/ethnicity and describe every "
+            f"recurring character's appearance"
+        )
+    result["setting_and_characters"] = setting_and_characters[:MAX_SETTING_CHARS]
+
     shot_list = result.get("shot_list")
     if not isinstance(shot_list, list) or len(shot_list) == 0:
         return False, "missing or empty shot_list"
@@ -239,6 +265,27 @@ caught in extraordinary historical moments, whose names history left out.
 
 Episode topic: {title}
 Angle: {angle}
+
+SETTING AND CHARACTERS - write this FIRST, before anything else, as a fixed
+visual anchor for the whole episode. This is the single most important
+field for keeping the episode visually consistent, so treat it as
+non-negotiable:
+- State the real-world location, country/region, era, and the actual
+  ethnicity/culture of the people in this specific story. Be explicit and
+  concrete (e.g. "rural Gambia, West Africa, 1981 - Gambian people, dark
+  skin, traditional and period-appropriate West African dress" NOT vague
+  phrasing that a video model could misread as a different region).
+- For every recurring named or clearly-identifiable person in the story
+  (e.g. "the mother," "the young soldier," "the porter"), give one fixed,
+  concrete physical description (approximate age, build, hair, distinctive
+  clothing) that must be repeated consistently - this person must look the
+  same in every shot they appear in, not reinterpreted shot to shot.
+  If the story has no individually-tracked recurring character (e.g. it
+  follows a crowd or an unnamed narrator's perspective), say so explicitly
+  instead of inventing one.
+This full anchor will be attached to every single shot's image/video
+generation prompt later in the pipeline, so write it as a standalone
+paragraph that makes sense with no other context - 2-5 sentences.
 
 OPENING HOOK - this is the most important part of the script. The first 8
 seconds of narration determine whether the viewer stays or leaves, so follow
@@ -309,6 +356,12 @@ this is a hard requirement, not a suggestion. This is a dense, sub-sentence
 level breakdown - a single narration sentence should often span 2-3 separate
 shots, not one. Do not write sparse, paragraph-level shots.
 
+Every shot's "visual_description" must stay consistent with the
+"setting_and_characters" anchor above - same location/era/ethnicity, and
+any recurring person described there must match their fixed appearance in
+every shot they appear in. Do not introduce a different ethnicity, region,
+or unplanned recurring character partway through.
+
 For each shot, provide:
 - "shot_type": one of "wide", "medium", "close_up", "extreme_close_up",
   "establishing", "detail_insert"
@@ -372,13 +425,14 @@ Return ONLY valid JSON, no other text, no markdown fences, in this exact
 format:
 
 {{
+  "setting_and_characters": "2-5 sentence fixed anchor: real-world location/era/ethnicity of this story, plus a fixed physical description of every recurring named/identifiable character.",
   "narration_text": "The full narration script as one string, written to be read aloud.",
   "hook_text": "Short punchy thumbnail cover line, max {MAX_HOOK_TEXT_WORDS} words and under {MAX_HOOK_TEXT_CHARS} characters, readable in a 2-second glance, written specifically for THIS episode's topic - never the style example above.",
   "music_mood": "Background score prompt for the whole episode, describing its build-up arc.",
   "shot_list": [
     {{
       "shot_number": 1,
-      "visual_description": "Detailed description for AI image/video generation",
+      "visual_description": "Detailed description for AI image/video generation, consistent with setting_and_characters above",
       "narration_excerpt": "The exact portion of narration this shot covers",
       "shot_type": "wide",
       "camera_movement": "push_in",
@@ -411,7 +465,7 @@ Include between {MIN_SHOTS} and {MAX_SHOTS} shots covering the full narration.""
     raise RuntimeError(f"Script generation failed after {MAX_GENERATION_ATTEMPTS} attempts. Last reason: {last_reason}")
 
 
-def save_script(topic_id, narration_text, shot_list, music_mood, hook_text):
+def save_script(topic_id, narration_text, shot_list, music_mood, hook_text, setting_and_characters):
     resp = requests.post(
         f"{SUPABASE_URL}/rest/v1/scripts",
         headers={**HEADERS, "Prefer": "return=representation"},
@@ -421,6 +475,7 @@ def save_script(topic_id, narration_text, shot_list, music_mood, hook_text):
             "shot_list": shot_list,
             "music_mood": music_mood,
             "hook_text": hook_text,
+            "setting_and_characters": setting_and_characters,
             "status": "pending",
         },
         timeout=30,
@@ -472,6 +527,7 @@ def main():
         result["shot_list"],
         result["music_mood"],
         result["hook_text"],
+        result["setting_and_characters"],
     )
     mark_topic_scripted(topic["id"])
     print("Done.")
