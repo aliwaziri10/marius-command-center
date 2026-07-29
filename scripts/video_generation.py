@@ -153,6 +153,28 @@ back, and nearly every shot was still rendering underlit. build_agnes_prompt
 now puts a stronger "bright natural daylight, high-key lighting,
 well-exposed, vivid colors" cue FIRST in the prompt instead of last,
 for shots that don't already imply a deliberately dark scene.
+
+ONE-TAKE / ANCHOR / ANACHRONISM FIX (2026-07-29): three related fixes based
+on direct feedback after watching a finished "Erased" upload:
+1. Shots longer than MAX_CLIP_SECONDS were being split into multiple
+   SEPARATE Agnes generations of the same prompt and stitched together -
+   since Agnes has no memory between calls, each independent generation
+   rendered its own random camera angle, so a single "shot" visibly cut
+   between 2-3 unrelated takes instead of playing as one continuous shot.
+   generate_shot_clip now generates exactly ONE take (up to the cap) and
+   extends any remaining duration by holding its final frame instead.
+2. script_writing.py's setting_and_characters anchor (real-world location/
+   era/ethnicity + fixed character descriptions) was never actually being
+   passed into build_agnes_prompt despite an earlier changelog entry
+   claiming this was wired up - it wasn't. It is now threaded through
+   generate_shot_clip -> _generate_one_segment -> build_agnes_prompt, so
+   every shot's prompt is anchored to the episode's real setting/era.
+3. Added an explicit ANACHRONISM_GUARD ("no modern technology, no cars, no
+   drones, no modern clothing, no digital devices") and QUALITY_GUARD
+   ("shot on film, vivid saturated color, no sepia, no CGI look") to every
+   prompt, to stop modern-day objects/vehicles leaking into historical
+   scenes and to push back against Agnes's tendency toward a flat,
+   desaturated, synthetic-looking default grade.
 """
 
 import os
@@ -283,19 +305,42 @@ def download_file(url, out_path):
     return out_path
 
 
-def build_agnes_prompt(shot, use_fallback=False):
+ANACHRONISM_GUARD = (
+    "historically accurate to this exact time period and setting, no modern technology, "
+    "no cars, no drones, no modern clothing, no digital devices, no anachronistic objects of any kind"
+)
+
+QUALITY_GUARD = (
+    "shot on film, natural film grain, vivid saturated color, no sepia tone, "
+    "no heavy desaturation, no muted documentary color grading, no artificial CGI look, no plastic skin"
+)
+
+
+def build_agnes_prompt(shot, setting_and_characters="", use_fallback=False):
     shot_type = (shot.get("shot_type") or "medium").replace("_", " ")
     camera_movement = (shot.get("camera_movement") or "static").replace("_", " ")
     lens_effect = shot.get("lens_effect") or "none"
+    anchor = (setting_and_characters or "").strip()
 
     if use_fallback:
-        parts = ["bright natural daylight, high-key lighting, well-exposed", f"{shot_type} cinematic documentary shot"]
+        parts = []
+        if anchor:
+            parts.append(anchor)
+        parts.append("bright natural daylight, high-key lighting, well-exposed")
+        parts.append(QUALITY_GUARD)
+        parts.append(ANACHRONISM_GUARD)
+        parts.append(f"{shot_type} cinematic documentary shot")
     else:
         visual = shot.get("visual_description", "").strip()
-        if any(kw in visual.lower() for kw in DARK_SCENE_KEYWORDS):
-            parts = [visual, f"{shot_type} shot"]
-        else:
-            parts = ["bright natural daylight, high-key lighting, well-exposed, vivid colors", visual, f"{shot_type} shot"]
+        parts = []
+        if anchor:
+            parts.append(anchor)
+        if not any(kw in visual.lower() for kw in DARK_SCENE_KEYWORDS):
+            parts.append("bright natural daylight, high-key lighting, well-exposed, vivid colors")
+        parts.append(QUALITY_GUARD)
+        parts.append(ANACHRONISM_GUARD)
+        parts.append(visual)
+        parts.append(f"{shot_type} shot")
 
     if camera_movement != "static":
         parts.append(f"camera {camera_movement}")
@@ -382,18 +427,18 @@ def poll_agnes_task(video_id, max_wait=300, interval=10):
     raise AgnesOverloadedError(f"Agnes generation timed out after {max_wait}s for video_id {video_id}")
 
 
-def _generate_one_segment(shot, segment_duration, out_path):
+def _generate_one_segment(shot, segment_duration, out_path, setting_and_characters=""):
     raw_frames = int(segment_duration * FRAME_RATE)
     raw_frames = max(MIN_FRAMES, min(MAX_FRAMES, raw_frames))
     num_frames = round_to_valid_frames(raw_frames)
     num_frames = max(MIN_FRAMES, min(MAX_FRAMES, num_frames))
 
-    prompt = build_agnes_prompt(shot, use_fallback=False)
+    prompt = build_agnes_prompt(shot, setting_and_characters, use_fallback=False)
     try:
         video_id = create_agnes_task(prompt, num_frames)
     except ContentPolicyRejection:
         print("Content policy rejection on primary prompt - retrying once with a generic fallback prompt...")
-        fallback_prompt = build_agnes_prompt(shot, use_fallback=True)
+        fallback_prompt = build_agnes_prompt(shot, setting_and_characters, use_fallback=True)
         video_id = create_agnes_task(fallback_prompt, num_frames)
 
     video_url = poll_agnes_task(video_id)
@@ -401,31 +446,41 @@ def _generate_one_segment(shot, segment_duration, out_path):
     return out_path
 
 
-def generate_shot_clip(shot, target_duration, out_path):
-    n_segments = max(1, math.ceil(target_duration / MAX_CLIP_SECONDS))
-    segment_duration = target_duration / n_segments
+def generate_shot_clip(shot, target_duration, out_path, setting_and_characters=""):
+    """
+    ONE-TAKE FIX (2026-07-29): this used to split any shot longer than
+    MAX_CLIP_SECONDS into multiple SEPARATE, INDEPENDENT Agnes generations
+    of the same prompt and stitch them back to back. Agnes has no memory
+    between calls, so each independent generation rendered its own random
+    camera angle/framing - a single "shot" over ~7s visibly cut between
+    2-3 unrelated takes of the same scene, which read as a jarring angle
+    change instead of one continuous shot.
 
-    if n_segments == 1:
-        return _generate_one_segment(shot, segment_duration, out_path)
+    Now: generate exactly ONE Agnes clip at up to MAX_CLIP_SECONDS, then
+    extend the remaining duration (if any) by holding its final frame -
+    the same freeze-frame technique fit_clip_to_duration already uses at
+    the assembly stage. This guarantees a shot is always one continuous
+    take, at the cost of a still hold instead of new motion for the
+    overflow portion - a much less noticeable trade-off than a visible
+    angle-change cut.
+    """
+    capped_duration = min(target_duration, MAX_CLIP_SECONDS)
+    _generate_one_segment(shot, capped_duration, out_path, setting_and_characters)
 
+    if target_duration <= MAX_CLIP_SECONDS:
+        return out_path
+
+    extra = target_duration - capped_duration
     print(f"Shot needs {target_duration:.1f}s (over the ~{MAX_CLIP_SECONDS:.1f}s per-generation cap) - "
-          f"generating {n_segments} clips of ~{segment_duration:.1f}s each and stitching, instead of freezing.")
+          f"generating one {capped_duration:.1f}s continuous take and holding its final frame for the "
+          f"remaining {extra:.1f}s, instead of stitching multiple independently-generated takes together.")
 
-    segment_paths = []
-    for seg in range(n_segments):
-        seg_path = out_path.replace(".mp4", f"_seg{seg}.mp4")
-        _generate_one_segment(shot, segment_duration, seg_path)
-        segment_paths.append(seg_path)
-        if seg < n_segments - 1:
-            time.sleep(4)
-
-    clips = [VideoFileClip(p) for p in segment_paths]
-    stitched = concatenate_videoclips(clips, method="compose")
-    stitched.write_videofile(out_path, fps=FRAME_RATE, codec="libx264", audio=False, threads=2, logger=None)
-    for c in clips:
-        c.close()
-    for p in segment_paths:
-        os.remove(p)
+    clip = VideoFileClip(out_path)
+    extended = fit_clip_to_duration(clip, target_duration)
+    tmp_path = out_path.replace(".mp4", "_extended.mp4")
+    extended.write_videofile(tmp_path, fps=FRAME_RATE, codec="libx264", audio=False, threads=2, logger=None)
+    clip.close()
+    os.replace(tmp_path, out_path)
 
     return out_path
 
@@ -1022,7 +1077,7 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
             raw_path = f"/tmp/shot_{i:03d}.mp4"
             print(f"Generating shot {i+1}/{total_shots} (~{shot_durations[i]:.1f}s)...")
             try:
-                generate_shot_clip(shot, shot_durations[i], raw_path)
+                generate_shot_clip(shot, shot_durations[i], raw_path, script.get("setting_and_characters", ""))
             except ContentPolicyRejection as e:
                 mark_content_flagged(script_id, i, str(e))
                 print(f"Rejected visual_description: {shot.get('visual_description', '')!r}")
