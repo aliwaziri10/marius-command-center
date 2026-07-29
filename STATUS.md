@@ -1,6 +1,6 @@
 # Marius Status
-Updated: 2026-07-29 16:06 UTC
+Updated: 2026-07-29 16:23 UTC
 
 Topics: 162
-Scripts by status: archived=1, uploaded=16, content_flagged=2, images_generated=14
-Latest script: e7036174 — images_generated (0 clips)
+Scripts by status: archived=1, uploaded=16, content_flagged=2, images_generated=14, pending=1
+Latest script: 7aa71b16 — pending (0 clips)
