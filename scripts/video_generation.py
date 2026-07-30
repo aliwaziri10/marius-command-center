@@ -175,6 +175,39 @@ on direct feedback after watching a finished "Erased" upload:
    prompt, to stop modern-day objects/vehicles leaking into historical
    scenes and to push back against Agnes's tendency toward a flat,
    desaturated, synthetic-looking default grade.
+
+CHARACTER-CONSISTENCY / SHOT-CONTINUITY FIX (2026-07-31): direct feedback
+after watching another upload flagged three related problems: characters
+changing appearance between shots (e.g. an old mother appearing out of
+nowhere), no visual continuity of motion/framing between consecutive shots,
+and occasional visual/content mismatches. Root cause: every shot was being
+generated as a pure text-to-video call with zero visual anchor, so Agnes
+had nothing to hold identity or continuity to across independent
+generations. Two additions, both confirmed against Agnes's own live API
+docs (agnes-image-2.1-flash for images, agnes-video-v2.0 image-to-video
+mode for video) and both still within the $0/free-tier ceiling:
+1. generate_character_reference() calls Agnes's image model ONCE per
+   script, right before shot 0, using the same setting_and_characters
+   anchor text already used for prompts, plus the quality/anachronism
+   guards. The resulting image URL is stored in scripts.character_reference_url
+   (new column) so it's generated at most once per script, ever - reused
+   on every resumed run.
+2. Every shot's Agnes video call now passes an "image" anchor: shot 0 uses
+   the character reference image; every shot after that uses the LAST
+   FRAME of the previous shot's own clip (extracted via moviepy, uploaded
+   to storage, passed as image-to-video input). This chains shots visually
+   frame-to-frame instead of generating each one blind, which is the same
+   mechanism Agnes's own docs describe for maintaining "consistent character
+   identity" and "natural camera movement" across a sequence. On resume
+   (script picked up mid-way through a later run), the anchor is
+   reconstructed by downloading the most recently completed clip and
+   extracting its last frame, so continuity isn't lost across run
+   boundaries.
+This does NOT use true keyframe-interpolation mode (which needs a known
+END frame, which we don't have ahead of generation) - it uses Agnes's
+image-to-video mode with a single starting anchor image, which is the
+correct mode for "continue from here" rather than "interpolate between
+two known points".
 """
 
 import os
@@ -216,6 +249,7 @@ HEADERS = {
 
 AGNES_BASE = "https://apihub.agnes-ai.com/v1"
 AGNES_POLL_URL = "https://apihub.agnes-ai.com/agnesapi"
+AGNES_IMAGE_URL = f"{AGNES_BASE}/images/generations"
 AGNES_HEADERS = {
     "Authorization": f"Bearer {AGNES_API_KEY}",
     "Content-Type": "application/json",
@@ -248,6 +282,8 @@ LIMITER_CEILING = 0.98
 
 AGNES_RETRYABLE_CODES = {429, 500, 502, 503, 504}
 AGNES_MAX_RETRIES = 4
+
+AGNES_IMAGE_MAX_RETRIES = 3
 
 CLIP_VERIFY_RETRIES = 3
 CLIP_VERIFY_RETRY_WAIT = 5
@@ -350,21 +386,185 @@ def build_agnes_prompt(shot, setting_and_characters="", use_fallback=False):
     return ", ".join(p for p in parts if p)
 
 
-def create_agnes_task(prompt, num_frames):
+def build_character_reference_prompt(setting_and_characters):
+    parts = [
+        setting_and_characters.strip(),
+        "character reference portrait, full figure visible, neutral pose, clear face and clothing detail",
+        "bright natural daylight, high-key lighting, well-exposed, vivid colors",
+        QUALITY_GUARD,
+        ANACHRONISM_GUARD,
+    ]
+    return ", ".join(p for p in parts if p)
+
+
+def generate_character_reference(script):
+    """
+    Generates ONE reference image per script (via agnes-image-2.1-flash),
+    anchored to the episode's setting_and_characters text, so every shot's
+    video call has a consistent character/setting to hold onto instead of
+    starting blind. Persists the result to scripts.character_reference_url
+    so this only ever runs once per script, even across resumed runs.
+    Returns None (and skips silently) if there's no setting_and_characters
+    text to anchor to, or if Agnes's image endpoint fails after retries -
+    the pipeline still works without it, just without the consistency
+    boost.
+    """
+    script_id = script["id"]
+    existing = script.get("character_reference_url")
+    if existing:
+        return existing
+
+    anchor = (script.get("setting_and_characters") or "").strip()
+    if not anchor:
+        print("No setting_and_characters text on this script - skipping character reference image.")
+        return None
+
+    prompt = build_character_reference_prompt(anchor)
+    last_error_text = None
+
+    for attempt in range(AGNES_IMAGE_MAX_RETRIES):
+        try:
+            resp = requests.post(
+                AGNES_IMAGE_URL,
+                headers=AGNES_HEADERS,
+                json={
+                    "model": "agnes-image-2.1-flash",
+                    "prompt": prompt,
+                    "size": f"{WIDTH}x{HEIGHT}",
+                    "extra_body": {"response_format": "url"},
+                },
+                timeout=60,
+            )
+        except requests.RequestException as e:
+            last_error_text = str(e)
+            print(f"Character reference image request raised an exception (attempt {attempt + 1}/{AGNES_IMAGE_MAX_RETRIES}): {e}")
+            time.sleep(10 * (attempt + 1))
+            continue
+
+        if resp.status_code in AGNES_RETRYABLE_CODES:
+            last_error_text = resp.text
+            print(f"Character reference image transient error {resp.status_code} (attempt {attempt + 1}/{AGNES_IMAGE_MAX_RETRIES}): {resp.text}")
+            time.sleep(10 * (attempt + 1))
+            continue
+
+        if resp.status_code >= 400:
+            print(f"Character reference image generation failed permanently ({resp.status_code}): {resp.text} - continuing without a reference image.")
+            return None
+
+        data = resp.json()
+        image_url = None
+        for entry in data.get("data", []):
+            if isinstance(entry, dict) and entry.get("url"):
+                image_url = entry["url"]
+                break
+        if not image_url:
+            image_url = data.get("url")
+
+        if not image_url:
+            print(f"Character reference image response had no usable URL: {data} - continuing without a reference image.")
+            return None
+
+        resp2 = requests.patch(
+            f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
+            headers=HEADERS,
+            json={"character_reference_url": image_url},
+            timeout=30,
+        )
+        resp2.raise_for_status()
+        print(f"Character reference image generated and saved for script {script_id}.")
+        return image_url
+
+    print(f"Character reference image generation exhausted all retries ({last_error_text}) - continuing without one.")
+    return None
+
+
+def upload_reference_image(script_id, file_name, local_path):
+    with open(local_path, "rb") as f:
+        file_bytes = f.read()
+    dest = f"{script_id}/refs/{file_name}"
+    resp = requests.put(
+        f"{SUPABASE_URL}/storage/v1/object/{CLIP_BUCKET}/{dest}",
+        headers={
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "image/png",
+        },
+        data=file_bytes,
+        timeout=60,
+    )
+    if resp.status_code >= 400:
+        print(f"Reference frame upload failed - status {resp.status_code}: {resp.text}")
+        return None
+    return f"{SUPABASE_URL}/storage/v1/object/public/{CLIP_BUCKET}/{dest}"
+
+
+def extract_last_frame_url(script_id, shot_index, local_video_path):
+    """
+    Pulls the final frame of a just-generated (or already-downloaded) shot
+    clip and uploads it as a small PNG, so it can be passed as the "image"
+    anchor for the NEXT shot's Agnes call - this is what chains shots
+    together visually instead of each one being generated blind. Fails
+    soft (returns None) on any error, same fail-soft pattern as
+    music/SFX/captions elsewhere in this file - continuity is a quality
+    improvement, not something that should ever crash a run.
+    """
+    try:
+        clip = VideoFileClip(local_video_path)
+        frame = clip.get_frame(max(clip.duration - 1 / FRAME_RATE, 0))
+        clip.close()
+        img = Image.fromarray(frame)
+        png_path = local_video_path.replace(".mp4", "_lastframe.png")
+        img.save(png_path)
+        url = upload_reference_image(script_id, f"shot_{shot_index:03d}_lastframe.png", png_path)
+        os.remove(png_path)
+        return url
+    except Exception as e:
+        print(f"Could not extract/upload last frame for shot {shot_index}, continuing without a continuity anchor for the next shot: {e}")
+        return None
+
+
+def get_continuity_anchor(script, video_urls):
+    """
+    Reconstructs the correct anchor image for the NEXT shot to generate:
+    - if at least one shot is already done, downloads the most recently
+      completed clip and extracts its last frame (this is what makes
+      continuity survive across resumed runs, not just within one run)
+    - otherwise falls back to the script's character reference image
+      (generating it if it doesn't exist yet)
+    """
+    if video_urls:
+        try:
+            tmp_path = "/tmp/_anchor_source.mp4"
+            download_file(video_urls[-1], tmp_path)
+            url = extract_last_frame_url(script["id"], len(video_urls) - 1, tmp_path)
+            os.remove(tmp_path)
+            if url:
+                return url
+        except Exception as e:
+            print(f"Could not rebuild continuity anchor from the last completed clip, falling back to character reference: {e}")
+
+    return generate_character_reference(script)
+
+
+def create_agnes_task(prompt, num_frames, image_url=None):
     last_error_text = None
 
     for attempt in range(AGNES_MAX_RETRIES):
+        payload = {
+            "model": "agnes-video-v2.0",
+            "prompt": prompt,
+            "height": HEIGHT,
+            "width": WIDTH,
+            "num_frames": num_frames,
+            "frame_rate": FRAME_RATE,
+        }
+        if image_url:
+            payload["image"] = image_url
+
         resp = requests.post(
             f"{AGNES_BASE}/videos",
             headers=AGNES_HEADERS,
-            json={
-                "model": "agnes-video-v2.0",
-                "prompt": prompt,
-                "height": HEIGHT,
-                "width": WIDTH,
-                "num_frames": num_frames,
-                "frame_rate": FRAME_RATE,
-            },
+            json=payload,
             timeout=60,
         )
 
@@ -427,7 +627,7 @@ def poll_agnes_task(video_id, max_wait=300, interval=10):
     raise AgnesOverloadedError(f"Agnes generation timed out after {max_wait}s for video_id {video_id}")
 
 
-def _generate_one_segment(shot, segment_duration, out_path, setting_and_characters=""):
+def _generate_one_segment(shot, segment_duration, out_path, setting_and_characters="", anchor_image_url=None):
     raw_frames = int(segment_duration * FRAME_RATE)
     raw_frames = max(MIN_FRAMES, min(MAX_FRAMES, raw_frames))
     num_frames = round_to_valid_frames(raw_frames)
@@ -435,18 +635,18 @@ def _generate_one_segment(shot, segment_duration, out_path, setting_and_characte
 
     prompt = build_agnes_prompt(shot, setting_and_characters, use_fallback=False)
     try:
-        video_id = create_agnes_task(prompt, num_frames)
+        video_id = create_agnes_task(prompt, num_frames, image_url=anchor_image_url)
     except ContentPolicyRejection:
         print("Content policy rejection on primary prompt - retrying once with a generic fallback prompt...")
         fallback_prompt = build_agnes_prompt(shot, setting_and_characters, use_fallback=True)
-        video_id = create_agnes_task(fallback_prompt, num_frames)
+        video_id = create_agnes_task(fallback_prompt, num_frames, image_url=anchor_image_url)
 
     video_url = poll_agnes_task(video_id)
     download_file(video_url, out_path)
     return out_path
 
 
-def generate_shot_clip(shot, target_duration, out_path, setting_and_characters=""):
+def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="", anchor_image_url=None):
     """
     ONE-TAKE FIX (2026-07-29): this used to split any shot longer than
     MAX_CLIP_SECONDS into multiple SEPARATE, INDEPENDENT Agnes generations
@@ -463,9 +663,15 @@ def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="
     take, at the cost of a still hold instead of new motion for the
     overflow portion - a much less noticeable trade-off than a visible
     angle-change cut.
+
+    anchor_image_url (2026-07-31): when provided, this shot's Agnes call
+    runs in image-to-video mode using that image as the starting frame -
+    either the episode's character reference (shot 0) or the previous
+    shot's own last frame (every shot after that) - so the shot continues
+    visually from wherever the story left off instead of generating blind.
     """
     capped_duration = min(target_duration, MAX_CLIP_SECONDS)
-    _generate_one_segment(shot, capped_duration, out_path, setting_and_characters)
+    _generate_one_segment(shot, capped_duration, out_path, setting_and_characters, anchor_image_url=anchor_image_url)
 
     if target_duration <= MAX_CLIP_SECONDS:
         return out_path
@@ -1024,6 +1230,7 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
         shot_list = json.loads(shot_list)
     total_shots = len(shot_list)
     music_mood = script.get("music_mood") or ""
+    setting_and_characters = script.get("setting_and_characters", "")
 
     video_urls = script.get("video_urls") or []
     next_index = script.get("video_next_index") or 0
@@ -1072,12 +1279,18 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
         batch_end = min(next_index + shot_limit, total_shots)
         print(f"Resuming from shot {next_index + 1}/{total_shots} ({len(video_urls)} already done) - generating up to shot {batch_end} this run (budget this call: {shot_limit})")
 
+        anchor_image_url = get_continuity_anchor(script, video_urls)
+        if anchor_image_url:
+            print(f"Using continuity anchor image for shot {next_index + 1}: {anchor_image_url}")
+        else:
+            print(f"No continuity anchor available for shot {next_index + 1} - generating blind (text-to-video only) for this shot.")
+
         for i in range(next_index, batch_end):
             shot = shot_list[i]
             raw_path = f"/tmp/shot_{i:03d}.mp4"
             print(f"Generating shot {i+1}/{total_shots} (~{shot_durations[i]:.1f}s)...")
             try:
-                generate_shot_clip(shot, shot_durations[i], raw_path, script.get("setting_and_characters", ""))
+                generate_shot_clip(shot, shot_durations[i], raw_path, setting_and_characters, anchor_image_url=anchor_image_url)
             except ContentPolicyRejection as e:
                 mark_content_flagged(script_id, i, str(e))
                 print(f"Rejected visual_description: {shot.get('visual_description', '')!r}")
@@ -1101,6 +1314,11 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
             save_progress(script_id, video_urls, i + 1)
             shots_used += 1
             print(f"Saved progress: {i + 1}/{total_shots} shots done")
+
+            # Chain the NEXT shot's anchor to THIS shot's own last frame,
+            # extracted from the clip we just generated, before it's removed.
+            next_anchor = extract_last_frame_url(script_id, i, raw_path)
+            anchor_image_url = next_anchor or anchor_image_url
 
             os.remove(raw_path)
             time.sleep(4)
