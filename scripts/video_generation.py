@@ -208,6 +208,14 @@ END frame, which we don't have ahead of generation) - it uses Agnes's
 image-to-video mode with a single starting anchor image, which is the
 correct mode for "continue from here" rather than "interpolate between
 two known points".
+
+UPLOAD UPSERT FIX (2026-07-31): upload_clip/upload_reference_image/
+upload_video used plain PUT with no upsert flag, so re-uploading to a
+path that already exists (e.g. a script manually reset back to shot 0
+for regeneration) fails with a duplicate-object conflict and crashes the
+whole run instead of overwriting. All three now send "x-upsert: true" so
+regenerating an already-existing script's clips/reference/final video
+always succeeds.
 """
 
 import os
@@ -488,6 +496,7 @@ def upload_reference_image(script_id, file_name, local_path):
             "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}",
             "Content-Type": "image/png",
+            "x-upsert": "true",
         },
         data=file_bytes,
         timeout=60,
@@ -719,6 +728,7 @@ def upload_clip(script_id, index, file_path):
             "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}",
             "Content-Type": "video/mp4",
+            "x-upsert": "true",
         },
         data=file_bytes,
         timeout=300,
@@ -1174,6 +1184,7 @@ def upload_video(script_id, file_path):
             "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}",
             "Content-Type": "video/mp4",
+            "x-upsert": "true",
         },
         data=file_bytes,
         timeout=300,
