@@ -25,6 +25,23 @@ RATE = "-5%"
 PAUSE_SECONDS_MIN = 1.0
 PAUSE_SECONDS_MAX = 2.0
 
+# STUTTER/DUPLICATE GUARD (2026-07-31): synthesize_sentence made a single
+# Edge-TTS WebSocket call per sentence with no retry and no validation of
+# what came back. Edge TTS occasionally glitches mid-stream and returns
+# audio where part of the sentence is duplicated or restarted - confirmed
+# by viewer feedback of full/half-repeated sentences at 2-3 points across
+# an otherwise-clean 8-minute narration, with no matching duplication in
+# the source narration_text itself (checked directly - the written script
+# is clean). Since nothing validated the TTS output, a glitched clip went
+# straight into the final narration untouched.
+# Fix: after synthesizing a sentence, sanity-check its duration against a
+# rough expected speaking pace for that many words. A duplicated/stuttered
+# clip runs noticeably longer than a clean one, so if the measured
+# duration exceeds what's plausible, discard it and retry the TTS call.
+MIN_PLAUSIBLE_WORDS_PER_SECOND = 1.6  # slow-end normal speech at -5% rate
+DURATION_SLACK_SECONDS = 1.0          # small fixed buffer for short sentences
+MAX_SENTENCE_TTS_ATTEMPTS = 3
+
 
 def split_into_segments(narration_text):
     """Splits narration into one segment per SENTENCE, so a pause gets
@@ -42,12 +59,45 @@ async def _synthesize_sentence(text, voice, rate, out_path):
     await communicate.save(out_path)
 
 
+def _max_plausible_duration(text):
+    word_count = max(len(text.split()), 1)
+    return (word_count / MIN_PLAUSIBLE_WORDS_PER_SECOND) + DURATION_SLACK_SECONDS
+
+
 def synthesize_sentence(text, voice, rate, tmp_path):
     """One real TTS call per full sentence - correct prosody/intonation,
     no mid-sentence resets (this was the fix for the choppy,
-    sub-sentence-fragment narration bug). Returns a pydub AudioSegment."""
-    asyncio.run(_synthesize_sentence(text, voice, rate, tmp_path))
-    return AudioSegment.from_file(tmp_path)
+    sub-sentence-fragment narration bug). Returns a pydub AudioSegment.
+
+    STUTTER/DUPLICATE GUARD (2026-07-31): validates the synthesized clip's
+    duration against a rough expected-speaking-pace ceiling for that
+    sentence's word count. Edge TTS occasionally returns audio with part
+    of the sentence duplicated/restarted (a WebSocket-level glitch, not a
+    text problem) - a clip that runs far longer than any normal reading
+    pace for its word count is almost certainly one of these, so it's
+    discarded and re-synthesized instead of being trusted blindly.
+    """
+    max_plausible = _max_plausible_duration(text)
+    last_duration = None
+
+    for attempt in range(MAX_SENTENCE_TTS_ATTEMPTS):
+        asyncio.run(_synthesize_sentence(text, voice, rate, tmp_path))
+        clip = AudioSegment.from_file(tmp_path)
+        duration_seconds = len(clip) / 1000.0
+        last_duration = duration_seconds
+
+        if duration_seconds <= max_plausible:
+            return clip
+
+        print(f"TTS output for sentence looks like a stutter/duplicate "
+              f"({duration_seconds:.1f}s, expected under {max_plausible:.1f}s for "
+              f"{len(text.split())} words) - attempt {attempt + 1}/{MAX_SENTENCE_TTS_ATTEMPTS}. "
+              f"Sentence: {text[:80]!r}")
+
+    print(f"Sentence still looks anomalous after {MAX_SENTENCE_TTS_ATTEMPTS} attempts "
+          f"({last_duration:.1f}s) - using the last attempt anyway rather than blocking the whole run: "
+          f"{text[:80]!r}")
+    return clip
 
 
 def synthesize_with_pauses(narration_text, voice, rate):
