@@ -273,7 +273,7 @@ HF_MUSICGEN_URL = "https://api-inference.huggingface.co/models/facebook/musicgen
 
 VIDEO_BUCKET = "videos"
 CLIP_BUCKET = "video_clips"
-WIDTH, HEIGHT = 1152, 768
+WIDTH, HEIGHT = 1280, 720
 FRAME_RATE = 24
 MIN_FRAMES = 49
 MAX_FRAMES = 169
