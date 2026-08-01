@@ -296,6 +296,19 @@ AGNES_IMAGE_MAX_RETRIES = 3
 CLIP_VERIFY_RETRIES = 3
 CLIP_VERIFY_RETRY_WAIT = 5
 
+# SMOOTH-EXTENSION FIX (2026-08-01): when a shot (or the final trail) needs
+# more duration than one Agnes generation can produce (MAX_CLIP_SECONDS),
+# this used to freeze the last frame for the remainder - visible as a
+# "stuck" still image, happening at every sentence-boundary pause across
+# an episode plus every single video's outro. MAX_CHAIN_SEGMENTS caps how
+# many additional REAL Agnes clips we'll chain (each anchored to the
+# previous clip's own last frame, same mechanism as cross-shot continuity)
+# to cover the overflow with real motion instead. 3 extra segments at
+# ~7s each covers up to ~21s of overflow, far more than any real
+# pause/trail needs. If Agnes fails mid-chain, we still fall back to a
+# freeze-hold for whatever's left rather than crashing the run.
+MAX_CHAIN_SEGMENTS = 3
+
 DARK_SCENE_KEYWORDS = (
     "night", "dark", "dim", "shadow", "silhouette", "dusk", "twilight",
     "candlelit", "moonlit", "underground", "cave", "storm", "eclipse",
@@ -655,29 +668,59 @@ def _generate_one_segment(shot, segment_duration, out_path, setting_and_characte
     return out_path
 
 
-def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="", anchor_image_url=None):
+def _extract_last_frame_local(video_path):
+    """Extracts the last frame of a local clip file and uploads it nowhere -
+    returns a local PNG path for immediate reuse as the next Agnes anchor
+    within the same shot's chain-extension. Separate from
+    extract_last_frame_url (which uploads to storage) because chain
+    segments are purely intra-shot and never need to survive a resumed run."""
+    clip = VideoFileClip(video_path)
+    frame = clip.get_frame(max(clip.duration - 1 / FRAME_RATE, 0))
+    clip.close()
+    png_path = video_path.replace(".mp4", "_lastframe.png")
+    Image.fromarray(frame).save(png_path)
+    return png_path
+
+
+def _upload_local_image_for_anchor(script_id, tag, png_path):
+    """Chain-extension anchors must be passed to Agnes as a URL (same as
+    every other anchor in this file), so the local last-frame PNG gets
+    uploaded to storage just like extract_last_frame_url does, then
+    removed locally."""
+    url = upload_reference_image(script_id, tag, png_path)
+    os.remove(png_path)
+    return url
+
+
+def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="", anchor_image_url=None, script_id=None):
     """
-    ONE-TAKE FIX (2026-07-29): this used to split any shot longer than
-    MAX_CLIP_SECONDS into multiple SEPARATE, INDEPENDENT Agnes generations
-    of the same prompt and stitch them back to back. Agnes has no memory
-    between calls, so each independent generation rendered its own random
-    camera angle/framing - a single "shot" over ~7s visibly cut between
-    2-3 unrelated takes of the same scene, which read as a jarring angle
-    change instead of one continuous shot.
+    ONE-TAKE FIX (2026-07-29): a shot longer than MAX_CLIP_SECONDS used to
+    be split into multiple SEPARATE, INDEPENDENT Agnes generations of the
+    same prompt and stitched back to back - each one rendering its own
+    random camera angle, reading as a jarring cut instead of one shot.
 
-    Now: generate exactly ONE Agnes clip at up to MAX_CLIP_SECONDS, then
-    extend the remaining duration (if any) by holding its final frame -
-    the same freeze-frame technique fit_clip_to_duration already uses at
-    the assembly stage. This guarantees a shot is always one continuous
-    take, at the cost of a still hold instead of new motion for the
-    overflow portion - a much less noticeable trade-off than a visible
-    angle-change cut.
+    SMOOTH-EXTENSION FIX (2026-08-01, supersedes the freeze-hold approach
+    used between 2026-07-29 and 2026-08-01): freeze-holding the final frame
+    for the overflow portion technically kept the shot as "one take", but
+    it meant every shot that ran even slightly over the ~7s per-generation
+    cap froze visibly for the rest of its duration. Because narration.py
+    folds each sentence-boundary pause (1-2s) into whichever shot sits at
+    that boundary, this was triggering constantly throughout an episode,
+    not just occasionally - this is the root cause of the "rigid, not
+    smooth" feedback on finished videos.
 
-    anchor_image_url (2026-07-31): when provided, this shot's Agnes call
-    runs in image-to-video mode using that image as the starting frame -
+    Now: the first ~MAX_CLIP_SECONDS is one real Agnes take exactly as
+    before. Any remaining duration is covered by chaining up to
+    MAX_CHAIN_SEGMENTS additional REAL Agnes clips, each anchored to the
+    literal last frame of the previous segment (identical mechanism to
+    cross-shot continuity) - so the shot keeps moving smoothly through
+    the overflow instead of freezing. Only if Agnes fails mid-chain after
+    retries does this fall back to a freeze-hold for whatever duration is
+    still missing, so a flaky API call still can't crash the run.
+
+    anchor_image_url: the starting frame for the FIRST segment only -
     either the episode's character reference (shot 0) or the previous
-    shot's own last frame (every shot after that) - so the shot continues
-    visually from wherever the story left off instead of generating blind.
+    shot's own last frame (every shot after that).
     """
     capped_duration = min(target_duration, MAX_CLIP_SECONDS)
     _generate_one_segment(shot, capped_duration, out_path, setting_and_characters, anchor_image_url=anchor_image_url)
@@ -685,16 +728,46 @@ def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="
     if target_duration <= MAX_CLIP_SECONDS:
         return out_path
 
-    extra = target_duration - capped_duration
-    print(f"Shot needs {target_duration:.1f}s (over the ~{MAX_CLIP_SECONDS:.1f}s per-generation cap) - "
-          f"generating one {capped_duration:.1f}s continuous take and holding its final frame for the "
-          f"remaining {extra:.1f}s, instead of stitching multiple independently-generated takes together.")
+    remaining = target_duration - capped_duration
+    segment_paths = [out_path]
+    current_anchor_path = out_path
+    chain_used = 0
 
-    clip = VideoFileClip(out_path)
-    extended = fit_clip_to_duration(clip, target_duration)
+    print(f"Shot needs {target_duration:.1f}s (over the ~{MAX_CLIP_SECONDS:.1f}s per-generation cap) - "
+          f"chaining real continuation clips for the remaining {remaining:.1f}s instead of freezing.")
+
+    while remaining > 0.05 and chain_used < MAX_CHAIN_SEGMENTS:
+        seg_duration = min(remaining, MAX_CLIP_SECONDS)
+        seg_out_path = out_path.replace(".mp4", f"_chain{chain_used + 1}.mp4")
+        try:
+            local_frame_path = _extract_last_frame_local(current_anchor_path)
+            chain_anchor_url = _upload_local_image_for_anchor(
+                script_id or "unknown", f"chain_{os.path.basename(seg_out_path)}", local_frame_path
+            )
+            _generate_one_segment(shot, seg_duration, seg_out_path, setting_and_characters, anchor_image_url=chain_anchor_url)
+        except (ContentPolicyRejection, AgnesOverloadedError, Exception) as e:
+            print(f"Chain-extension segment {chain_used + 1} failed ({e}) - falling back to a freeze-hold "
+                  f"for the remaining {remaining:.1f}s instead of losing the whole shot.")
+            break
+
+        segment_paths.append(seg_out_path)
+        current_anchor_path = seg_out_path
+        remaining -= seg_duration
+        chain_used += 1
+
+    clips = [VideoFileClip(p) for p in segment_paths]
+    combined = concatenate_videoclips(clips, method="compose")
+
+    if remaining > 0.05:
+        combined = fit_clip_to_duration(combined, combined.duration + remaining)
+
     tmp_path = out_path.replace(".mp4", "_extended.mp4")
-    extended.write_videofile(tmp_path, fps=FRAME_RATE, codec="libx264", audio=False, threads=2, logger=None)
-    clip.close()
+    combined.write_videofile(tmp_path, fps=FRAME_RATE, codec="libx264", audio=False, threads=2, logger=None)
+    for c in clips:
+        c.close()
+    for p in segment_paths[1:]:
+        if os.path.exists(p):
+            os.remove(p)
     os.replace(tmp_path, out_path)
 
     return out_path
@@ -1122,14 +1195,48 @@ def build_caption_clips(shot_list, shot_durations, shot_starts, video_width=WIDT
     return caption_clips
 
 
-def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot_list, shot_durations, output_path):
+def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot_list, shot_durations, output_path, setting_and_characters=""):
     clips = []
     for i, url in enumerate(video_urls):
         raw_path = f"/tmp/final_shot_{i:03d}.mp4"
         download_file(url, raw_path)
-        clip = VideoFileClip(raw_path)
-        clip = clip.resized(new_size=(WIDTH, HEIGHT))
-        clip = fit_clip_to_duration(clip, shot_durations[i])
+
+        if i == len(video_urls) - 1:
+            # TRAIL_SECONDS is added to the last shot's target duration
+            # AFTER that shot was already generated during the per-shot
+            # loop, so this clip is always short by exactly that amount.
+            # SMOOTH-EXTENSION FIX (2026-08-01): previously freeze-held
+            # for the trail, guaranteeing every single video ended on a
+            # frozen frame. Now chain-extends with real continuation
+            # footage anchored to this clip's own last frame, same as
+            # mid-shot overflow handling.
+            clip = VideoFileClip(raw_path)
+            clip = clip.resized(new_size=(WIDTH, HEIGHT))
+            if clip.duration < shot_durations[i]:
+                local_frame_path = _extract_last_frame_local(raw_path)
+                chain_anchor_url = _upload_local_image_for_anchor(
+                    script_id, f"trail_{os.path.basename(raw_path)}", local_frame_path
+                )
+                trail_out_path = raw_path.replace(".mp4", "_trail.mp4")
+                remaining = shot_durations[i] - clip.duration
+                try:
+                    _generate_one_segment(
+                        shot_list[i], min(remaining, MAX_CLIP_SECONDS), trail_out_path,
+                        setting_and_characters, anchor_image_url=chain_anchor_url,
+                    )
+                    trail_clip = VideoFileClip(trail_out_path).resized(new_size=(WIDTH, HEIGHT))
+                    combined = concatenate_videoclips([clip, trail_clip], method="compose")
+                    if combined.duration < shot_durations[i]:
+                        combined = fit_clip_to_duration(combined, shot_durations[i])
+                    clip = combined
+                except Exception as e:
+                    print(f"Trail chain-extension failed ({e}) - falling back to freeze-hold for the outro: {e}")
+                    clip = fit_clip_to_duration(clip, shot_durations[i])
+        else:
+            clip = VideoFileClip(raw_path)
+            clip = clip.resized(new_size=(WIDTH, HEIGHT))
+            clip = fit_clip_to_duration(clip, shot_durations[i])
+
         clips.append(clip)
 
     total_duration = sum(shot_durations)
@@ -1301,7 +1408,7 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
             raw_path = f"/tmp/shot_{i:03d}.mp4"
             print(f"Generating shot {i+1}/{total_shots} (~{shot_durations[i]:.1f}s)...")
             try:
-                generate_shot_clip(shot, shot_durations[i], raw_path, setting_and_characters, anchor_image_url=anchor_image_url)
+                generate_shot_clip(shot, shot_durations[i], raw_path, setting_and_characters, anchor_image_url=anchor_image_url, script_id=script_id)
             except ContentPolicyRejection as e:
                 mark_content_flagged(script_id, i, str(e))
                 print(f"Rejected visual_description: {shot.get('visual_description', '')!r}")
@@ -1348,7 +1455,7 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
         shot_durations[-1] += TRAIL_SECONDS
 
         output_path = "/tmp/final_video.mp4"
-        output_path, audio_stats = assemble_final_video(script_id, video_urls, audio_path, music_mood, shot_list, shot_durations, output_path)
+        output_path, audio_stats = assemble_final_video(script_id, video_urls, audio_path, music_mood, shot_list, shot_durations, output_path, setting_and_characters=setting_and_characters)
 
         video_url = upload_video(script_id, output_path)
         print(f"Uploaded: {video_url}")
