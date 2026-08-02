@@ -26,6 +26,16 @@ came back empty and the finished video had no sound design at all beyond
 narration and score. Broadened the guidance to also cover ambient/
 atmospheric sound (footsteps, wind, fire, doors, distant voices, etc.) so
 quiet episodes still get some sound design instead of none.
+
+CTA RELIABILITY FIX (2026-08-03): the prompt already instructed the model to
+weave a like/subscribe/comment call-to-action into the narration right after
+the emotional climax, but this was never validated, so it was silently
+optional in practice - confirmed in production that some episodes got a
+well-written in-voice CTA and others got none at all, with the exact same
+prompt. Added a validation check (same pattern as the hook_text checks
+below) that fails and retries generation if no CTA-shaped language is found
+in the back portion of narration_text, so a missing CTA is now a hard
+regeneration trigger instead of a coin flip.
 """
 
 import os
@@ -53,6 +63,17 @@ MIN_SETTING_CHARS = 40
 MAX_SETTING_CHARS = 900
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
+
+# Words/phrases that signal an in-voice engagement CTA is present. Kept broad
+# on purpose - this is a presence check, not a quality check, so it should
+# catch "comment," "share," "subscribe," "like this," etc. in whatever
+# phrasing the model chose, without forcing exact wording.
+CTA_KEYWORDS = (
+    "comment", "comments", "subscribe", "share this", "share it",
+    "like this", "like and", "tell us", "let us know", "hit follow",
+    "hit that", "follow along", "leave a", "drop a",
+)
+CTA_SEARCH_WINDOW_CHARS = 700
 
 VALID_SHOT_TYPES = {
     "wide", "medium", "close_up", "extreme_close_up", "establishing", "detail_insert"
@@ -198,6 +219,14 @@ def hook_text_matches_story(hook_text, narration_text):
     return any(w in narration_lower for w in meaningful_words)
 
 
+def narration_has_engagement_cta(narration_text):
+    if not narration_text:
+        return False
+
+    window = narration_text[-CTA_SEARCH_WINDOW_CHARS:].lower()
+    return any(keyword in window for keyword in CTA_KEYWORDS)
+
+
 def validate_and_normalize(result):
     if "narration_text" not in result or not result["narration_text"].strip():
         return False, "missing narration_text"
@@ -211,6 +240,13 @@ def validate_and_normalize(result):
             f"recurring character's appearance"
         )
     result["setting_and_characters"] = setting_and_characters[:MAX_SETTING_CHARS]
+
+    if not narration_has_engagement_cta(result["narration_text"]):
+        return False, (
+            "narration_text is missing an in-voice engagement call-to-action "
+            "(like/subscribe/comment) near the end - must weave one in right "
+            "after the emotional climax, before the closing line"
+        )
 
     shot_list = result.get("shot_list")
     if not isinstance(shot_list, list) or len(shot_list) == 0:
@@ -324,14 +360,19 @@ Write a complete 8-10 minute narration script (roughly 1200-1500 words) with
 this opening structure, a clear narrative arc through the rest of the story,
 and a reflective closing line.
 
-CALL TO ACTION: immediately after the emotional climax of the story and
-before the final reflective closing line, write one natural, in-voice
-sentence encouraging the viewer to like, subscribe, and share their own
-thoughts in the comments so more of these erased stories get told. This
-must NOT be a generic "smash that like button" line - write it in the
-tone and voice of this specific episode, using imagery or phrasing that
-echoes the story just told, and vary the wording from episode to episode.
-It is part of the narration_text itself, not a separate field.
+CALL TO ACTION - THIS IS REQUIRED, NOT OPTIONAL: immediately after the
+emotional climax of the story and before the final reflective closing line,
+you MUST write one natural, in-voice sentence encouraging the viewer to
+like, subscribe, and share their own thoughts in the comments so more of
+these erased stories get told. Every single script must include this - a
+script with no call to action will be rejected and regenerated. It must
+NOT be a generic "smash that like button" line - write it in the tone and
+voice of this specific episode, using imagery or phrasing that echoes the
+story just told, and vary the wording from episode to episode. It is part
+of the narration_text itself, not a separate field. Use natural language
+that clearly asks the viewer to like/share/subscribe and to respond in the
+comments (for example, weaving in words like "comment," "share," or
+"subscribe" naturally) so the ask is unambiguous, not just implied.
 
 THUMBNAIL HOOK TEXT - separate from the narration, also write a short,
 punchy line of thumbnail cover text that would make someone scrolling
