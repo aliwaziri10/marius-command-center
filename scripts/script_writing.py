@@ -16,6 +16,16 @@ appearance of every recurring named person, generated once per episode and
 required to be respected by every shot. video_generation.py now injects
 this into every single shot's Agnes prompt so the anchor is never lost or
 forgotten partway through the episode.
+
+SFX COVERAGE FIX (2026-08-03): sfx_cue guidance previously told the model
+to only add a sound cue for LOUD/dramatic moments (explosions, gunfire,
+crashes) and leave everything else empty. Confirmed in production: quiet,
+reflective true stories (a lighthouse keeper, a genocide-rescue story)
+genuinely have zero loud/dramatic beats, so every single shot's sfx_cue
+came back empty and the finished video had no sound design at all beyond
+narration and score. Broadened the guidance to also cover ambient/
+atmospheric sound (footsteps, wind, fire, doors, distant voices, etc.) so
+quiet episodes still get some sound design instead of none.
 """
 
 import os
@@ -415,11 +425,19 @@ SOUND DESIGNER - audio requirements:
   explicitly in the prompt. Favor modern, high-energy scoring over
   classical/orchestral-documentary tropes - think trailer music and
   true-crime thriller scoring, not elevator-music strings.
-- For each shot, include "sfx_cue": a short sound-effect prompt ONLY for
-  shots that are loud or dramatic moments (explosions, gunfire, crashes,
-  sudden reveals, door slams, crowd roars). For all other shots, set
-  "sfx_cue" to an empty string. Do not invent SFX for quiet or ordinary
-  shots - use this field sparingly.
+- For each shot, include "sfx_cue": a short sound-effect prompt for
+  BOTH loud dramatic moments (explosions, gunfire, crashes, sudden
+  reveals, door slams, crowd roars) AND quieter ambient/atmospheric
+  sound that grounds a scene in physical reality (footsteps on a
+  specific surface, wind, rain, fire crackling, a door creaking, distant
+  voices/crowd murmur, birds, waves, rustling paper/fabric, a clock
+  ticking). Many true stories are quiet, not explosive - if every shot's
+  sfx_cue is left empty because nothing "loud" happens, the finished
+  video plays with no sound design at all, which is worse than a subtle
+  ambient cue. Aim for at least half of all shots to carry SOME sfx_cue
+  (loud or ambient), and only leave "sfx_cue" as an empty string for
+  shots where truly no distinct sound would be audible (e.g. a static
+  wide shot of an empty landscape with only score playing).
 
 Return ONLY valid JSON, no other text, no markdown fences, in this exact
 format:
