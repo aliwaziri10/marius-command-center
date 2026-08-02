@@ -216,6 +216,28 @@ for regeneration) fails with a duplicate-object conflict and crashes the
 whole run instead of overwriting. All three now send "x-upsert: true" so
 regenerating an already-existing script's clips/reference/final video
 always succeeds.
+
+SMOOTH-EXTENSION FIX (2026-08-01): covered in MAX_CHAIN_SEGMENTS comment
+below - chains real Agnes footage instead of freezing on shot/trail
+overflow past MAX_CLIP_SECONDS.
+
+FREEZE-FRAME ROUNDING FIX (2026-08-03): round_to_valid_frames() used
+round-to-nearest when snapping a target frame count to Agnes's valid
+"8n+1" frame grid, which rounds DOWN roughly half the time - producing a
+clip up to ~0.3s shorter than the requested duration, silently eaten by a
+frozen last frame at assembly time. Zia confirmed a persistent ~0.5s
+freeze on every shot despite the 2026-08-01 chain-extension fix, which
+only covers overflow past MAX_CLIP_SECONDS, not this smaller per-shot
+rounding shortfall. Switched to ceiling rounding so every generated clip
+is always >= its target duration - nothing left to freeze except
+sub-frame (a few milliseconds) remainders.
+
+ANACHRONISM GUARD STRENGTHENED (2026-08-03): a generic "no digital
+devices" phrase in ANACHRONISM_GUARD wasn't specific enough - Agnes
+rendered people sitting behind laptops in a 1994 Rwanda scene despite it.
+Added explicit named objects (laptops, computers, smartphones, tablets,
+screens/monitors, modern furniture, electrical wiring, plastic) so the
+model has concrete nouns to avoid instead of a vague category.
 """
 
 import os
@@ -339,7 +361,13 @@ class AgnesOverloadedError(Exception):
 
 
 def round_to_valid_frames(num_frames):
-    n = round((num_frames - 1) / 8)
+    # FREEZE-FRAME FIX (2026-08-03): was using round() to the nearest valid
+    # frame count, which rounds DOWN roughly half the time - producing a
+    # clip up to ~0.3s shorter than the target duration, which then had to
+    # be covered by a frozen final frame. Using ceiling instead guarantees
+    # the generated clip is always >= target duration, so there's nothing
+    # left to freeze except sub-frame remainders (a few milliseconds).
+    n = math.ceil((num_frames - 1) / 8)
     n = max(0, n)
     return 8 * n + 1
 
@@ -364,7 +392,9 @@ def download_file(url, out_path):
 
 ANACHRONISM_GUARD = (
     "historically accurate to this exact time period and setting, no modern technology, "
-    "no cars, no drones, no modern clothing, no digital devices, no anachronistic objects of any kind"
+    "no cars, no drones, no modern clothing, no digital devices, no anachronistic objects of any kind, "
+    "no laptops, no computers, no smartphones, no tablets, no screens or monitors of any kind, "
+    "no modern furniture, no electrical wiring or outlets, no plastic objects"
 )
 
 QUALITY_GUARD = (
