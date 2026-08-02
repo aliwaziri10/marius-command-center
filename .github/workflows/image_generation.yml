@@ -1,4 +1,0 @@
-# This workflow has been retired. image_generation.py was removed
-# 2026-07-20 - Agnes generates video directly from shot_list text,
-# it never used these still images. Narration now hands off straight
-# to status "images_generated" for video_generation.py to pick up.
