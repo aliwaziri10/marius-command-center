@@ -1,645 +1,283 @@
-"""
-Marius Command Center - Script Writing Agent
-Takes the oldest pending topic and turns it into a full narration script
-plus a shot-by-shot visual production plan for "Erased."
-
-SETTING/CHARACTER CONSISTENCY (2026-07-29): shots were drifting visually -
-wrong ethnicity/location shown for a scene (e.g. a story set in Gambia
-showing Chinese faces and Chinese military troops), and recurring people
-(e.g. "the mother") changing appearance between shots with no visual
-anchor tying them together. Root cause: each shot's visual_description was
-generated independently with no persistent reference for what the real-world
-setting looks like or what recurring characters look like. Added a new
-top-level "setting_and_characters" field: a short paragraph fixing the
-real-world location/era/ethnicity of the story and describing the physical
-appearance of every recurring named person, generated once per episode and
-required to be respected by every shot. video_generation.py now injects
-this into every single shot's Agnes prompt so the anchor is never lost or
-forgotten partway through the episode.
-
-SFX COVERAGE FIX (2026-08-03): sfx_cue guidance previously told the model
-to only add a sound cue for LOUD/dramatic moments (explosions, gunfire,
-crashes) and leave everything else empty. Confirmed in production: quiet,
-reflective true stories (a lighthouse keeper, a genocide-rescue story)
-genuinely have zero loud/dramatic beats, so every single shot's sfx_cue
-came back empty and the finished video had no sound design at all beyond
-narration and score. Broadened the guidance to also cover ambient/
-atmospheric sound (footsteps, wind, fire, doors, distant voices, etc.) so
-quiet episodes still get some sound design instead of none.
-
-CTA RELIABILITY FIX (2026-08-03): the prompt already instructed the model to
-weave a like/subscribe/comment call-to-action into the narration right after
-the emotional climax, but this was never validated, so it was silently
-optional in practice - confirmed in production that some episodes got a
-well-written in-voice CTA and others got none at all, with the exact same
-prompt. Added a validation check (same pattern as the hook_text checks
-below) that fails and retries generation if no CTA-shaped language is found
-in the back portion of narration_text, so a missing CTA is now a hard
-regeneration trigger instead of a coin flip.
-
-EMPTY-SHOT PADDING FIX (2026-08-03): found via a real uploaded video
-(script 3ad85abb) whose shot_list had 65 entries but only the first 21 had
-real narration_excerpt/visual_description text - the remaining 44 were
-empty placeholder objects. Root cause: validate_and_normalize only ever
-checked shot COUNT against MIN_SHOTS/MAX_SHOTS, never that each shot
-actually has content - so when the free model ran out of real story to
-break into shots, it silently padded the list with blanks to hit the
-count requirement, and this file accepted it. Those empty shots still
-consumed real Agnes video-generation budget downstream for content that
-gets discarded to zero duration in the final cut. Fixed two ways: the
-prompt now explicitly forbids empty placeholder shots, and
-validate_and_normalize now rejects (and triggers a retry on) any script
-where any shot has an empty visual_description or narration_excerpt,
-instead of saving it.
-"""
-
 import os
+import re
+import sys
 import json
-import time
-import requests
+import subprocess
+from supabase import create_client
+import torchaudio
+from chatterbox.tts import ChatterboxTTS
+from pydub import AudioSegment
+from pydub.effects import normalize as pydub_normalize
 
+# --- Config from GitHub Actions secrets ---
 SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
-OPENROUTER_KEY = os.environ["OPENROUTER_API_KEY"]
+SUPABASE_SECRET_KEY = os.environ["SUPABASE_SECRET_KEY"]
 
-HEADERS = {
-    "apikey": SUPABASE_KEY,
-    "Authorization": f"Bearer {SUPABASE_KEY}",
-    "Content-Type": "application/json",
-}
+# Chatterbox - replaces Edge TTS. Switched after a side-by-side comparison
+# found Chatterbox has noticeably more natural prosody/"feel". Same switch
+# already made on TechPulse.
+SLOWDOWN_FACTOR = "0.95"  # ~5% slower, pitch preserved (was RATE="-5%" under Edge TTS)
 
-MAX_RETRIES = 4
-MIN_SHOTS = 60
-MAX_SHOTS = 85
-MAX_GENERATION_ATTEMPTS = 5
-MAX_HOOK_TEXT_CHARS = 40
-MAX_HOOK_TEXT_WORDS = 5
-MIN_SETTING_CHARS = 40
-MAX_SETTING_CHARS = 900
+# Pause after EVERY sentence, per Zia's explicit instruction - not just
+# paragraph breaks. 1-2s per pause.
+PAUSE_SECONDS_MIN = 1.0
+PAUSE_SECONDS_MAX = 2.0
 
-EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
+# STUTTER/DUPLICATE GUARD: carried over from the Edge TTS version. Sanity-
+# checks a synthesized sentence's duration against a rough expected speaking
+# pace for its word count, and retries if the clip looks glitched
+# (duplicated/restarted audio). Generic safety net, not backend-specific.
+MIN_PLAUSIBLE_WORDS_PER_SECOND = 1.6
+DURATION_SLACK_SECONDS = 1.0
+MAX_SENTENCE_TTS_ATTEMPTS = 3
 
-# Words/phrases that signal an in-voice engagement CTA is present. Kept broad
-# on purpose - this is a presence check, not a quality check, so it should
-# catch "comment," "share," "subscribe," "like this," etc. in whatever
-# phrasing the model chose, without forcing exact wording.
-CTA_KEYWORDS = (
-    "comment", "comments", "subscribe", "share this", "share it",
-    "like this", "like and", "tell us", "let us know", "hit follow",
-    "hit that", "follow along", "leave a", "drop a",
-)
-CTA_SEARCH_WINDOW_CHARS = 700
-
-VALID_SHOT_TYPES = {
-    "wide", "medium", "close_up", "extreme_close_up", "establishing", "detail_insert"
-}
-VALID_CAMERA_MOVEMENTS = {
-    "static", "pan_left", "pan_right", "tilt_up", "tilt_down", "zoom_in", "zoom_out",
-    "push_in", "pull_out", "dolly_in", "dolly_out", "tracking", "crash_zoom",
-    "whip_pan", "handheld_shake", "orbit", "drone_rise", "drone_descend",
-    "parallax", "focus_pull", "dutch_angle", "snap_zoom", "speed_ramp",
-}
-VALID_LENS_EFFECTS = {
-    "shallow_depth_of_field", "lens_flare", "film_grain", "none"
-}
-
-ZOOM_FAMILY_MOVEMENTS = {"push_in", "crash_zoom", "zoom_in", "snap_zoom"}
-MAX_ZOOM_SHOT_RATIO = 0.32
-MAX_CONSECUTIVE_ZOOM_SHOTS = 2
+_tts_model = None
 
 
-def get_next_pending_topic():
-    resp = requests.get(
-        f"{SUPABASE_URL}/rest/v1/topics?status=eq.pending&order=created_at.asc&limit=1",
-        headers=HEADERS,
-        timeout=30,
-    )
-    resp.raise_for_status()
-    rows = resp.json()
-    return rows[0] if rows else None
+def get_tts_model():
+    global _tts_model
+    if _tts_model is None:
+        _tts_model = ChatterboxTTS.from_pretrained(device="cpu")
+    return _tts_model
 
 
-def call_openrouter(prompt):
-    last_error = None
-    for attempt in range(MAX_RETRIES):
-        resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "openrouter/free",
-                "messages": [{"role": "user", "content": prompt}],
-            },
-            timeout=90,
-        )
-        if resp.status_code == 429:
-            wait = (attempt + 1) * 15
-            print(f"Rate limited, waiting {wait}s before retry...")
-            time.sleep(wait)
-            last_error = resp
-            continue
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
-
-    raise RuntimeError(f"OpenRouter still rate-limited after {MAX_RETRIES} attempts: {last_error.text if last_error else 'unknown'}")
+def split_into_segments(narration_text):
+    """Splits narration into one segment per SENTENCE, so a pause gets
+    inserted after every sentence (not just at paragraph/blank-line
+    breaks, which most scripts don't have). Sentence boundary = ./!/?
+    followed by whitespace. Falls back to the whole text as a single
+    segment if no sentence-ending punctuation is found at all."""
+    raw_segments = re.split(r"(?<=[.!?])\s+", narration_text.strip())
+    segments = [seg.strip() for seg in raw_segments if seg.strip()]
+    return segments if segments else [narration_text.strip()]
 
 
-def extract_json(raw_text):
-    text = raw_text.strip()
-
-    if "```" in text:
-        parts = text.split("```")
-        for part in parts:
-            candidate = part.strip()
-            if candidate.startswith("json"):
-                candidate = candidate[4:].strip()
-            if candidate.startswith("{"):
-                text = candidate
-                break
-
-    start = text.find("{")
-    end = text.rfind("}")
-    if start == -1 or end == -1 or end < start:
-        raise ValueError("No JSON object found in model output.")
-
-    return json.loads(text[start:end + 1])
+def _max_plausible_duration(text):
+    word_count = max(len(text.split()), 1)
+    return (word_count / MIN_PLAUSIBLE_WORDS_PER_SECOND) + DURATION_SLACK_SECONDS
 
 
-def normalize_shot(shot, index):
-    shot_type = shot.get("shot_type")
-    if shot_type not in VALID_SHOT_TYPES:
-        shot_type = "medium"
+def synthesize_sentence(text, tts, tmp_path):
+    """One real Chatterbox TTS call per full sentence - correct prosody/
+    intonation, no mid-sentence resets. Returns a pydub AudioSegment.
 
-    camera_movement = shot.get("camera_movement")
-    if camera_movement not in VALID_CAMERA_MOVEMENTS:
-        camera_movement = "static"
+    STUTTER/DUPLICATE GUARD: validates the synthesized clip's duration
+    against a rough expected-speaking-pace ceiling for that sentence's word
+    count, retrying if the clip looks glitched (duplicated/restarted audio)
+    instead of trusting it blindly.
+    """
+    max_plausible = _max_plausible_duration(text)
+    last_duration = None
+    clip = None
 
-    lens_effect = shot.get("lens_effect")
-    if lens_effect not in VALID_LENS_EFFECTS:
-        lens_effect = "none"
+    for attempt in range(MAX_SENTENCE_TTS_ATTEMPTS):
+        wav = tts.generate(text)
+        torchaudio.save(tmp_path, wav, tts.sr)
+        clip = AudioSegment.from_file(tmp_path)
+        duration_seconds = len(clip) / 1000.0
+        last_duration = duration_seconds
 
-    return {
-        "shot_number": shot.get("shot_number", index + 1),
-        "visual_description": shot.get("visual_description", ""),
-        "narration_excerpt": shot.get("narration_excerpt", ""),
-        "shot_type": shot_type,
-        "camera_movement": camera_movement,
-        "camera_reason": shot.get("camera_reason", ""),
-        "lens_effect": lens_effect,
-        "sfx_cue": shot.get("sfx_cue", ""),
-    }
+        if duration_seconds <= max_plausible:
+            return clip
 
+        print(f"TTS output for sentence looks like a stutter/duplicate "
+              f"({duration_seconds:.1f}s, expected under {max_plausible:.1f}s for "
+              f"{len(text.split())} words) - attempt {attempt + 1}/{MAX_SENTENCE_TTS_ATTEMPTS}. "
+              f"Sentence: {text[:80]!r}")
 
-def normalize_hook_text(result):
-    hook_text = (result.get("hook_text") or "").strip()
-    if hook_text:
-        return hook_text[:MAX_HOOK_TEXT_CHARS].rstrip()
-
-    shot_list = result.get("shot_list") or []
-    if shot_list:
-        fallback = (shot_list[0].get("narration_excerpt") or "").strip()
-        if len(fallback) <= MAX_HOOK_TEXT_CHARS:
-            return fallback
-        if fallback:
-            return fallback[:MAX_HOOK_TEXT_CHARS].rsplit(" ", 1)[0] + "..."
-
-    return ""
+    print(f"Sentence still looks anomalous after {MAX_SENTENCE_TTS_ATTEMPTS} attempts "
+          f"({last_duration:.1f}s) - using the last attempt anyway rather than blocking the whole run: "
+          f"{text[:80]!r}")
+    return clip
 
 
-def hook_text_matches_prompt_example(hook_text):
-    def _simplify(s):
-        return "".join(ch.lower() for ch in s if ch.isalnum())
+def synthesize_with_pauses(narration_text, tts):
+    """Synthesizes narration sentence-by-sentence and concatenates them
+    with a real silence gap (1-2s) after every sentence. Used only when
+    no shot_list is available yet (fallback path)."""
+    segments = split_into_segments(narration_text)
+    print(f"Narration split into {len(segments)} sentence(s) for pause insertion.")
 
-    return _simplify(hook_text) == _simplify(EXAMPLE_HOOK_TEXT)
+    combined = AudioSegment.silent(duration=0)
+    for i, segment in enumerate(segments):
+        clip = synthesize_sentence(segment, tts, f"/tmp/sent_{i}.wav")
+        combined += clip
+        if i < len(segments) - 1:
+            pause_len = PAUSE_SECONDS_MIN if i % 2 == 0 else PAUSE_SECONDS_MAX
+            combined += AudioSegment.silent(duration=int(pause_len * 1000))
 
-
-def hook_text_too_long_to_glance(hook_text):
-    word_count = len(hook_text.split())
-    return word_count > MAX_HOOK_TEXT_WORDS
-
-
-def hook_text_matches_story(hook_text, narration_text):
-    if not hook_text or not narration_text:
-        return False
-
-    narration_lower = narration_text.lower()
-    hook_words = [w.strip(".,!?\"'").lower() for w in hook_text.split()]
-    meaningful_words = [w for w in hook_words if len(w) >= 4]
-
-    if not meaningful_words:
-        return True
-
-    return any(w in narration_lower for w in meaningful_words)
+    return combined
 
 
-def narration_has_engagement_cta(narration_text):
-    if not narration_text:
-        return False
+def _assign_shots_to_sentences(sentences, shot_list):
+    """Maps each shot's narration_excerpt onto the real sentence(s) it
+    falls inside, using word-position overlap (not per-shot TTS).
 
-    window = narration_text[-CTA_SEARCH_WINDOW_CHARS:].lower()
-    return any(keyword in window for keyword in CTA_KEYWORDS)
+    Shots are sub-sentence fragments by design (script_writing.py splits
+    one sentence across 2-3 shots for fast-cut editing) - this function
+    figures out, for each shot, which sentence(s) its words came from and
+    how many words it contributed to each, so a sentence's single real
+    audio duration can later be split proportionally across its shots.
 
-
-def find_empty_shots(normalized_shots):
-    """EMPTY-SHOT PADDING FIX (2026-08-03): the free model sometimes runs out
-    of real story to break into shots before reaching MIN_SHOTS, and pads the
-    remainder of the list with placeholder shot objects that have an empty
-    visual_description and/or narration_excerpt. Those shots still cost a
-    real Agnes video generation downstream and end up discarded to zero
-    duration in the final cut - so this must be caught here and rejected,
-    not silently saved."""
-    return [
-        i for i, s in enumerate(normalized_shots)
-        if not (s["visual_description"] or "").strip() or not (s["narration_excerpt"] or "").strip()
+    Returns (contributions, sentence_word_bounds) or None if no shot has
+    usable narration_excerpt text at all.
+    """
+    sentence_word_counts = [max(len(s.split()), 1) for s in sentences]
+    shot_word_counts = [
+        len((shot.get("narration_excerpt") or "").split()) for shot in shot_list
     ]
 
+    total_sentence_words = sum(sentence_word_counts)
+    total_shot_words = sum(shot_word_counts)
+    if total_shot_words == 0:
+        return None
 
-def validate_and_normalize(result):
-    if "narration_text" not in result or not result["narration_text"].strip():
-        return False, "missing narration_text"
+    scale = total_sentence_words / total_shot_words
 
-    setting_and_characters = (result.get("setting_and_characters") or "").strip()
-    if len(setting_and_characters) < MIN_SETTING_CHARS:
-        return False, (
-            f"setting_and_characters missing or too short "
-            f"({len(setting_and_characters)} chars, need at least {MIN_SETTING_CHARS}) - "
-            f"must fix the real-world location/era/ethnicity and describe every "
-            f"recurring character's appearance"
-        )
-    result["setting_and_characters"] = setting_and_characters[:MAX_SETTING_CHARS]
+    sentence_bounds = []
+    running = 0
+    for wc in sentence_word_counts:
+        sentence_bounds.append((running, running + wc))
+        running += wc
 
-    if not narration_has_engagement_cta(result["narration_text"]):
-        return False, (
-            "narration_text is missing an in-voice engagement call-to-action "
-            "(like/subscribe/comment) near the end - must weave one in right "
-            "after the emotional climax, before the closing line"
-        )
+    contributions = []
+    running_shot_pos = 0.0
+    for wc in shot_word_counts:
+        start = running_shot_pos * scale
+        end = (running_shot_pos + wc) * scale
+        running_shot_pos += wc
 
-    shot_list = result.get("shot_list")
-    if not isinstance(shot_list, list) or len(shot_list) == 0:
-        return False, "missing or empty shot_list"
+        shot_contribs = []
+        for s_idx, (s_start, s_end) in enumerate(sentence_bounds):
+            overlap = min(end, s_end) - max(start, s_start)
+            if overlap > 0:
+                shot_contribs.append((s_idx, overlap))
+        contributions.append(shot_contribs)
 
-    if len(shot_list) < MIN_SHOTS or len(shot_list) > MAX_SHOTS:
-        return False, f"shot count {len(shot_list)} outside {MIN_SHOTS}-{MAX_SHOTS} range"
-
-    normalized_shots = [normalize_shot(s, i) for i, s in enumerate(shot_list)]
-
-    empty_shots = find_empty_shots(normalized_shots)
-    if empty_shots:
-        return False, (
-            f"{len(empty_shots)} of {len(normalized_shots)} shots have an empty "
-            f"visual_description and/or narration_excerpt (first at shot index "
-            f"{empty_shots[0]}) - every shot must have real content, do not pad "
-            f"the list with placeholder shots just to reach {MIN_SHOTS} total; "
-            f"split the real narration into more/finer shots instead"
-        )
-
-    zoom_count = sum(
-        1 for s in normalized_shots
-        if s["camera_movement"] in ZOOM_FAMILY_MOVEMENTS or s["shot_type"] == "extreme_close_up"
-    )
-    zoom_ratio = zoom_count / len(normalized_shots)
-    if zoom_ratio > MAX_ZOOM_SHOT_RATIO:
-        return False, (
-            f"too many zoomed-in shots: {zoom_count}/{len(normalized_shots)} "
-            f"({zoom_ratio:.0%}) use a zoom-in-family movement or extreme_close_up, "
-            f"over the {MAX_ZOOM_SHOT_RATIO:.0%} ceiling - spread in more wide/establishing shots"
-        )
-
-    consecutive_zoom = 0
-    max_consecutive_zoom = 0
-    for s in normalized_shots:
-        if s["camera_movement"] in ZOOM_FAMILY_MOVEMENTS:
-            consecutive_zoom += 1
-            max_consecutive_zoom = max(max_consecutive_zoom, consecutive_zoom)
-        else:
-            consecutive_zoom = 0
-    if max_consecutive_zoom > MAX_CONSECUTIVE_ZOOM_SHOTS:
-        return False, (
-            f"{max_consecutive_zoom} zoom-in-family shots in a row (max {MAX_CONSECUTIVE_ZOOM_SHOTS}) "
-            f"- too claustrophobic back to back, spread zoom movements out through the episode"
-        )
-
-    result["shot_list"] = normalized_shots
-    result["music_mood"] = result.get("music_mood", "").strip() or (
-        "Tense cinematic thriller score, sparse low piano and rising strings "
-        "at the start, driving percussion and brass stabs building through "
-        "the middle, explosive full-orchestra climax at the reveal, "
-        "tapering to a quiet resolution."
-    )
-    result["hook_text"] = normalize_hook_text(result)
-
-    if hook_text_matches_prompt_example(result["hook_text"]):
-        return False, "hook_text copied the prompt's example verbatim instead of writing a real one"
-
-    if hook_text_too_long_to_glance(result["hook_text"]):
-        return False, f"hook_text is {len(result['hook_text'].split())} words - too long to read in a 2-second glance (max {MAX_HOOK_TEXT_WORDS})"
-
-    if not hook_text_matches_story(result["hook_text"], result["narration_text"]):
-        return False, f"hook_text {result['hook_text']!r} doesn't appear related to this story's narration"
-
-    return True, result
+    return contributions, sentence_bounds
 
 
-def generate_script(title, angle):
-    prompt = f"""You are the head writer for "Erased," a YouTube documentary
-channel telling real, historically documented true stories of ordinary people
-caught in extraordinary historical moments, whose names history left out.
+def synthesize_per_sentence_with_shot_durations(narration_text, shot_list, tts):
+    """Synthesizes narration one real SENTENCE at a time via Chatterbox.
+    Each full sentence gets ONE natural TTS call (correct prosody/
+    intonation, no mid-sentence resets), with a real 1-2s pause only at
+    real sentence boundaries.
 
-Episode topic: {title}
-Angle: {angle}
+    Per-shot video-sync timing still works: each sentence's single real
+    measured audio duration is distributed across the shots that fall
+    inside it, proportional to word count.
+    """
+    sentences = split_into_segments(narration_text)
+    print(f"Narration split into {len(sentences)} real sentence(s) for natural TTS.")
 
-SETTING AND CHARACTERS - write this FIRST, before anything else, as a fixed
-visual anchor for the whole episode. This is the single most important
-field for keeping the episode visually consistent, so treat it as
-non-negotiable:
-- State the real-world location, country/region, era, and the actual
-  ethnicity/culture of the people in this specific story. Be explicit and
-  concrete (e.g. "rural Gambia, West Africa, 1981 - Gambian people, dark
-  skin, traditional and period-appropriate West African dress" NOT vague
-  phrasing that a video model could misread as a different region).
-- For every recurring named or clearly-identifiable person in the story
-  (e.g. "the mother," "the young soldier," "the porter"), give one fixed,
-  concrete physical description (approximate age, build, hair, distinctive
-  clothing) that must be repeated consistently - this person must look the
-  same in every shot they appear in, not reinterpreted shot to shot.
-  If the story has no individually-tracked recurring character (e.g. it
-  follows a crowd or an unnamed narrator's perspective), say so explicitly
-  instead of inventing one.
-This full anchor will be attached to every single shot's image/video
-generation prompt later in the pipeline, so write it as a standalone
-paragraph that makes sense with no other context - 2-5 sentences.
+    combined = AudioSegment.silent(duration=0)
+    sentence_durations = []
 
-OPENING HOOK - this is the most important part of the script. The first 8
-seconds of narration determine whether the viewer stays or leaves, so follow
-this exact structure for the opening lines:
+    for i, sentence in enumerate(sentences):
+        clip = synthesize_sentence(sentence, tts, f"/tmp/sent_{i}.wav")
+        combined += clip
+        sentence_durations.append(len(clip) / 1000.0)
 
-1. STAKE (first 1-2 sentences): State the single most dramatic, concrete fact
-   of the story immediately. Do NOT say "today we'll look at" or "this is the
-   story of" or introduce the channel/topic first. Lead with the fact itself,
-   as if the viewer already knows what's at risk. Use a real, specific number,
-   name, or consequence from the story - not a vague tease.
-   Bad: "Today we're going to talk about a forgotten hero of history."
-   Good: "140,000 men dug the trenches of the Western Front - and history
-   erased every one of their names."
+        if i < len(sentences) - 1:
+            pause_len = PAUSE_SECONDS_MIN if i % 2 == 0 else PAUSE_SECONDS_MAX
+            combined += AudioSegment.silent(duration=int(pause_len * 1000))
+            # The pause belongs to the sentence right before it timing-wise.
+            sentence_durations[-1] += pause_len
 
-2. VISUAL LOCK (next 1 sentence): A concrete, specific image or moment that
-   proves the stake is real - not generic scene-setting.
+    shot_durations = [0.0] * len(shot_list)
+    result = _assign_shots_to_sentences(sentences, shot_list)
+    if result is None:
+        even_share = sum(sentence_durations) / max(len(shot_list), 1)
+        shot_durations = [even_share] * len(shot_list)
+    else:
+        contributions, sentence_bounds = result
+        for shot_idx, shot_contribs in enumerate(contributions):
+            for s_idx, words in shot_contribs:
+                s_start, s_end = sentence_bounds[s_idx]
+                sentence_word_span = max(s_end - s_start, 1)
+                share = (words / sentence_word_span) * sentence_durations[s_idx]
+                shot_durations[shot_idx] += share
 
-3. CURIOSITY GAP (next 1-2 sentences): Pose the specific question the rest of
-   the episode answers, so the viewer needs to keep watching to find out.
-
-Only after these opening beats should the script settle into the normal
-narrative arc. No channel intro, no "welcome back," no restating the title -
-go straight into the stake.
-
-Write a complete 8-10 minute narration script (roughly 1200-1500 words) with
-this opening structure, a clear narrative arc through the rest of the story,
-and a reflective closing line.
-
-CALL TO ACTION - THIS IS REQUIRED, NOT OPTIONAL: immediately after the
-emotional climax of the story and before the final reflective closing line,
-you MUST write one natural, in-voice sentence encouraging the viewer to
-like, subscribe, and share their own thoughts in the comments so more of
-these erased stories get told. Every single script must include this - a
-script with no call to action will be rejected and regenerated. It must
-NOT be a generic "smash that like button" line - write it in the tone and
-voice of this specific episode, using imagery or phrasing that echoes the
-story just told, and vary the wording from episode to episode. It is part
-of the narration_text itself, not a separate field. Use natural language
-that clearly asks the viewer to like/share/subscribe and to respond in the
-comments (for example, weaving in words like "comment," "share," or
-"subscribe" naturally) so the ask is unambiguous, not just implied.
-
-THUMBNAIL HOOK TEXT - separate from the narration, also write a short,
-punchy line of thumbnail cover text that would make someone scrolling
-YouTube stop and click. This is NOT a narration sentence - it should read
-like a headline: concrete, high-stakes, and built around the single most
-shocking number, name, or fact in THIS SPECIFIC STORY (the one named in
-"Episode topic" above) - never a different story.
-
-THE 2-SECOND RULE: a thumbnail gets about 2 seconds of a scrolling viewer's
-attention before they move on, and most viewers see it shrunk down on a
-phone screen. The hook text must be absorbable in that window - which
-means SHORT: {MAX_HOOK_TEXT_WORDS} words maximum, ideally 3-4, under
-{MAX_HOOK_TEXT_CHARS} characters. This is not a summary of the story - the
-video title already gives that context. This is the single emotional
-spike: one number, one name, or one consequence. Use short punchy
-fragments separated by periods, not one flowing sentence - fragments let
-the eye grab each piece independently instead of having to read
-start-to-finish.
-
-The example below shows the STYLE only - a short fragment built from a real
-number/name/consequence. It is NOT about this episode's topic. Do not reuse
-it, copy it, or adapt it - write an entirely new line using facts that
-actually appear in the narration you write for THIS episode.
-   Bad (too long/sentence-like): "When a bomb hit the pub, 312 diaries were
-   buried under the rubble."
-   Style example only, from an unrelated story - never copy this line
-   itself: "312 DIARIES. ONE BOMB. GONE IN SECONDS."
-
-CINEMATIC DIRECTOR - shot list requirements:
-Break the episode into EXACTLY between {MIN_SHOTS} and {MAX_SHOTS} shots -
-this is a hard requirement, not a suggestion. This is a dense, sub-sentence
-level breakdown - a single narration sentence should often span 2-3 separate
-shots, not one. Do not write sparse, paragraph-level shots.
-
-EVERY SHOT MUST HAVE REAL CONTENT - THIS IS ALSO A HARD REQUIREMENT: every
-single shot object must have a real, non-empty "visual_description" and a
-real, non-empty "narration_excerpt" drawn from the actual narration you
-wrote. NEVER insert an empty or placeholder shot object just to reach the
-{MIN_SHOTS}-{MAX_SHOTS} count - a script containing even one empty shot will
-be rejected and regenerated. If your narration doesn't naturally break into
-{MAX_SHOTS} shots, break it more finely instead: split individual sentences
-into smaller sub-sentence beats (a clause, an image, a reaction) rather than
-padding the list with blanks.
-
-Every shot's "visual_description" must stay consistent with the
-"setting_and_characters" anchor above - same location/era/ethnicity, and
-any recurring person described there must match their fixed appearance in
-every shot they appear in. Do not introduce a different ethnicity, region,
-or unplanned recurring character partway through.
-
-For each shot, provide:
-- "shot_type": one of "wide", "medium", "close_up", "extreme_close_up",
-  "establishing", "detail_insert"
-- "camera_movement": one of "static", "pan_left", "pan_right", "tilt_up",
-  "tilt_down", "zoom_in", "zoom_out", "push_in", "pull_out", "dolly_in",
-  "dolly_out", "tracking", "crash_zoom", "whip_pan", "handheld_shake",
-  "orbit", "drone_rise", "drone_descend", "parallax", "focus_pull",
-  "dutch_angle", "snap_zoom", "speed_ramp"
-- "camera_reason": one short sentence on why this movement was chosen for
-  this specific narration beat
-- "lens_effect": one of "shallow_depth_of_field", "lens_flare", "film_grain",
-  "none" - use sparingly and only where it heightens the moment (e.g.
-  shallow_depth_of_field on an emotional close-up, lens_flare on a
-  triumphant reveal). Most shots should be "none".
-
-PACING RHYTHM (Gen Z attention span - keep it moving):
-- Default to quick shots (roughly 2-4 seconds of narration each). Avoid long
-  static stretches.
-- Only use a held/static shot deliberately, right before a big reveal or
-  emotional gut-punch, to let it land. These held shots should be rare -
-  most of the episode should feel fast-cut.
-- Vary shot_type, camera_movement, and lens_effect constantly - never repeat
-  the same camera_movement more than twice in a row.
-
-ZOOM DISCIPLINE (avoid an all-close-up, all-zoomed-in episode): push_in,
-crash_zoom, zoom_in, snap_zoom, and extreme_close_up all tighten the frame.
-Used too often, back-to-back, the whole episode feels claustrophobic and
-zoomed-in with no sense of place - this has been a real problem, so treat
-this as a hard budget, not a suggestion:
-- At most 1 in 4 shots may use a zoom-in-family movement (push_in,
-  crash_zoom, zoom_in, snap_zoom) or an extreme_close_up shot_type. Never
-  use two zoom-in-family movements back to back.
-- At least 1 in 4 shots must be "wide" or "establishing" shot_type, spread
-  through the episode (not clustered only at the start), so the viewer
-  keeps a sense of location and space between tight moments.
-- For the remaining shots, favor movements that add energy WITHOUT
-  tightening the frame: pan_left, pan_right, tilt_up, tilt_down, tracking,
-  dolly_in, dolly_out, whip_pan, orbit, drone_rise, drone_descend,
-  parallax, handheld_shake, dutch_angle, speed_ramp, pull_out, zoom_out.
-  These give the same fast-cut, premium-AI-video energy without the
-  claustrophobic zoomed-in feel.
-
-SOUND DESIGNER - audio requirements:
-- At the top level, include "music_mood": a single descriptive prompt (for
-  an AI music generator) describing the background score for the WHOLE
-  episode. Score it like a THRILLER MOVIE, not a somber museum documentary:
-  it should build tension progressively through the episode - start
-  restrained and low-key, add layers/intensity as the story escalates, and
-  peak into a dramatic, percussive climax at the episode's biggest reveal
-  or emotional gut-punch, before resolving. Describe the specific arc
-  explicitly in the prompt. Favor modern, high-energy scoring over
-  classical/orchestral-documentary tropes - think trailer music and
-  true-crime thriller scoring, not elevator-music strings.
-- For each shot, include "sfx_cue": a short sound-effect prompt for
-  BOTH loud dramatic moments (explosions, gunfire, crashes, sudden
-  reveals, door slams, crowd roars) AND quieter ambient/atmospheric
-  sound that grounds a scene in physical reality (footsteps on a
-  specific surface, wind, rain, fire crackling, a door creaking, distant
-  voices/crowd murmur, birds, waves, rustling paper/fabric, a clock
-  ticking). Many true stories are quiet, not explosive - if every shot's
-  sfx_cue is left empty because nothing "loud" happens, the finished
-  video plays with no sound design at all, which is worse than a subtle
-  ambient cue. Aim for at least half of all shots to carry SOME sfx_cue
-  (loud or ambient), and only leave "sfx_cue" as an empty string for
-  shots where truly no distinct sound would be audible (e.g. a static
-  wide shot of an empty landscape with only score playing).
-
-Return ONLY valid JSON, no other text, no markdown fences, in this exact
-format:
-
-{{
-  "setting_and_characters": "2-5 sentence fixed anchor: real-world location/era/ethnicity of this story, plus a fixed physical description of every recurring named/identifiable character.",
-  "narration_text": "The full narration script as one string, written to be read aloud.",
-  "hook_text": "Short punchy thumbnail cover line, max {MAX_HOOK_TEXT_WORDS} words and under {MAX_HOOK_TEXT_CHARS} characters, readable in a 2-second glance, written specifically for THIS episode's topic - never the style example above.",
-  "music_mood": "Background score prompt for the whole episode, describing its build-up arc.",
-  "shot_list": [
-    {{
-      "shot_number": 1,
-      "visual_description": "Detailed description for AI image/video generation, consistent with setting_and_characters above",
-      "narration_excerpt": "The exact portion of narration this shot covers",
-      "shot_type": "wide",
-      "camera_movement": "push_in",
-      "camera_reason": "Why this movement fits this beat",
-      "lens_effect": "none",
-      "sfx_cue": ""
-    }}
-  ]
-}}
-
-Include between {MIN_SHOTS} and {MAX_SHOTS} shots covering the full narration - every shot must have real, non-empty visual_description and narration_excerpt text, never a placeholder."""
-
-    last_reason = None
-    for attempt in range(MAX_GENERATION_ATTEMPTS):
-        raw = call_openrouter(prompt)
-        try:
-            parsed = extract_json(raw)
-        except (ValueError, json.JSONDecodeError) as e:
-            last_reason = f"JSON parse failed: {e}"
-            print(f"Attempt {attempt + 1}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
-            continue
-
-        is_valid, result = validate_and_normalize(parsed)
-        if is_valid:
-            return result
-
-        last_reason = result
-        print(f"Attempt {attempt + 1}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
-
-    raise RuntimeError(f"Script generation failed after {MAX_GENERATION_ATTEMPTS} attempts. Last reason: {last_reason}")
-
-
-def save_script(topic_id, narration_text, shot_list, music_mood, hook_text, setting_and_characters):
-    resp = requests.post(
-        f"{SUPABASE_URL}/rest/v1/scripts",
-        headers={**HEADERS, "Prefer": "return=representation"},
-        json={
-            "topic_id": topic_id,
-            "narration_text": narration_text,
-            "shot_list": shot_list,
-            "music_mood": music_mood,
-            "hook_text": hook_text,
-            "setting_and_characters": setting_and_characters,
-            "status": "pending",
-        },
-        timeout=30,
-    )
-    resp.raise_for_status()
-    print("Script saved.")
-
-
-def mark_topic_scripted(topic_id):
-    resp = requests.patch(
-        f"{SUPABASE_URL}/rest/v1/topics?id=eq.{topic_id}",
-        headers=HEADERS,
-        json={"status": "scripted"},
-        timeout=30,
-    )
-    resp.raise_for_status()
-
-
-def mark_topic_generation_failed(topic_id, reason):
-    resp = requests.patch(
-        f"{SUPABASE_URL}/rest/v1/topics?id=eq.{topic_id}",
-        headers=HEADERS,
-        json={"status": "generation_failed"},
-        timeout=30,
-    )
-    resp.raise_for_status()
-    print(f"Topic {topic_id} marked generation_failed - will be skipped by future runs until manually "
-          f"reset. Last reason: {reason}")
-    print(f"FIX: review/reword the topic's title or angle in the topics table for {topic_id}, then "
-          f"reset status back to 'pending' to retry it.")
+    return combined, shot_durations
 
 
 def main():
-    topic = get_next_pending_topic()
-    if not topic:
-        print("No pending topics found. Nothing to do.")
+    supabase = create_client(SUPABASE_URL, SUPABASE_SECRET_KEY)
+
+    # 1. Get one pending script
+    result = supabase.table("scripts").select("*").eq("status", "pending").limit(1).execute()
+    if not result.data:
+        print("No pending scripts found. Exiting.")
         return
 
-    print(f"Writing script for: {topic['title']}")
-    try:
-        result = generate_script(topic["title"], topic["angle"])
-    except RuntimeError as e:
-        mark_topic_generation_failed(topic["id"], str(e))
-        return
+    script = result.data[0]
+    script_id = script["id"]
+    narration_text = script["narration_text"]
+    shot_list = script.get("shot_list")
+    if isinstance(shot_list, str):
+        shot_list = json.loads(shot_list)
+    print(f"Narrating script id={script_id}, length={len(narration_text)} chars, {len(shot_list or [])} shots")
 
-    save_script(
-        topic["id"],
-        result["narration_text"],
-        result["shot_list"],
-        result["music_mood"],
-        result["hook_text"],
-        result["setting_and_characters"],
+    tts = get_tts_model()
+
+    # 2. Generate narration audio via Chatterbox, one real sentence at a
+    # time (natural prosody, no mid-sentence fragment resets). If
+    # shot_list is available, each sentence's real measured duration is
+    # distributed across the shots inside it for accurate video-sync
+    # timing. Falls back to the whole-text sentence-split method (no
+    # shot durations) if shot_list isn't available yet.
+    shot_durations = None
+    if shot_list:
+        combined_audio, shot_durations = synthesize_per_sentence_with_shot_durations(
+            narration_text, shot_list, tts
+        )
+    else:
+        combined_audio = synthesize_with_pauses(narration_text, tts)
+
+    # 2b. Normalize loudness to a consistent, normal level.
+    combined_audio = pydub_normalize(combined_audio)
+
+    raw_filename = f"narration_{script_id}_raw.wav"
+    output_filename = f"narration_{script_id}.wav"
+    combined_audio.export(raw_filename, format="wav")
+
+    # 2c. Slow down slightly for pacing (pitch preserved via ffmpeg atempo),
+    # matching the -5% rate used under Edge TTS.
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", raw_filename, "-filter:a", f"atempo={SLOWDOWN_FACTOR}", output_filename],
+        check=True, capture_output=True,
     )
-    mark_topic_scripted(topic["id"])
-    print("Done.")
+    os.remove(raw_filename)
+    print(f"Audio written to {output_filename}")
+
+    # 3. Upload to Supabase storage bucket 'narration'
+    with open(output_filename, "rb") as f:
+        supabase.storage.from_("narration").upload(
+            output_filename,
+            f,
+            {"content-type": "audio/wav", "upsert": "true"}
+        )
+    public_url = supabase.storage.from_("narration").get_public_url(output_filename)
+    print(f"Uploaded. Public URL: {public_url}")
+
+    # 4. Update script status, narration URL, and real per-shot timing.
+    update_payload = {
+        "status": "images_generated",
+        "narration_url": public_url
+    }
+    if shot_durations is not None:
+        # Shot durations were measured BEFORE the final atempo slowdown -
+        # scale them by the same factor so they still match the exported,
+        # slowed-down audio.
+        slowdown = float(SLOWDOWN_FACTOR)
+        update_payload["shot_durations"] = [d / slowdown for d in shot_durations]
+    supabase.table("scripts").update(update_payload).eq("id", script_id).execute()
+    print("Script status updated to 'images_generated'. Done.")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
