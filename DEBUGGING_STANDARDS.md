@@ -21,3 +21,6 @@ Before presenting any root cause or diagnosis as fact:
 ## Log of past mistakes (add to this, don't delete)
 
 - 2026-08-04 (Marius): Diagnosed Video Generation "finishing in 2 minutes" as an Agnes API account block, based only on a Cloudflare page shown once. Zia proved this wrong by showing 19 real YouTube uploads through Aug 1. Real picture: two separate issues existed — (a) Agnes genuinely failing on the newest stuck script, and (b) 19 old `archived` scripts sitting in the DB, wrongly assumed to be "already uploaded duplicates" until checked title-by-title against the real YouTube upload list — only 1 of 19 was actually a duplicate.
+## Account ownership — check this BEFORE assuming any API account is "blocked"
+
+The Agnes AI account that owns the real working API keys (`marius`, `Nova Command Center`) was created and is logged into via **aliwaziri10.2@gmail.com** — NOT any zia-owned email/profile. If a dashboard login shows "you have been blocked" or looks empty/wrong, check which email you're logged in as FIRST. Logging into the wrong email will look identical to an account being blocked, but it isn't — it's just the wrong account. This applies to every AI assistant profile/session working on this project going forward.
