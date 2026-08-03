@@ -49,6 +49,15 @@ using the same backoff pattern.
 ZOOM FAMILY UPDATE (2026-08-04): added "dolly_in" to ZOOM_FAMILY_MOVEMENTS,
 so it now counts toward the zoom-shot ratio/consecutive-zoom limits the same
 way push_in, crash_zoom, zoom_in, and snap_zoom already do.
+
+NULL CONTENT FIX (2026-08-04): extract_json crashed with an uncaught
+AttributeError ('NoneType' object has no attribute 'strip') whenever
+OpenRouter returned a response with content: null - a dropped/refused
+generation with no error code, distinct from a 429 or network failure.
+This killed the entire workflow run instead of being treated as a normal
+failed attempt. extract_json now raises a ValueError on empty/None input
+instead, which the existing retry loop in generate_script already catches
+and retries like any other parse failure.
 """
 
 import os
@@ -157,6 +166,8 @@ def call_openrouter(prompt):
 
 
 def extract_json(raw_text):
+    if not raw_text:
+        raise ValueError("Model returned empty/None content (likely a dropped or refused generation).")
     text = raw_text.strip()
 
     if "```" in text:
