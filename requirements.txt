@@ -4,5 +4,5 @@ supabase
 moviepy
 Pillow
 numpy
-edge-tts
 pydub
+chatterbox-tts
