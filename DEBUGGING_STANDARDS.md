@@ -5,7 +5,7 @@ Written: 2026-08-04, by Claude. Verified live against Supabase (`swnjzzejsuupecd
 Do not trust this document at face value. Re-verify every claim against live Supabase/GitHub before acting. See also `DEBUGGING_STANDARDS.md` in this repo — read it before diagnosing any bug.
 
 ## Account ownership (resolved 2026-08-04, was a real source of confusion)
-The Agnes AI account holding the real working API keys (`marius`, `Nova Command Center`) is owned by **aliwaziri@gmail.com**, not any Zia-owned login. A "you have been blocked" Cloudflare page on the Agnes dashboard was caused by being logged into the WRONG email — the actual account and its keys are fine. Check which email you're logged in as before assuming an account/key problem.
+The Agnes AI account holding the real working API keys (`marius`, `Nova Command Center`) is owned by **aliwaziri10.2@gmail.com**, not any Zia-owned login. A "you have been blocked" Cloudflare page on the Agnes dashboard was caused by being logged into the WRONG email — the actual account and its keys are fine. Check which email you're logged in as before assuming an account/key problem.
 
 ## Live script status counts (2026-08-04)
 | Status | Count |
