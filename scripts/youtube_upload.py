@@ -14,6 +14,23 @@ Altered/Synthetic content disclosure requirement (API field added
 Also sets a custom thumbnail via thumbnails.set, using thumbnail_url from
 the scripts row if video_generation.py produced one. Missing thumbnail
 never blocks the upload itself - it's a best-effort step.
+
+CHANNEL VERIFICATION (2026-08-03): Nova's youtube_upload.py has a guard
+that checks which channel the OAuth credentials are actually authorized
+for before uploading, since a wrong client_id/refresh_token pair could
+silently post to the wrong channel (this happened for real on Nova once).
+Marius never had this. Added here too, but in a NON-BLOCKING form: the
+authorized channel title is always fetched and logged so it's visible in
+every run's log, but this only hard-blocks the upload if an
+EXPECTED_YOUTUBE_CHANNEL_TITLE secret is explicitly set to a specific
+name. Left unset by default because the exact current live title of
+Marius's channel (was "Wazza Boys", a rename to "Erased" was planned) is
+not confirmed as of this change - hard-coding a guess here risks blocking
+every future upload if the guess is wrong, which is worse than no check
+at all. Once you confirm the exact current channel title (check
+youtube.com while signed into the account that owns Erased), set
+EXPECTED_YOUTUBE_CHANNEL_TITLE as a repo secret to that exact string to
+turn on the hard block.
 """
 
 import os
@@ -25,6 +42,9 @@ YOUTUBE_CLIENT_ID = os.environ["YOUTUBE_CLIENT_ID"]
 YOUTUBE_CLIENT_SECRET = os.environ["YOUTUBE_CLIENT_SECRET"]
 YOUTUBE_REFRESH_TOKEN = os.environ["YOUTUBE_REFRESH_TOKEN"]
 
+# Optional - see CHANNEL VERIFICATION note above. Unset by default.
+EXPECTED_YOUTUBE_CHANNEL_TITLE = os.environ.get("EXPECTED_YOUTUBE_CHANNEL_TITLE", "").strip()
+
 HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -32,6 +52,7 @@ HEADERS = {
 }
 
 TOKEN_URL = "https://oauth2.googleapis.com/token"
+CHANNELS_URL = "https://www.googleapis.com/youtube/v3/channels"
 UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos"
 THUMBNAIL_SET_URL = "https://www.googleapis.com/upload/youtube/v3/thumbnails/set"
 
@@ -51,6 +72,27 @@ def get_access_token():
         print(f"TOKEN REFRESH ERROR {resp.status_code}: {resp.text}")
     resp.raise_for_status()
     return resp.json()["access_token"]
+
+
+def get_authorized_channel(access_token):
+    """Asks YouTube which channel the current access token is actually
+    authorized for. Logged every run for visibility; only enforced as a
+    hard block if EXPECTED_YOUTUBE_CHANNEL_TITLE is set (see file header)."""
+    resp = requests.get(
+        CHANNELS_URL,
+        headers={"Authorization": f"Bearer {access_token}"},
+        params={"part": "snippet", "mine": "true"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    items = resp.json().get("items", [])
+    if not items:
+        raise RuntimeError(
+            "YouTube API returned no channel for these credentials - the token "
+            "may be invalid, expired, or missing required scopes."
+        )
+    channel = items[0]
+    return channel["id"], channel["snippet"]["title"]
 
 
 def get_next_ready_script():
@@ -119,8 +161,6 @@ def upload_to_youtube(access_token, video_path, title, description):
         "status": {
             "privacyStatus": "public",
             "selfDeclaredMadeForKids": False,
-            # Required disclosure for AI-generated/altered realistic content.
-            # Field added to the YouTube Data API v3 on 2024-10-30.
             "containsSyntheticMedia": True,
         },
     }
@@ -208,13 +248,28 @@ def main():
         print("Script has no video_url yet. Skipping.")
         return
 
+    access_token = get_access_token()
+
+    channel_id, channel_title = get_authorized_channel(access_token)
+    print(f"These credentials are authorized for channel: {channel_title!r} ({channel_id})")
+    if EXPECTED_YOUTUBE_CHANNEL_TITLE:
+        if channel_title.strip().lower() != EXPECTED_YOUTUBE_CHANNEL_TITLE.lower():
+            raise RuntimeError(
+                f"REFUSING TO UPLOAD: these credentials authorize {channel_title!r}, not the "
+                f"expected {EXPECTED_YOUTUBE_CHANNEL_TITLE!r}. Wrong YOUTUBE_CLIENT_ID/"
+                f"YOUTUBE_REFRESH_TOKEN pair for Marius. No video was downloaded or uploaded."
+            )
+        print(f"Channel verified ({EXPECTED_YOUTUBE_CHANNEL_TITLE}) - proceeding.")
+    else:
+        print("EXPECTED_YOUTUBE_CHANNEL_TITLE not set - skipping hard verification, "
+              "proceeding based on channel title logged above only.")
+
     title = get_topic_title(script["topic_id"])
     description = build_description(script.get("narration_text", ""))
 
     video_path = "/tmp/upload_video.mp4"
     download_file(script["video_url"], video_path)
 
-    access_token = get_access_token()
     youtube_id = upload_to_youtube(access_token, video_path, title, description)
     print(f"Uploaded to YouTube (PUBLIC): https://youtube.com/watch?v={youtube_id}")
 
