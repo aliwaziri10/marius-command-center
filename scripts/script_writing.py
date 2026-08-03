@@ -36,6 +36,19 @@ prompt. Added a validation check (same pattern as the hook_text checks
 below) that fails and retries generation if no CTA-shaped language is found
 in the back portion of narration_text, so a missing CTA is now a hard
 regeneration trigger instead of a coin flip.
+
+NETWORK RETRY FIX (2026-08-04): script writing was crashing the entire
+workflow (uncaught ChunkedEncodingError / ConnectionError / Timeout) whenever
+OpenRouter's connection dropped mid-response, even though a retry loop
+already existed right next to it for HTTP 429. A dropped connection happens
+before any status code is returned, so it was never hitting the 429 branch -
+it just killed the whole run instantly. call_openrouter now catches
+network-level exceptions (not just 429 responses) and retries those too,
+using the same backoff pattern.
+
+ZOOM FAMILY UPDATE (2026-08-04): added "dolly_in" to ZOOM_FAMILY_MOVEMENTS,
+so it now counts toward the zoom-shot ratio/consecutive-zoom limits the same
+way push_in, crash_zoom, zoom_in, and snap_zoom already do.
 """
 
 import os
@@ -64,10 +77,6 @@ MAX_SETTING_CHARS = 900
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 
-# Words/phrases that signal an in-voice engagement CTA is present. Kept broad
-# on purpose - this is a presence check, not a quality check, so it should
-# catch "comment," "share," "subscribe," "like this," etc. in whatever
-# phrasing the model chose, without forcing exact wording.
 CTA_KEYWORDS = (
     "comment", "comments", "subscribe", "share this", "share it",
     "like this", "like and", "tell us", "let us know", "hit follow",
@@ -88,9 +97,15 @@ VALID_LENS_EFFECTS = {
     "shallow_depth_of_field", "lens_flare", "film_grain", "none"
 }
 
-ZOOM_FAMILY_MOVEMENTS = {"push_in", "crash_zoom", "zoom_in", "snap_zoom"}
+ZOOM_FAMILY_MOVEMENTS = {"push_in", "crash_zoom", "zoom_in", "snap_zoom", "dolly_in"}
 MAX_ZOOM_SHOT_RATIO = 0.32
 MAX_CONSECUTIVE_ZOOM_SHOTS = 2
+
+RETRYABLE_NETWORK_EXCEPTIONS = (
+    requests.exceptions.ChunkedEncodingError,
+    requests.exceptions.ConnectionError,
+    requests.exceptions.Timeout,
+)
 
 
 def get_next_pending_topic():
@@ -107,18 +122,26 @@ def get_next_pending_topic():
 def call_openrouter(prompt):
     last_error = None
     for attempt in range(MAX_RETRIES):
-        resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "openrouter/free",
-                "messages": [{"role": "user", "content": prompt}],
-            },
-            timeout=90,
-        )
+        try:
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "openrouter/free",
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+                timeout=90,
+            )
+        except RETRYABLE_NETWORK_EXCEPTIONS as e:
+            wait = (attempt + 1) * 15
+            print(f"Network error ({e.__class__.__name__}: {e}), waiting {wait}s before retry...")
+            last_error = e
+            time.sleep(wait)
+            continue
+
         if resp.status_code == 429:
             wait = (attempt + 1) * 15
             print(f"Rate limited, waiting {wait}s before retry...")
@@ -128,6 +151,8 @@ def call_openrouter(prompt):
         resp.raise_for_status()
         return resp.json()["choices"][0]["message"]["content"]
 
+    if isinstance(last_error, Exception) and not hasattr(last_error, "text"):
+        raise RuntimeError(f"OpenRouter still failing after {MAX_RETRIES} attempts: {last_error}")
     raise RuntimeError(f"OpenRouter still rate-limited after {MAX_RETRIES} attempts: {last_error.text if last_error else 'unknown'}")
 
 
