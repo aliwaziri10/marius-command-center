@@ -1,26 +1,36 @@
-# Debugging Standards — Read Before Diagnosing Any Bug
+# Marius Command Center — Handoff Sheet
+Written: 2026-08-04, by Claude. Verified live against Supabase (`swnjzzejsuupecdgbzzf`) at time of writing.
 
-Applies to any AI assistant or person debugging Nova, Marius, or TechPulse.
+## ⚠️ STANDING RULE — READ THIS FIRST
+Do not trust this document at face value. Re-verify every claim against live Supabase/GitHub before acting. See also `DEBUGGING_STANDARDS.md` in this repo — read it before diagnosing any bug.
 
-Before presenting any root cause or diagnosis as fact:
+## Account ownership (resolved 2026-08-04, was a real source of confusion)
+The Agnes AI account holding the real working API keys (`marius`, `Nova Command Center`) is owned by **aliwaziri@gmail.com**, not any Zia-owned login. A "you have been blocked" Cloudflare page on the Agnes dashboard was caused by being logged into the WRONG email — the actual account and its keys are fine. Check which email you're logged in as before assuming an account/key problem.
 
-1. Trace the actual failure end-to-end in the real code — open and read the exact file/function involved. Never infer a cause from a filename, a comment, or a plausible-sounding theory.
+## Live script status counts (2026-08-04)
+| Status | Count |
+|---|---|
+| `archived` | 18 |
+| `content_flagged` | 3 |
+| `pending` | 1 |
+| `uploaded` | 16 |
 
-2. Cross-check every claim against live data (Supabase/GitHub/actual product output) — never conclude from a single data point.
+## Script `92dec2f9` — resolved diagnosis (2026-08-04)
+Was assumed stuck due to an Agnes account block — WRONG, see above. Real cause, verified live: `character_reference_url` populated successfully (Agnes account/key working fine), but shot generation was rejected on content-policy grounds (likely the WWII/Nazi flag imagery in the prompt), retried once with fallback, failed again, auto-flagged `content_flagged` by the pipeline's own designed behavior. To resume: reword the flagged shot's `visual_description` in `shot_list`, then reset status to `images_generated`.
 
-3. Actively look for contradicting evidence before settling on an explanation. If the theory is "X is broken," check the real-world output (e.g. the actual YouTube channel, actual storage bucket) — not just an internal status flag, since status/flags can be stale or manually edited and not reflect reality.
+## Deleted 2026-08-04
+Script `97becca1-0b6b-4bbc-b955-ffe644df54b1` ("The Librarian of Red Emma, Detroit") — deleted. Confirmed duplicate: this exact title was already live on YouTube (uploaded 2026-07-31 under a different script). This was an old abandoned attempt at the same topic, only 16/60 clips done, safe to remove.
 
-4. Explicitly rule out at least one alternative explanation before presenting a conclusion.
+## 18 archived scripts — NOT deleted, contain real unfinished work
+Checked every one of the (formerly 19, now 18) `archived` scripts' topic title against the actual YouTube channel upload list (not just DB status, which can be stale/wrong). Only 1 was a real duplicate (deleted above). The other 18 are unique topics never published, with real Agnes-generated progress already paid for:
+- 4 scripts are 45–73% done (`The Scavenger of the Great Stink` 38/70, `The Mail Battalion's Last Witness` 51/70, `The San Francisco Resident...` 42/85, `The Courier of the Siege of Sarajevo` 37/82)
+- 14 others range 0–18 clips done
+None have been reset yet — still sitting at `archived`, not in the active queue. Resume by setting status back to `images_generated` (pipeline is resume-safe, will continue from `video_next_index`).
 
-5. If a theory doesn't fully explain every observed symptom, say so out loud and keep investigating instead of presenting a partial explanation as the root cause.
-
-6. Do not state a root cause with confidence until it has been verified from at least two independent angles (e.g. code logic + live data, or DB state + real-world output).
-
-7. If full verification isn't possible with available tools, say exactly what remains unverified — do not present a guess as confirmed.
-
-## Log of past mistakes (add to this, don't delete)
-
-- 2026-08-04 (Marius): Diagnosed Video Generation "finishing in 2 minutes" as an Agnes API account block, based only on a Cloudflare page shown once. Zia proved this wrong by showing 19 real YouTube uploads through Aug 1. Real picture: two separate issues existed — (a) Agnes genuinely failing on the newest stuck script, and (b) 19 old `archived` scripts sitting in the DB, wrongly assumed to be "already uploaded duplicates" until checked title-by-title against the real YouTube upload list — only 1 of 19 was actually a duplicate.
-## Account ownership — check this BEFORE assuming any API account is "blocked"
-
-The Agnes AI account that owns the real working API keys (`marius`, `Nova Command Center`) was created and is logged into via **aliwaziri10.2@gmail.com** — NOT any zia-owned email/profile. If a dashboard login shows "you have been blocked" or looks empty/wrong, check which email you're logged in as FIRST. Logging into the wrong email will look identical to an account being blocked, but it isn't — it's just the wrong account. This applies to every AI assistant profile/session working on this project going forward.
+## Reusable references
+- Supabase project ID: `swnjzzejsuupecdgbzzf`
+- GitHub repo: `https://github.com/aliwaziri10/marius-command-center`
+- GitHub Actions: `https://github.com/aliwaziri10/marius-command-center/actions`
+- YouTube channel: "Erased From History" (`@erased.fromhistory`, channel ID `UC2VOrDdsqMEc33kvK3u4JXA`)
+- GitHub `create_or_update_file` API write returns 403 — all code/doc changes go through Zia pasting into GitHub web editor.
+- `CLIP_BATCH_LIMIT = 8` in `video_generation.py` — max 8 new clips per scheduled run, resumes automatically. `AgnesOverloadedError` exits quietly (exit 0, no GitHub issue) on transient overload by design — check `video_next_index` in Supabase directly to see real progress, don't rely on issue count alone.
