@@ -58,6 +58,18 @@ This killed the entire workflow run instead of being treated as a normal
 failed attempt. extract_json now raises a ValueError on empty/None input
 instead, which the existing retry loop in generate_script already catches
 and retries like any other parse failure.
+
+SUPABASE CALL HARDENING (2026-08-05): the NETWORK RETRY FIX above only
+covered the OpenRouter call inside generate_script(). The three Supabase
+calls in main() - get_next_pending_topic(), save_script(), and
+mark_topic_scripted() - had zero retry/exception handling: a single
+transient network blip or Supabase hiccup on any of them raised an
+uncaught exception straight out of main() and killed the whole workflow
+run (this is the direct cause of the repeated "Script Writing workflow
+failed" issues - GitHub confirms this crashed intermittently even on runs
+where generate_script() itself succeeded). All three now go through the
+same retryable_request() helper, using the same network-exception/5xx
+retry pattern already proven in call_openrouter.
 """
 
 import os
@@ -115,15 +127,52 @@ RETRYABLE_NETWORK_EXCEPTIONS = (
     requests.exceptions.ConnectionError,
     requests.exceptions.Timeout,
 )
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+
+
+def retryable_request(method, url, max_retries=MAX_RETRIES, **kwargs):
+    """
+    SUPABASE CALL HARDENING (2026-08-05): shared retry wrapper for the
+    Supabase REST calls in this file, mirroring the same network-exception
+    and 5xx/429 retry pattern already used for OpenRouter in
+    call_openrouter(). Raises the underlying exception (or the last bad
+    response's HTTPError) after exhausting retries, so a genuinely broken
+    call still surfaces as a real failure - it just no longer dies on the
+    first transient blip.
+    """
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            resp = requests.request(method, url, **kwargs)
+        except RETRYABLE_NETWORK_EXCEPTIONS as e:
+            wait = (attempt + 1) * 10
+            print(f"Supabase network error ({e.__class__.__name__}: {e}), waiting {wait}s before retry...")
+            last_error = e
+            time.sleep(wait)
+            continue
+
+        if resp.status_code in RETRYABLE_STATUS_CODES:
+            wait = (attempt + 1) * 10
+            print(f"Supabase transient error {resp.status_code}, waiting {wait}s before retry: {resp.text}")
+            last_error = resp
+            time.sleep(wait)
+            continue
+
+        resp.raise_for_status()
+        return resp
+
+    if isinstance(last_error, Exception):
+        raise RuntimeError(f"Supabase call still failing after {max_retries} attempts: {last_error}")
+    raise RuntimeError(f"Supabase call still failing after {max_retries} attempts: {last_error.status_code if last_error else 'unknown'} {last_error.text if last_error else ''}")
 
 
 def get_next_pending_topic():
-    resp = requests.get(
+    resp = retryable_request(
+        "GET",
         f"{SUPABASE_URL}/rest/v1/topics?status=eq.pending&order=created_at.asc&limit=1",
         headers=HEADERS,
         timeout=30,
     )
-    resp.raise_for_status()
     rows = resp.json()
     return rows[0] if rows else None
 
@@ -561,7 +610,8 @@ Include between {MIN_SHOTS} and {MAX_SHOTS} shots covering the full narration.""
 
 
 def save_script(topic_id, narration_text, shot_list, music_mood, hook_text, setting_and_characters):
-    resp = requests.post(
+    retryable_request(
+        "POST",
         f"{SUPABASE_URL}/rest/v1/scripts",
         headers={**HEADERS, "Prefer": "return=representation"},
         json={
@@ -575,28 +625,27 @@ def save_script(topic_id, narration_text, shot_list, music_mood, hook_text, sett
         },
         timeout=30,
     )
-    resp.raise_for_status()
     print("Script saved.")
 
 
 def mark_topic_scripted(topic_id):
-    resp = requests.patch(
+    retryable_request(
+        "PATCH",
         f"{SUPABASE_URL}/rest/v1/topics?id=eq.{topic_id}",
         headers=HEADERS,
         json={"status": "scripted"},
         timeout=30,
     )
-    resp.raise_for_status()
 
 
 def mark_topic_generation_failed(topic_id, reason):
-    resp = requests.patch(
+    retryable_request(
+        "PATCH",
         f"{SUPABASE_URL}/rest/v1/topics?id=eq.{topic_id}",
         headers=HEADERS,
         json={"status": "generation_failed"},
         timeout=30,
     )
-    resp.raise_for_status()
     print(f"Topic {topic_id} marked generation_failed - will be skipped by future runs until manually "
           f"reset. Last reason: {reason}")
     print(f"FIX: review/reword the topic's title or angle in the topics table for {topic_id}, then "
