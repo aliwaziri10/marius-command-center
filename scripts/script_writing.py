@@ -70,12 +70,30 @@ failed" issues - GitHub confirms this crashed intermittently even on runs
 where generate_script() itself succeeded). All three now go through the
 same retryable_request() helper, using the same network-exception/5xx
 retry pattern already proven in call_openrouter.
+
+DUPLICATE-SHOT / SHORT-NARRATION PADDING FIX (2026-08-06): found in
+production via an uploaded video ("The Lighthouse Keeper of Sable Island")
+that came out ~2 minutes long and visually looped the same handful of shots
+over and over. Root cause: the model wrote a narration_text of only ~320
+words (well under the 1200-1500 word target) and only 10 genuinely distinct
+shots, then padded the shot_list to the required MIN_SHOTS by repeating
+that same block of 10 shots six times over. The existing empty-shot check
+(find_empty_shots, still below) only rejects shots with blank text - a
+duplicated-but-non-empty shot passed it every time, and there was no floor
+on narration length at all. Fixed two ways: validate_and_normalize now
+hard-rejects narration_text under MIN_NARRATION_WORDS words, and
+find_duplicate_shots now rejects any script where the same
+(visual_description, narration_excerpt) pair appears more than
+MAX_SHOT_REPEAT_COUNT times - both trigger a retry/regeneration exactly
+like the other validation failures in this file, instead of silently
+saving a script that will play as a frozen, repeating video.
 """
 
 import os
 import json
 import time
 import requests
+from collections import Counter
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
@@ -95,6 +113,8 @@ MAX_HOOK_TEXT_CHARS = 40
 MAX_HOOK_TEXT_WORDS = 5
 MIN_SETTING_CHARS = 40
 MAX_SETTING_CHARS = 900
+MIN_NARRATION_WORDS = 900
+MAX_SHOT_REPEAT_COUNT = 2
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 
@@ -312,9 +332,55 @@ def narration_has_engagement_cta(narration_text):
     return any(keyword in window for keyword in CTA_KEYWORDS)
 
 
+def find_duplicate_shots(normalized_shots):
+    """DUPLICATE-SHOT PADDING FIX (2026-08-06): the free model sometimes
+    runs out of real story before reaching MIN_SHOTS and pads the remainder
+    by repeating an earlier block of shots verbatim (same
+    visual_description + narration_excerpt) instead of leaving them empty -
+    which the older find_empty_shots check below can't catch, since the
+    repeated shots aren't empty. Confirmed in production: one uploaded
+    video looped the same 10 shots six times, producing a frozen-looking,
+    ~2-minute video instead of the intended 8-10 minute episode. Returns a
+    list of (visual_description, narration_excerpt, count) tuples for any
+    shot pair that appears more than MAX_SHOT_REPEAT_COUNT times."""
+    pair_counts = Counter(
+        ((s["visual_description"] or "").strip().lower(), (s["narration_excerpt"] or "").strip().lower())
+        for s in normalized_shots
+    )
+    return [
+        (visual, narration, count)
+        for (visual, narration), count in pair_counts.items()
+        if visual and count > MAX_SHOT_REPEAT_COUNT
+    ]
+
+
+def find_empty_shots(normalized_shots):
+    """EMPTY-SHOT PADDING FIX (2026-08-03): the free model sometimes runs out
+    of real story to break into shots before reaching MIN_SHOTS, and pads the
+    remainder of the list with placeholder shot objects that have an empty
+    visual_description and/or narration_excerpt. Those shots still cost a
+    real Agnes video generation downstream and end up discarded to zero
+    duration in the final cut - so this must be caught here and rejected,
+    not silently saved."""
+    return [
+        i for i, s in enumerate(normalized_shots)
+        if not (s["visual_description"] or "").strip() or not (s["narration_excerpt"] or "").strip()
+    ]
+
+
 def validate_and_normalize(result):
     if "narration_text" not in result or not result["narration_text"].strip():
         return False, "missing narration_text"
+
+    narration_word_count = len(result["narration_text"].split())
+    if narration_word_count < MIN_NARRATION_WORDS:
+        return False, (
+            f"narration_text is only {narration_word_count} words - need at least "
+            f"{MIN_NARRATION_WORDS} (target is 1200-1500 for an 8-10 minute episode). "
+            f"A short narration doesn't have enough real story content to fill "
+            f"{MIN_SHOTS}+ distinct shots and forces padding the shot list with "
+            f"repeated shots instead of real coverage."
+        )
 
     setting_and_characters = (result.get("setting_and_characters") or "").strip()
     if len(setting_and_characters) < MIN_SETTING_CHARS:
@@ -341,6 +407,28 @@ def validate_and_normalize(result):
         return False, f"shot count {len(shot_list)} outside {MIN_SHOTS}-{MAX_SHOTS} range"
 
     normalized_shots = [normalize_shot(s, i) for i, s in enumerate(shot_list)]
+
+    empty_shots = find_empty_shots(normalized_shots)
+    if empty_shots:
+        return False, (
+            f"{len(empty_shots)} of {len(normalized_shots)} shots have an empty "
+            f"visual_description and/or narration_excerpt (first at shot index "
+            f"{empty_shots[0]}) - every shot must have real content, do not pad "
+            f"the list with placeholder shots just to reach {MIN_SHOTS} total; "
+            f"split the real narration into more/finer shots instead"
+        )
+
+    duplicate_shots = find_duplicate_shots(normalized_shots)
+    if duplicate_shots:
+        worst_visual, _, worst_count = max(duplicate_shots, key=lambda d: d[2])
+        return False, (
+            f"{len(duplicate_shots)} shot(s) are repeated more than "
+            f"{MAX_SHOT_REPEAT_COUNT} times instead of being distinct - worst case "
+            f"repeated {worst_count} times ({worst_visual[:80]!r}...). This means the "
+            f"shot list was padded by looping an earlier block of shots instead of "
+            f"covering new narration - write more real, distinct shots covering the "
+            f"full story instead of repeating any."
+        )
 
     zoom_count = sum(
         1 for s in normalized_shots
@@ -441,9 +529,15 @@ Only after these opening beats should the script settle into the normal
 narrative arc. No channel intro, no "welcome back," no restating the title -
 go straight into the stake.
 
-Write a complete 8-10 minute narration script (roughly 1200-1500 words) with
-this opening structure, a clear narrative arc through the rest of the story,
-and a reflective closing line.
+Write a complete 8-10 minute narration script of AT LEAST 1200 words
+(target 1200-1500 words) with this opening structure, a clear narrative arc
+through the rest of the story, and a reflective closing line. This length is
+a hard requirement, not a suggestion - a short narration doesn't have enough
+real content to fill the shot list below without repeating shots, and will
+be rejected. If you don't know enough real detail about this specific story
+to reach 1200 words, expand on documented historical context, setting, and
+the emotional experience of the people involved - do not pad with repetition
+or filler, and do not submit a short script expecting it to be padded later.
 
 CALL TO ACTION - THIS IS REQUIRED, NOT OPTIONAL: immediately after the
 emotional climax of the story and before the final reflective closing line,
@@ -491,6 +585,15 @@ Break the episode into EXACTLY between {MIN_SHOTS} and {MAX_SHOTS} shots -
 this is a hard requirement, not a suggestion. This is a dense, sub-sentence
 level breakdown - a single narration sentence should often span 2-3 separate
 shots, not one. Do not write sparse, paragraph-level shots.
+
+EVERY SHOT MUST BE DISTINCT - THIS IS ALSO A HARD REQUIREMENT: every shot
+must have its own real visual_description and narration_excerpt drawn from
+a different part of the narration you wrote. NEVER repeat an earlier shot
+(same visual_description and narration_excerpt) later in the list just to
+reach the shot count - a script that repeats any shot more than twice will
+be rejected and regenerated. If your narration doesn't naturally break into
+{MAX_SHOTS} distinct shots, write a longer narration and break it more
+finely instead of looping earlier shots.
 
 Every shot's "visual_description" must stay consistent with the
 "setting_and_characters" anchor above - same location/era/ethnicity, and
@@ -587,7 +690,7 @@ format:
   ]
 }}
 
-Include between {MIN_SHOTS} and {MAX_SHOTS} shots covering the full narration."""
+Include between {MIN_SHOTS} and {MAX_SHOTS} shots covering the full narration - every shot must be distinct, never repeat an earlier shot."""
 
     last_reason = None
     for attempt in range(MAX_GENERATION_ATTEMPTS):
