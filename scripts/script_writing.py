@@ -151,6 +151,30 @@ single model's rate-limit/outage doesn't burn attempts on a different
 random model each time. If gpt-oss-120b:free itself is ever de-listed from
 the free tier, re-check openrouter.ai/models for a current equivalent
 before reverting to the random router.
+
+MODEL FALLBACK PARAM FIX (2026-08-06): confirmed in production - the very
+next run after the MODEL SELECTION FIX above burned zero attempts and
+never even reached mark_topic_generation_failed() (topic e6de9f4d stayed
+'pending', not 'generation_failed', after the run failed and opened issue
+#49). Root cause: the previous fix sent BOTH "model": OPENROUTER_MODEL AND
+"models": OPENROUTER_MODEL_FALLBACKS in the same request body - but
+OpenRouter's documented fallback API (per openrouter.ai/docs/guides/
+routing/model-fallbacks) takes a SINGLE "models" array with the primary
+model listed first, not a separate "model" + "models" pair. Sending both
+in a conflicting/undocumented shape almost certainly returned a non-429
+4xx from OpenRouter, which resp.raise_for_status() raised as an uncaught
+requests.exceptions.HTTPError - call_openrouter only ever caught
+RETRYABLE_NETWORK_EXCEPTIONS and JSON-envelope errors, not HTTPError, so
+this propagated straight out of main() past the "except RuntimeError"
+guard and killed the whole run before mark_topic_generation_failed() could
+run. Fixed two ways: (1) call_openrouter now sends a single "models" array
+(OPENROUTER_MODEL first, then OPENROUTER_MODEL_FALLBACKS) with no separate
+"model" key, matching OpenRouter's documented shape exactly; (2) added an
+explicit except for requests.exceptions.HTTPError on non-429 status codes,
+so any future unexpected 4xx/5xx from OpenRouter is treated like every
+other transient failure in this file - retried within budget, then
+surfaced as a normal RuntimeError that mark_topic_generation_failed() can
+catch - instead of crashing the whole workflow uncaught again.
 """
 
 import os
@@ -182,8 +206,12 @@ MAX_SHOT_REPEAT_COUNT = 2
 
 # MODEL SELECTION FIX (2026-08-06): pinned primary + stable fallback,
 # replacing the random "openrouter/free" auto-router. See file docstring.
+# MODEL FALLBACK PARAM FIX (2026-08-06): sent as ONE "models" list with
+# the primary first - OpenRouter's documented fallback shape - never as a
+# separate "model" key alongside "models".
 OPENROUTER_MODEL = "openai/gpt-oss-120b:free"
 OPENROUTER_MODEL_FALLBACKS = ["meta-llama/llama-3.3-70b-instruct:free"]
+OPENROUTER_MODELS_PAYLOAD = [OPENROUTER_MODEL] + OPENROUTER_MODEL_FALLBACKS
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 
@@ -277,8 +305,7 @@ def call_openrouter(prompt):
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": OPENROUTER_MODEL,
-                    "models": OPENROUTER_MODEL_FALLBACKS,
+                    "models": OPENROUTER_MODELS_PAYLOAD,
                     "messages": [{"role": "user", "content": prompt}],
                 },
                 timeout=90,
@@ -296,7 +323,24 @@ def call_openrouter(prompt):
             time.sleep(wait)
             last_error = resp
             continue
-        resp.raise_for_status()
+
+        try:
+            resp.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            # MODEL FALLBACK PARAM FIX (2026-08-06): any unexpected non-429
+            # error status from OpenRouter (e.g. a malformed request body,
+            # bad model slug, etc.) used to raise this HTTPError straight
+            # out of call_openrouter uncaught, since only 429s and network
+            # exceptions were retried. That killed the whole workflow run
+            # before the topic could even be marked generation_failed.
+            # Treat it like every other transient failure here: retry
+            # within budget, and surface the response body so the real
+            # cause is visible in logs instead of a bare HTTPError.
+            wait = (attempt + 1) * 15
+            print(f"OpenRouter HTTP error {resp.status_code} ({e}): {resp.text}, waiting {wait}s before retry...")
+            last_error = resp
+            time.sleep(wait)
+            continue
 
         try:
             return resp.json()["choices"][0]["message"]["content"]
@@ -315,7 +359,7 @@ def call_openrouter(prompt):
 
     if isinstance(last_error, Exception) and not hasattr(last_error, "text"):
         raise RuntimeError(f"OpenRouter still failing after {MAX_RETRIES} attempts: {last_error}")
-    raise RuntimeError(f"OpenRouter still rate-limited after {MAX_RETRIES} attempts: {last_error.text if last_error else 'unknown'}")
+    raise RuntimeError(f"OpenRouter still failing after {MAX_RETRIES} attempts: {last_error.text if last_error else 'unknown'}")
 
 
 def sanitize_json_control_chars(text):
