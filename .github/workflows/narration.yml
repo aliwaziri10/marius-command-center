@@ -2,7 +2,7 @@ name: Narration
 
 on:
   schedule:
-    - cron: "0 5,17 * * *"
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 permissions:
