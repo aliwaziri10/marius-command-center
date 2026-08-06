@@ -1,0 +1,2226 @@
+{
+  "generated_by": "generate_codemap.py",
+  "file_count": 11,
+  "env_vars": [
+    "ACE_MUSIC_API_KEY",
+    "AGNES_API_KEY",
+    "EXPECTED_YOUTUBE_CHANNEL_TITLE",
+    "FREELLM_API_KEY",
+    "FREELLM_API_URL",
+    "FREESOUND_API_KEY",
+    "HF_TOKEN",
+    "OPENROUTER_API_KEY",
+    "SUPABASE_SECRET_KEY",
+    "SUPABASE_URL",
+    "X",
+    "YOUTUBE_CLIENT_ID",
+    "YOUTUBE_CLIENT_SECRET",
+    "YOUTUBE_REFRESH_TOKEN"
+  ],
+  "tables": [
+    "scripts",
+    "topics"
+  ],
+  "files": [
+    {
+      "path": "generate_codemap.py",
+      "functions": [
+        {
+          "name": "find_py_files",
+          "line": 27,
+          "args": [
+            "root"
+          ],
+          "calls": [
+            "endswith",
+            "join",
+            "walk"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "get_docstring_first_line",
+          "line": 35,
+          "args": [
+            "node"
+          ],
+          "calls": [
+            "get_docstring",
+            "split",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "extract_env_vars",
+          "line": 59,
+          "args": [
+            "source_text"
+          ],
+          "calls": [
+            "add",
+            "finditer",
+            "group",
+            "set",
+            "sorted"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "extract_tables",
+          "line": 70,
+          "args": [
+            "source_text"
+          ],
+          "calls": [
+            "findall",
+            "set",
+            "sorted"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "process_file",
+          "line": 74,
+          "args": [
+            "path"
+          ],
+          "calls": [
+            "CallCollector",
+            "append",
+            "extract_env_vars",
+            "extract_tables",
+            "get_docstring_first_line",
+            "isinstance",
+            "open",
+            "parse",
+            "read",
+            "set",
+            "sorted",
+            "str",
+            "visit",
+            "walk"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_codemap",
+          "line": 111,
+          "args": [
+            "root"
+          ],
+          "calls": [
+            "append",
+            "find_py_files",
+            "get",
+            "len",
+            "process_file",
+            "relpath",
+            "set",
+            "sorted",
+            "update"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 133,
+          "args": [],
+          "calls": [
+            "build_codemap",
+            "dump",
+            "join",
+            "len",
+            "open",
+            "print"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "__init__",
+          "line": 45,
+          "args": [
+            "self"
+          ],
+          "calls": [],
+          "docstring": ""
+        },
+        {
+          "name": "visit_Call",
+          "line": 48,
+          "args": [
+            "self",
+            "node"
+          ],
+          "calls": [
+            "append",
+            "generic_visit",
+            "isinstance"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "X"
+      ],
+      "tables": []
+    },
+    {
+      "path": "scripts/image_generation.py",
+      "functions": [
+        {
+          "name": "generate_image",
+          "line": 17,
+          "args": [
+            "prompt",
+            "seed"
+          ],
+          "calls": [
+            "get",
+            "quote",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "extract_shot_descriptions",
+          "line": 30,
+          "args": [
+            "shot_list"
+          ],
+          "calls": [
+            "append",
+            "get",
+            "isinstance"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 42,
+          "args": [],
+          "calls": [
+            "append",
+            "create_client",
+            "enumerate",
+            "eq",
+            "execute",
+            "extract_shot_descriptions",
+            "from_",
+            "generate_image",
+            "get",
+            "get_public_url",
+            "len",
+            "limit",
+            "print",
+            "select",
+            "sleep",
+            "table",
+            "update",
+            "upload"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": []
+    },
+    {
+      "path": "scripts/narration.py",
+      "functions": [
+        {
+          "name": "get_tts_model",
+          "line": 37,
+          "args": [],
+          "calls": [
+            "from_pretrained"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "split_into_segments",
+          "line": 44,
+          "args": [
+            "narration_text"
+          ],
+          "calls": [
+            "split",
+            "strip"
+          ],
+          "docstring": "Splits narration into one segment per SENTENCE, so a pause gets"
+        },
+        {
+          "name": "_max_plausible_duration",
+          "line": 55,
+          "args": [
+            "text"
+          ],
+          "calls": [
+            "len",
+            "max",
+            "split"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "synthesize_sentence",
+          "line": 60,
+          "args": [
+            "text",
+            "tts",
+            "tmp_path"
+          ],
+          "calls": [
+            "_max_plausible_duration",
+            "from_file",
+            "generate",
+            "len",
+            "print",
+            "range",
+            "save",
+            "split"
+          ],
+          "docstring": "One real Chatterbox TTS call per full sentence - correct prosody/"
+        },
+        {
+          "name": "synthesize_with_pauses",
+          "line": 94,
+          "args": [
+            "narration_text",
+            "tts"
+          ],
+          "calls": [
+            "enumerate",
+            "int",
+            "len",
+            "print",
+            "silent",
+            "split_into_segments",
+            "synthesize_sentence"
+          ],
+          "docstring": "Synthesizes narration sentence-by-sentence and concatenates them"
+        },
+        {
+          "name": "_assign_shots_to_sentences",
+          "line": 112,
+          "args": [
+            "sentences",
+            "shot_list"
+          ],
+          "calls": [
+            "append",
+            "enumerate",
+            "get",
+            "len",
+            "max",
+            "min",
+            "split",
+            "sum"
+          ],
+          "docstring": "Maps each shot's narration_excerpt onto the real sentence(s) it"
+        },
+        {
+          "name": "synthesize_per_sentence_with_shot_durations",
+          "line": 160,
+          "args": [
+            "narration_text",
+            "shot_list",
+            "tts"
+          ],
+          "calls": [
+            "_assign_shots_to_sentences",
+            "append",
+            "enumerate",
+            "int",
+            "len",
+            "max",
+            "print",
+            "silent",
+            "split_into_segments",
+            "sum",
+            "synthesize_sentence"
+          ],
+          "docstring": "Synthesizes narration one real SENTENCE at a time via Chatterbox."
+        },
+        {
+          "name": "main",
+          "line": 204,
+          "args": [],
+          "calls": [
+            "create_client",
+            "eq",
+            "execute",
+            "export",
+            "float",
+            "from_",
+            "get",
+            "get_public_url",
+            "get_tts_model",
+            "isinstance",
+            "len",
+            "limit",
+            "loads",
+            "open",
+            "print",
+            "pydub_normalize",
+            "remove",
+            "run",
+            "select",
+            "synthesize_per_sentence_with_shot_durations",
+            "synthesize_with_pauses",
+            "table",
+            "update",
+            "upload"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": []
+    },
+    {
+      "path": "scripts/script_writing.py",
+      "functions": [
+        {
+          "name": "retryable_request",
+          "line": 179,
+          "args": [
+            "method",
+            "url",
+            "max_retries"
+          ],
+          "calls": [
+            "RuntimeError",
+            "isinstance",
+            "print",
+            "raise_for_status",
+            "range",
+            "request",
+            "sleep"
+          ],
+          "docstring": "SUPABASE CALL HARDENING (2026-08-05): shared retry wrapper for the"
+        },
+        {
+          "name": "get_next_pending_topic",
+          "line": 215,
+          "args": [],
+          "calls": [
+            "json",
+            "retryable_request"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "call_openrouter",
+          "line": 226,
+          "args": [
+            "prompt"
+          ],
+          "calls": [
+            "RuntimeError",
+            "hasattr",
+            "isinstance",
+            "json",
+            "post",
+            "print",
+            "raise_for_status",
+            "range",
+            "sleep"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "sanitize_json_control_chars",
+          "line": 263,
+          "args": [
+            "text"
+          ],
+          "calls": [
+            "append",
+            "join",
+            "ord"
+          ],
+          "docstring": "CONTROL-CHARACTER JSON FIX (2026-08-06): the free model sometimes emits"
+        },
+        {
+          "name": "extract_json",
+          "line": 312,
+          "args": [
+            "raw_text"
+          ],
+          "calls": [
+            "ValueError",
+            "find",
+            "loads",
+            "rfind",
+            "sanitize_json_control_chars",
+            "split",
+            "startswith",
+            "str",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "normalize_shot",
+          "line": 341,
+          "args": [
+            "shot",
+            "index"
+          ],
+          "calls": [
+            "get"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "normalize_hook_text",
+          "line": 366,
+          "args": [
+            "result"
+          ],
+          "calls": [
+            "get",
+            "len",
+            "rsplit",
+            "rstrip",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "hook_text_matches_prompt_example",
+          "line": 382,
+          "args": [
+            "hook_text"
+          ],
+          "calls": [
+            "_simplify",
+            "isalnum",
+            "join",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "hook_text_too_long_to_glance",
+          "line": 389,
+          "args": [
+            "hook_text"
+          ],
+          "calls": [
+            "len",
+            "split"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "hook_text_matches_story",
+          "line": 394,
+          "args": [
+            "hook_text",
+            "narration_text"
+          ],
+          "calls": [
+            "any",
+            "len",
+            "lower",
+            "split",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "narration_has_engagement_cta",
+          "line": 408,
+          "args": [
+            "narration_text"
+          ],
+          "calls": [
+            "any",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_duplicate_shots",
+          "line": 416,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "Counter",
+            "items",
+            "lower",
+            "strip"
+          ],
+          "docstring": "DUPLICATE-SHOT PADDING FIX (2026-08-06): the free model sometimes"
+        },
+        {
+          "name": "find_empty_shots",
+          "line": 438,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "enumerate",
+            "strip"
+          ],
+          "docstring": "EMPTY-SHOT PADDING FIX (2026-08-03): the free model sometimes runs out"
+        },
+        {
+          "name": "validate_and_normalize",
+          "line": 452,
+          "args": [
+            "result"
+          ],
+          "calls": [
+            "enumerate",
+            "find_duplicate_shots",
+            "find_empty_shots",
+            "get",
+            "hook_text_matches_prompt_example",
+            "hook_text_matches_story",
+            "hook_text_too_long_to_glance",
+            "isinstance",
+            "len",
+            "max",
+            "narration_has_engagement_cta",
+            "normalize_hook_text",
+            "normalize_shot",
+            "split",
+            "strip",
+            "sum"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "generate_script",
+          "line": 561,
+          "args": [
+            "title",
+            "angle"
+          ],
+          "calls": [
+            "RuntimeError",
+            "call_openrouter",
+            "extract_json",
+            "print",
+            "range",
+            "validate_and_normalize"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "save_script",
+          "line": 796,
+          "args": [
+            "topic_id",
+            "narration_text",
+            "shot_list",
+            "music_mood",
+            "hook_text",
+            "setting_and_characters"
+          ],
+          "calls": [
+            "print",
+            "retryable_request"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "mark_topic_scripted",
+          "line": 815,
+          "args": [
+            "topic_id"
+          ],
+          "calls": [
+            "retryable_request"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "mark_topic_generation_failed",
+          "line": 825,
+          "args": [
+            "topic_id",
+            "reason"
+          ],
+          "calls": [
+            "print",
+            "retryable_request"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 839,
+          "args": [],
+          "calls": [
+            "generate_script",
+            "get_next_pending_topic",
+            "mark_topic_generation_failed",
+            "mark_topic_scripted",
+            "print",
+            "save_script",
+            "str"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_simplify",
+          "line": 383,
+          "args": [
+            "s"
+          ],
+          "calls": [
+            "isalnum",
+            "join",
+            "lower"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "OPENROUTER_API_KEY",
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": [
+        "scripts",
+        "topics"
+      ]
+    },
+    {
+      "path": "scripts/test_narration_edgetts.py",
+      "functions": [
+        {
+          "name": "get_sample_script",
+          "line": 74,
+          "args": [],
+          "calls": [
+            "RuntimeError",
+            "get",
+            "json",
+            "raise_for_status"
+          ],
+          "docstring": "Pulls ONE already-published script (status='uploaded') to use as"
+        },
+        {
+          "name": "download_video",
+          "line": 98,
+          "args": [
+            "video_url",
+            "out_path"
+          ],
+          "calls": [
+            "get",
+            "iter_content",
+            "open",
+            "raise_for_status",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "split_sentences",
+          "line": 106,
+          "args": [
+            "text"
+          ],
+          "calls": [
+            "split",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "chunk_shot_durations",
+          "line": 111,
+          "args": [
+            "shot_durations",
+            "n_sentences"
+          ],
+          "calls": [
+            "append",
+            "len",
+            "range",
+            "sum"
+          ],
+          "docstring": "Splits the video's per-shot durations into n_sentences groups, in"
+        },
+        {
+          "name": "synthesize",
+          "line": 129,
+          "args": [
+            "text",
+            "voice",
+            "rate",
+            "out_path"
+          ],
+          "calls": [
+            "Communicate",
+            "save"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_paced_narration",
+          "line": 134,
+          "args": [
+            "text",
+            "voice",
+            "rate",
+            "shot_durations",
+            "out_path",
+            "tmp_dir",
+            "label"
+          ],
+          "calls": [
+            "abs",
+            "chunk_shot_durations",
+            "enumerate",
+            "export",
+            "from_file",
+            "len",
+            "print",
+            "run",
+            "silent",
+            "split_sentences",
+            "synthesize"
+          ],
+          "docstring": "Synthesizes each sentence separately, then pads each one with"
+        },
+        {
+          "name": "mux_audio_onto_video",
+          "line": 163,
+          "args": [
+            "video_path",
+            "audio_path",
+            "out_path"
+          ],
+          "calls": [
+            "RuntimeError",
+            "run"
+          ],
+          "docstring": "Replaces the video's audio track with the new narration track."
+        },
+        {
+          "name": "upload_test_file",
+          "line": 184,
+          "args": [
+            "local_path",
+            "filename",
+            "bucket",
+            "content_type"
+          ],
+          "calls": [
+            "open",
+            "post",
+            "print",
+            "raise_for_status",
+            "read"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 205,
+          "args": [],
+          "calls": [
+            "append",
+            "build_paced_narration",
+            "download_video",
+            "get_sample_script",
+            "len",
+            "mux_audio_onto_video",
+            "print",
+            "split",
+            "time",
+            "upload_test_file"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": [
+        "scripts"
+      ]
+    },
+    {
+      "path": "scripts/test_narration_freellm.py",
+      "functions": [
+        {
+          "name": "get_sample_script",
+          "line": 44,
+          "args": [],
+          "calls": [
+            "RuntimeError",
+            "get",
+            "json",
+            "raise_for_status"
+          ],
+          "docstring": "Pulls ONE already-published script (status='uploaded') to use as"
+        },
+        {
+          "name": "test_freellm_tts",
+          "line": 59,
+          "args": [
+            "text"
+          ],
+          "calls": [
+            "dumps",
+            "encode",
+            "get",
+            "len",
+            "post",
+            "print",
+            "split",
+            "time"
+          ],
+          "docstring": "Calls FreeLLMAPI's /v1/audio/speech once with the full narration"
+        },
+        {
+          "name": "upload_test_audio",
+          "line": 108,
+          "args": [
+            "script_id",
+            "audio_bytes"
+          ],
+          "calls": [
+            "post",
+            "print",
+            "raise_for_status"
+          ],
+          "docstring": "Uploads to a TEST_-prefixed filename - never referenced by any"
+        },
+        {
+          "name": "main",
+          "line": 131,
+          "args": [],
+          "calls": [
+            "exit",
+            "get_sample_script",
+            "len",
+            "print",
+            "test_freellm_tts",
+            "upload_test_audio"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "FREELLM_API_KEY",
+        "FREELLM_API_URL",
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": [
+        "scripts"
+      ]
+    },
+    {
+      "path": "scripts/thumbnail_generation.py",
+      "functions": [
+        {
+          "name": "download_video_frame",
+          "line": 77,
+          "args": [
+            "video_url",
+            "fraction"
+          ],
+          "calls": [
+            "VideoFileClip",
+            "close",
+            "convert",
+            "fromarray",
+            "get",
+            "get_frame",
+            "max",
+            "min",
+            "open",
+            "raise_for_status",
+            "remove",
+            "write"
+          ],
+          "docstring": "Downloads the finished episode video and grabs a real frame from it"
+        },
+        {
+          "name": "resize_to_canvas",
+          "line": 97,
+          "args": [
+            "img",
+            "target_w",
+            "target_h"
+          ],
+          "calls": [
+            "crop",
+            "int",
+            "max",
+            "resize"
+          ],
+          "docstring": "Force-fits img to exactly (target_w, target_h) via a cover-crop:"
+        },
+        {
+          "name": "derive_hook_text",
+          "line": 112,
+          "args": [
+            "script",
+            "shot_list"
+          ],
+          "calls": [
+            "get",
+            "len",
+            "rsplit",
+            "rstrip",
+            "strip"
+          ],
+          "docstring": "Prefers a real hook_text column value. Falls back to shot 1's"
+        },
+        {
+          "name": "split_into_phrase_lines",
+          "line": 130,
+          "args": [
+            "text"
+          ],
+          "calls": [
+            "split",
+            "strip"
+          ],
+          "docstring": "Splits hook text on sentence-ending punctuation so each written"
+        },
+        {
+          "name": "_line_bbox",
+          "line": 139,
+          "args": [
+            "draw",
+            "text",
+            "font"
+          ],
+          "calls": [
+            "textbbox"
+          ],
+          "docstring": "Bounding box that includes the stroke outline, so width/height"
+        },
+        {
+          "name": "wrap_text",
+          "line": 145,
+          "args": [
+            "text",
+            "font",
+            "draw",
+            "max_width"
+          ],
+          "calls": [
+            "_line_bbox",
+            "append",
+            "split",
+            "strip"
+          ],
+          "docstring": "Greedy word wrap, used as a fallback within a single phrase if"
+        },
+        {
+          "name": "fits",
+          "line": 164,
+          "args": [
+            "lines",
+            "font",
+            "draw",
+            "max_width",
+            "max_height"
+          ],
+          "calls": [
+            "_line_bbox",
+            "append",
+            "len",
+            "max",
+            "sum"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "fit_text_to_frame",
+          "line": 177,
+          "args": [
+            "hook_text",
+            "draw",
+            "max_width",
+            "max_height"
+          ],
+          "calls": [
+            "extend",
+            "fits",
+            "split_into_phrase_lines",
+            "truetype",
+            "upper",
+            "wrap_text"
+          ],
+          "docstring": "Try progressively smaller font sizes until the phrase-per-line"
+        },
+        {
+          "name": "overlay_hook_text",
+          "line": 201,
+          "args": [
+            "img",
+            "hook_text"
+          ],
+          "calls": [
+            "BytesIO",
+            "Draw",
+            "_line_bbox",
+            "append",
+            "enumerate",
+            "fit_text_to_frame",
+            "getvalue",
+            "len",
+            "resize_to_canvas",
+            "save",
+            "sum",
+            "text"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "push_thumbnail_to_youtube",
+          "line": 240,
+          "args": [
+            "youtube_video_id",
+            "image_bytes"
+          ],
+          "calls": [
+            "json",
+            "len",
+            "post",
+            "print",
+            "raise_for_status",
+            "str"
+          ],
+          "docstring": "Pushes a thumbnail directly to an already-live YouTube video."
+        },
+        {
+          "name": "main",
+          "line": 289,
+          "args": [],
+          "calls": [
+            "create_client",
+            "derive_hook_text",
+            "download_video_frame",
+            "eq",
+            "execute",
+            "from_",
+            "get",
+            "get_public_url",
+            "in_",
+            "is_",
+            "isinstance",
+            "limit",
+            "loads",
+            "order",
+            "overlay_hook_text",
+            "print",
+            "push_thumbnail_to_youtube",
+            "select",
+            "table",
+            "update",
+            "upload"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL",
+        "YOUTUBE_CLIENT_ID",
+        "YOUTUBE_CLIENT_SECRET",
+        "YOUTUBE_REFRESH_TOKEN"
+      ],
+      "tables": []
+    },
+    {
+      "path": "scripts/topic_research.py",
+      "functions": [
+        {
+          "name": "get_existing_titles",
+          "line": 33,
+          "args": [],
+          "calls": [
+            "get",
+            "json",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "call_openrouter",
+          "line": 43,
+          "args": [
+            "prompt"
+          ],
+          "calls": [
+            "RuntimeError",
+            "json",
+            "post",
+            "print",
+            "raise_for_status",
+            "range",
+            "sleep"
+          ],
+          "docstring": "Call OpenRouter's free auto-router, retrying with backoff on 429s."
+        },
+        {
+          "name": "generate_topics",
+          "line": 71,
+          "args": [
+            "existing_titles"
+          ],
+          "calls": [
+            "call_openrouter",
+            "join",
+            "loads",
+            "split",
+            "startswith",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "save_topic",
+          "line": 97,
+          "args": [
+            "title",
+            "angle"
+          ],
+          "calls": [
+            "post",
+            "print",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 108,
+          "args": [],
+          "calls": [
+            "generate_topics",
+            "get",
+            "get_existing_titles",
+            "len",
+            "lower",
+            "print",
+            "save_topic",
+            "strip"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "OPENROUTER_API_KEY",
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": [
+        "topics"
+      ]
+    },
+    {
+      "path": "scripts/update_status.py",
+      "functions": [],
+      "env_vars": [
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": []
+    },
+    {
+      "path": "scripts/video_generation.py",
+      "functions": [
+        {
+          "name": "round_to_valid_frames",
+          "line": 363,
+          "args": [
+            "num_frames"
+          ],
+          "calls": [
+            "ceil",
+            "max"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "get_ready_scripts",
+          "line": 375,
+          "args": [
+            "limit"
+          ],
+          "calls": [
+            "get",
+            "json",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "download_file",
+          "line": 385,
+          "args": [
+            "url",
+            "out_path"
+          ],
+          "calls": [
+            "get",
+            "open",
+            "raise_for_status",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_agnes_prompt",
+          "line": 406,
+          "args": [
+            "shot",
+            "setting_and_characters",
+            "use_fallback"
+          ],
+          "calls": [
+            "any",
+            "append",
+            "get",
+            "join",
+            "lower",
+            "replace",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_character_reference_prompt",
+          "line": 440,
+          "args": [
+            "setting_and_characters"
+          ],
+          "calls": [
+            "join",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "generate_character_reference",
+          "line": 451,
+          "args": [
+            "script"
+          ],
+          "calls": [
+            "build_character_reference_prompt",
+            "get",
+            "isinstance",
+            "json",
+            "patch",
+            "post",
+            "print",
+            "raise_for_status",
+            "range",
+            "sleep",
+            "str",
+            "strip"
+          ],
+          "docstring": "Generates ONE reference image per script (via agnes-image-2.1-flash),"
+        },
+        {
+          "name": "upload_reference_image",
+          "line": 532,
+          "args": [
+            "script_id",
+            "file_name",
+            "local_path"
+          ],
+          "calls": [
+            "open",
+            "print",
+            "put",
+            "read"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "extract_last_frame_url",
+          "line": 553,
+          "args": [
+            "script_id",
+            "shot_index",
+            "local_video_path"
+          ],
+          "calls": [
+            "VideoFileClip",
+            "close",
+            "fromarray",
+            "get_frame",
+            "max",
+            "print",
+            "remove",
+            "replace",
+            "save",
+            "upload_reference_image"
+          ],
+          "docstring": "Pulls the final frame of a just-generated (or already-downloaded) shot"
+        },
+        {
+          "name": "get_continuity_anchor",
+          "line": 578,
+          "args": [
+            "script",
+            "video_urls"
+          ],
+          "calls": [
+            "download_file",
+            "extract_last_frame_url",
+            "generate_character_reference",
+            "len",
+            "print",
+            "remove"
+          ],
+          "docstring": "Reconstructs the correct anchor image for the NEXT shot to generate:"
+        },
+        {
+          "name": "create_agnes_task",
+          "line": 601,
+          "args": [
+            "prompt",
+            "num_frames",
+            "image_url"
+          ],
+          "calls": [
+            "AgnesOverloadedError",
+            "ContentPolicyRejection",
+            "get",
+            "json",
+            "post",
+            "print",
+            "raise_for_status",
+            "range",
+            "sleep"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "extract_video_url",
+          "line": 643,
+          "args": [
+            "data"
+          ],
+          "calls": [
+            "endswith",
+            "get",
+            "isinstance",
+            "startswith",
+            "values"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "poll_agnes_task",
+          "line": 654,
+          "args": [
+            "video_id",
+            "max_wait",
+            "interval"
+          ],
+          "calls": [
+            "AgnesOverloadedError",
+            "ContentPolicyRejection",
+            "RuntimeError",
+            "extract_video_url",
+            "get",
+            "json",
+            "print",
+            "raise_for_status",
+            "sleep"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_generate_one_segment",
+          "line": 682,
+          "args": [
+            "shot",
+            "segment_duration",
+            "out_path",
+            "setting_and_characters",
+            "anchor_image_url"
+          ],
+          "calls": [
+            "build_agnes_prompt",
+            "create_agnes_task",
+            "download_file",
+            "int",
+            "max",
+            "min",
+            "poll_agnes_task",
+            "print",
+            "round_to_valid_frames"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_extract_last_frame_local",
+          "line": 701,
+          "args": [
+            "video_path"
+          ],
+          "calls": [
+            "VideoFileClip",
+            "close",
+            "fromarray",
+            "get_frame",
+            "max",
+            "replace",
+            "save"
+          ],
+          "docstring": "Extracts the last frame of a local clip file and uploads it nowhere -"
+        },
+        {
+          "name": "_upload_local_image_for_anchor",
+          "line": 715,
+          "args": [
+            "script_id",
+            "tag",
+            "png_path"
+          ],
+          "calls": [
+            "remove",
+            "upload_reference_image"
+          ],
+          "docstring": "Chain-extension anchors must be passed to Agnes as a URL (same as"
+        },
+        {
+          "name": "generate_shot_clip",
+          "line": 725,
+          "args": [
+            "shot",
+            "target_duration",
+            "out_path",
+            "setting_and_characters",
+            "anchor_image_url",
+            "script_id"
+          ],
+          "calls": [
+            "VideoFileClip",
+            "_extract_last_frame_local",
+            "_generate_one_segment",
+            "_upload_local_image_for_anchor",
+            "append",
+            "basename",
+            "close",
+            "concatenate_videoclips",
+            "exists",
+            "fit_clip_to_duration",
+            "min",
+            "print",
+            "remove",
+            "replace",
+            "write_videofile"
+          ],
+          "docstring": "ONE-TAKE FIX (2026-07-29): a shot longer than MAX_CLIP_SECONDS used to"
+        },
+        {
+          "name": "fit_clip_to_duration",
+          "line": 806,
+          "args": [
+            "clip",
+            "target"
+          ],
+          "calls": [
+            "concatenate_videoclips",
+            "max",
+            "subclipped",
+            "to_ImageClip",
+            "with_duration",
+            "with_fps"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "fit_audio_to_duration",
+          "line": 816,
+          "args": [
+            "audio_clip",
+            "target"
+          ],
+          "calls": [
+            "concatenate_audioclips",
+            "int",
+            "subclipped"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "upload_clip",
+          "line": 824,
+          "args": [
+            "script_id",
+            "index",
+            "file_path"
+          ],
+          "calls": [
+            "open",
+            "print",
+            "put",
+            "raise_for_status",
+            "read"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "save_progress",
+          "line": 845,
+          "args": [
+            "script_id",
+            "video_urls",
+            "next_index"
+          ],
+          "calls": [
+            "patch",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "mark_content_flagged",
+          "line": 855,
+          "args": [
+            "script_id",
+            "shot_index",
+            "reason"
+          ],
+          "calls": [
+            "patch",
+            "print",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "compute_shot_durations",
+          "line": 866,
+          "args": [
+            "shot_list",
+            "total_duration"
+          ],
+          "calls": [
+            "get",
+            "len",
+            "max",
+            "sum"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "get_shot_durations",
+          "line": 872,
+          "args": [
+            "script",
+            "shot_list",
+            "audio_clip"
+          ],
+          "calls": [
+            "all",
+            "compute_shot_durations",
+            "get",
+            "isinstance",
+            "len",
+            "list",
+            "print"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "compute_shot_start_times",
+          "line": 885,
+          "args": [
+            "shot_durations"
+          ],
+          "calls": [
+            "append"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "compute_target_bitrate",
+          "line": 894,
+          "args": [
+            "duration_seconds",
+            "target_mb",
+            "audio_kbps"
+          ],
+          "calls": [
+            "int",
+            "max"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "poll_ace_music_task",
+          "line": 901,
+          "args": [
+            "task_id",
+            "out_path",
+            "base_url",
+            "max_wait",
+            "interval"
+          ],
+          "calls": [
+            "get",
+            "json",
+            "loads",
+            "open",
+            "post",
+            "print",
+            "raise_for_status",
+            "sleep",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "generate_background_music",
+          "line": 940,
+          "args": [
+            "prompt",
+            "duration",
+            "out_path"
+          ],
+          "calls": [
+            "generate_background_music_musicgen",
+            "get",
+            "int",
+            "json",
+            "max",
+            "min",
+            "poll_ace_music_task",
+            "post",
+            "print"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "generate_background_music_musicgen",
+          "line": 974,
+          "args": [
+            "prompt",
+            "duration",
+            "out_path"
+          ],
+          "calls": [
+            "get",
+            "int",
+            "json",
+            "min",
+            "open",
+            "post",
+            "print",
+            "sleep",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "search_freesound_sfx",
+          "line": 1015,
+          "args": [
+            "query",
+            "out_path"
+          ],
+          "calls": [
+            "download_file",
+            "get",
+            "json",
+            "print"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "apply_safety_limiter",
+          "line": 1050,
+          "args": [
+            "audio_clip",
+            "ceiling"
+          ],
+          "calls": [
+            "abs",
+            "float",
+            "max",
+            "print",
+            "to_soundarray",
+            "with_volume_scaled"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "extract_original_clip_audio",
+          "line": 1070,
+          "args": [
+            "video_clips",
+            "shot_durations",
+            "shot_starts",
+            "total_duration"
+          ],
+          "calls": [
+            "append",
+            "enumerate",
+            "print",
+            "subclipped",
+            "with_start",
+            "with_volume_scaled"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_audio_mix",
+          "line": 1087,
+          "args": [
+            "narration_path",
+            "music_mood",
+            "shot_list",
+            "shot_durations",
+            "shot_starts",
+            "total_duration",
+            "original_clip_audio_layers"
+          ],
+          "calls": [
+            "AudioFileClip",
+            "CompositeAudioClip",
+            "append",
+            "apply_safety_limiter",
+            "enumerate",
+            "extend",
+            "fit_audio_to_duration",
+            "generate_background_music",
+            "get",
+            "len",
+            "print",
+            "search_freesound_sfx",
+            "strip",
+            "subclipped",
+            "with_start",
+            "with_volume_scaled"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_load_caption_font",
+          "line": 1127,
+          "args": [
+            "size"
+          ],
+          "calls": [
+            "exists",
+            "load_default",
+            "print",
+            "truetype"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_wrap_caption_text",
+          "line": 1138,
+          "args": [
+            "text",
+            "font",
+            "max_width",
+            "draw"
+          ],
+          "calls": [
+            "append",
+            "split",
+            "strip",
+            "textbbox"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "render_caption_image",
+          "line": 1155,
+          "args": [
+            "text",
+            "video_width",
+            "video_height"
+          ],
+          "calls": [
+            "Draw",
+            "_load_caption_font",
+            "_wrap_caption_text",
+            "append",
+            "int",
+            "len",
+            "max",
+            "new",
+            "rounded_rectangle",
+            "strip",
+            "text",
+            "textbbox",
+            "zip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_caption_clip",
+          "line": 1201,
+          "args": [
+            "text",
+            "start",
+            "duration",
+            "video_width",
+            "video_height"
+          ],
+          "calls": [
+            "ImageClip",
+            "array",
+            "print",
+            "render_caption_image",
+            "with_start"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_caption_clips",
+          "line": 1215,
+          "args": [
+            "shot_list",
+            "shot_durations",
+            "shot_starts",
+            "video_width",
+            "video_height"
+          ],
+          "calls": [
+            "append",
+            "build_caption_clip",
+            "enumerate",
+            "get",
+            "len",
+            "print",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "assemble_final_video",
+          "line": 1228,
+          "args": [
+            "script_id",
+            "video_urls",
+            "narration_path",
+            "music_mood",
+            "shot_list",
+            "shot_durations",
+            "output_path",
+            "setting_and_characters"
+          ],
+          "calls": [
+            "AudioFadeIn",
+            "AudioFadeOut",
+            "FadeIn",
+            "FadeOut",
+            "VideoFileClip",
+            "_extract_last_frame_local",
+            "_generate_one_segment",
+            "_upload_local_image_for_anchor",
+            "append",
+            "basename",
+            "build_audio_mix",
+            "compute_shot_start_times",
+            "compute_target_bitrate",
+            "concatenate_videoclips",
+            "download_file",
+            "enumerate",
+            "extract_original_clip_audio",
+            "fit_clip_to_duration",
+            "len",
+            "min",
+            "print",
+            "replace",
+            "resized",
+            "sum",
+            "with_audio",
+            "with_effects",
+            "write_videofile"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "upload_video",
+          "line": 1311,
+          "args": [
+            "script_id",
+            "file_path"
+          ],
+          "calls": [
+            "getsize",
+            "open",
+            "print",
+            "put",
+            "raise_for_status",
+            "read"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "mark_video_generated",
+          "line": 1335,
+          "args": [
+            "script_id",
+            "video_url",
+            "audio_stats"
+          ],
+          "calls": [
+            "get",
+            "patch",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "process_script",
+          "line": 1349,
+          "args": [
+            "script",
+            "shot_limit"
+          ],
+          "calls": [
+            "AudioFileClip",
+            "append",
+            "assemble_final_video",
+            "download_file",
+            "endswith",
+            "enumerate",
+            "extract_last_frame_url",
+            "generate_shot_clip",
+            "get",
+            "get_continuity_anchor",
+            "get_shot_durations",
+            "head",
+            "isinstance",
+            "len",
+            "loads",
+            "mark_content_flagged",
+            "mark_video_generated",
+            "min",
+            "print",
+            "range",
+            "remove",
+            "save_progress",
+            "sleep",
+            "str",
+            "upload_clip",
+            "upload_video"
+          ],
+          "docstring": "Attempts up to shot_limit new shot generations on a single candidate"
+        },
+        {
+          "name": "main",
+          "line": 1499,
+          "args": [],
+          "calls": [
+            "get_ready_scripts",
+            "len",
+            "print",
+            "process_script"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "ACE_MUSIC_API_KEY",
+        "AGNES_API_KEY",
+        "FREESOUND_API_KEY",
+        "HF_TOKEN",
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": [
+        "scripts"
+      ]
+    },
+    {
+      "path": "scripts/youtube_upload.py",
+      "functions": [
+        {
+          "name": "get_access_token",
+          "line": 60,
+          "args": [],
+          "calls": [
+            "json",
+            "post",
+            "print",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "get_authorized_channel",
+          "line": 77,
+          "args": [
+            "access_token"
+          ],
+          "calls": [
+            "RuntimeError",
+            "get",
+            "json",
+            "raise_for_status"
+          ],
+          "docstring": "Asks YouTube which channel the current access token is actually"
+        },
+        {
+          "name": "get_next_ready_script",
+          "line": 98,
+          "args": [],
+          "calls": [
+            "get",
+            "json",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "get_topic_title",
+          "line": 109,
+          "args": [
+            "topic_id"
+          ],
+          "calls": [
+            "get",
+            "json",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "download_file",
+          "line": 120,
+          "args": [
+            "url",
+            "out_path"
+          ],
+          "calls": [
+            "get",
+            "open",
+            "raise_for_status",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_description",
+          "line": 128,
+          "args": [
+            "narration_text"
+          ],
+          "calls": [
+            "len",
+            "max",
+            "rfind",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "upload_to_youtube",
+          "line": 154,
+          "args": [
+            "access_token",
+            "video_path",
+            "title",
+            "description"
+          ],
+          "calls": [
+            "getsize",
+            "json",
+            "open",
+            "post",
+            "print",
+            "put",
+            "raise_for_status",
+            "read",
+            "str"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "set_thumbnail",
+          "line": 204,
+          "args": [
+            "access_token",
+            "youtube_id",
+            "thumbnail_path"
+          ],
+          "calls": [
+            "getsize",
+            "open",
+            "post",
+            "print",
+            "read",
+            "str"
+          ],
+          "docstring": "Best-effort: a thumbnail failure should never fail the whole upload,"
+        },
+        {
+          "name": "mark_uploaded",
+          "line": 228,
+          "args": [
+            "script_id",
+            "youtube_id"
+          ],
+          "calls": [
+            "patch",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 238,
+          "args": [],
+          "calls": [
+            "RuntimeError",
+            "build_description",
+            "download_file",
+            "get",
+            "get_access_token",
+            "get_authorized_channel",
+            "get_next_ready_script",
+            "get_topic_title",
+            "lower",
+            "mark_uploaded",
+            "print",
+            "set_thumbnail",
+            "strip",
+            "upload_to_youtube"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "EXPECTED_YOUTUBE_CHANNEL_TITLE",
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL",
+        "YOUTUBE_CLIENT_ID",
+        "YOUTUBE_CLIENT_SECRET",
+        "YOUTUBE_REFRESH_TOKEN"
+      ],
+      "tables": [
+        "scripts",
+        "topics"
+      ]
+    }
+  ]
+}
