@@ -87,6 +87,20 @@ find_duplicate_shots now rejects any script where the same
 MAX_SHOT_REPEAT_COUNT times - both trigger a retry/regeneration exactly
 like the other validation failures in this file, instead of silently
 saving a script that will play as a frozen, repeating video.
+
+ATTEMPT BUDGET FIX (2026-08-06): confirmed in production the same day the
+fix above shipped - Script Writing run #76 burned all 5 of
+MAX_GENERATION_ATTEMPTS and ended with the topic marked
+'generation_failed', producing zero new scripts, even though the workflow
+itself reported a clean "completed" run (main() catches the exhausted-
+attempts RuntimeError and returns normally, so this fails silently with no
+GitHub issue opened - only visible by checking the topics table directly).
+The new validation now stacks FIVE independent hard requirements on every
+single attempt (900+ word narration, a valid CTA, correct hook text, no
+empty shots, no shot repeated more than twice) - a free/weaker model needs
+more than 5 tries to land all of them at once. Raised to 8 attempts. This
+does not weaken any check; it just gives the model a fairer number of
+shots at clearing the same bar.
 """
 
 import os
@@ -108,7 +122,7 @@ HEADERS = {
 MAX_RETRIES = 4
 MIN_SHOTS = 60
 MAX_SHOTS = 85
-MAX_GENERATION_ATTEMPTS = 5
+MAX_GENERATION_ATTEMPTS = 8
 MAX_HOOK_TEXT_CHARS = 40
 MAX_HOOK_TEXT_WORDS = 5
 MIN_SETTING_CHARS = 40
