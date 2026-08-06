@@ -113,6 +113,23 @@ found inside JSON string literals (escaping \n, \r, \t and stripping any
 other stray control byte) before handing the text to json.loads, so a
 model that forgets to escape a newline inside a string no longer costs a
 full generation attempt.
+
+HTTP-ENVELOPE JSON FIX (2026-08-06): a malformed/truncated response body
+from OpenRouter itself (not the model's script JSON) used to crash the
+whole workflow uncaught, since only 429s and network-level exceptions were
+retried. call_openrouter now also retries a malformed/unparseable response
+envelope the same way.
+
+INDENTATION FIX (2026-08-06): the HTTP-ENVELOPE JSON FIX above was pasted
+with the "if resp.status_code == 429:" line one level under-indented
+relative to the surrounding try/except block. Python raised an
+IndentationError on module load, so the ENTIRE script crashed before
+executing a single line - every script_writing.py run failed instantly
+from the moment that commit landed. This is why 200 topics backed up in
+'pending' with zero new scripts reaching the scripts table, which in turn
+starved the narration workflow (correctly running every 30 min, but with
+nothing in the queue to narrate). Fixed by restoring the correct
+indentation - no logic changed, this is a pure syntax fix.
 """
 
 import os
@@ -246,7 +263,7 @@ def call_openrouter(prompt):
             time.sleep(wait)
             continue
 
-      if resp.status_code == 429:
+        if resp.status_code == 429:
             wait = (attempt + 1) * 15
             print(f"Rate limited, waiting {wait}s before retry...")
             time.sleep(wait)
@@ -268,7 +285,6 @@ def call_openrouter(prompt):
             last_error = e
             time.sleep(wait)
             continue
-        return resp.json()["choices"][0]["message"]["content"]
 
     if isinstance(last_error, Exception) and not hasattr(last_error, "text"):
         raise RuntimeError(f"OpenRouter still failing after {MAX_RETRIES} attempts: {last_error}")
