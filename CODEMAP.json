@@ -405,10 +405,316 @@
     },
     {
       "path": "scripts/script_writing.py",
-      "parse_error": "unindent does not match any outer indentation level (script_writing.py, line 249)",
-      "functions": [],
-      "env_vars": [],
-      "tables": []
+      "functions": [
+        {
+          "name": "retryable_request",
+          "line": 196,
+          "args": [
+            "method",
+            "url",
+            "max_retries"
+          ],
+          "calls": [
+            "RuntimeError",
+            "isinstance",
+            "print",
+            "raise_for_status",
+            "range",
+            "request",
+            "sleep"
+          ],
+          "docstring": "SUPABASE CALL HARDENING (2026-08-05): shared retry wrapper for the"
+        },
+        {
+          "name": "get_next_pending_topic",
+          "line": 232,
+          "args": [],
+          "calls": [
+            "json",
+            "retryable_request"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "call_openrouter",
+          "line": 243,
+          "args": [
+            "prompt"
+          ],
+          "calls": [
+            "RuntimeError",
+            "hasattr",
+            "isinstance",
+            "json",
+            "post",
+            "print",
+            "raise_for_status",
+            "range",
+            "sleep"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "sanitize_json_control_chars",
+          "line": 294,
+          "args": [
+            "text"
+          ],
+          "calls": [
+            "append",
+            "join",
+            "ord"
+          ],
+          "docstring": "CONTROL-CHARACTER JSON FIX (2026-08-06): the free model sometimes emits"
+        },
+        {
+          "name": "extract_json",
+          "line": 343,
+          "args": [
+            "raw_text"
+          ],
+          "calls": [
+            "ValueError",
+            "find",
+            "loads",
+            "rfind",
+            "sanitize_json_control_chars",
+            "split",
+            "startswith",
+            "str",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "normalize_shot",
+          "line": 372,
+          "args": [
+            "shot",
+            "index"
+          ],
+          "calls": [
+            "get"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "normalize_hook_text",
+          "line": 397,
+          "args": [
+            "result"
+          ],
+          "calls": [
+            "get",
+            "len",
+            "rsplit",
+            "rstrip",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "hook_text_matches_prompt_example",
+          "line": 413,
+          "args": [
+            "hook_text"
+          ],
+          "calls": [
+            "_simplify",
+            "isalnum",
+            "join",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "hook_text_too_long_to_glance",
+          "line": 420,
+          "args": [
+            "hook_text"
+          ],
+          "calls": [
+            "len",
+            "split"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "hook_text_matches_story",
+          "line": 425,
+          "args": [
+            "hook_text",
+            "narration_text"
+          ],
+          "calls": [
+            "any",
+            "len",
+            "lower",
+            "split",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "narration_has_engagement_cta",
+          "line": 439,
+          "args": [
+            "narration_text"
+          ],
+          "calls": [
+            "any",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_duplicate_shots",
+          "line": 447,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "Counter",
+            "items",
+            "lower",
+            "strip"
+          ],
+          "docstring": "DUPLICATE-SHOT PADDING FIX (2026-08-06): the free model sometimes"
+        },
+        {
+          "name": "find_empty_shots",
+          "line": 469,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "enumerate",
+            "strip"
+          ],
+          "docstring": "EMPTY-SHOT PADDING FIX (2026-08-03): the free model sometimes runs out"
+        },
+        {
+          "name": "validate_and_normalize",
+          "line": 483,
+          "args": [
+            "result"
+          ],
+          "calls": [
+            "enumerate",
+            "find_duplicate_shots",
+            "find_empty_shots",
+            "get",
+            "hook_text_matches_prompt_example",
+            "hook_text_matches_story",
+            "hook_text_too_long_to_glance",
+            "isinstance",
+            "len",
+            "max",
+            "narration_has_engagement_cta",
+            "normalize_hook_text",
+            "normalize_shot",
+            "split",
+            "strip",
+            "sum"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "generate_script",
+          "line": 592,
+          "args": [
+            "title",
+            "angle"
+          ],
+          "calls": [
+            "RuntimeError",
+            "call_openrouter",
+            "extract_json",
+            "print",
+            "range",
+            "validate_and_normalize"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "save_script",
+          "line": 827,
+          "args": [
+            "topic_id",
+            "narration_text",
+            "shot_list",
+            "music_mood",
+            "hook_text",
+            "setting_and_characters"
+          ],
+          "calls": [
+            "print",
+            "retryable_request"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "mark_topic_scripted",
+          "line": 846,
+          "args": [
+            "topic_id"
+          ],
+          "calls": [
+            "retryable_request"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "mark_topic_generation_failed",
+          "line": 856,
+          "args": [
+            "topic_id",
+            "reason"
+          ],
+          "calls": [
+            "print",
+            "retryable_request"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 870,
+          "args": [],
+          "calls": [
+            "generate_script",
+            "get_next_pending_topic",
+            "mark_topic_generation_failed",
+            "mark_topic_scripted",
+            "print",
+            "save_script",
+            "str"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_simplify",
+          "line": 414,
+          "args": [
+            "s"
+          ],
+          "calls": [
+            "isalnum",
+            "join",
+            "lower"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "OPENROUTER_API_KEY",
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": [
+        "scripts",
+        "topics"
+      ]
     },
     {
       "path": "scripts/test_narration_edgetts.py",
