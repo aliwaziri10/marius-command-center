@@ -209,8 +209,27 @@ MAX_SHOT_REPEAT_COUNT = 2
 # MODEL FALLBACK PARAM FIX (2026-08-06): sent as ONE "models" list with
 # the primary first - OpenRouter's documented fallback shape - never as a
 # separate "model" key alongside "models".
+MAX_RETRIES = 4
+MIN_SHOTS = 60
+MAX_SHOTS = 85
+MAX_GENERATION_ATTEMPTS = 8
+MAX_HOOK_TEXT_CHARS = 40
+MAX_HOOK_TEXT_WORDS = 5
+MIN_SETTING_CHARS = 40
+MAX_SETTING_CHARS = 900
+MIN_NARRATION_WORDS = 900
+MAX_SHOT_REPEAT_COUNT = 2
+
+# MODEL SELECTION FIX (2026-08-06): pinned primary + stable fallback,
+# replacing the random "openrouter/free" auto-router. See file docstring.
+# MODEL FALLBACK PARAM FIX (2026-08-06): sent as ONE "models" list with
+# the primary first - OpenRouter's documented fallback shape - never as a
+# separate "model" key alongside "models".
 OPENROUTER_MODEL = "openai/gpt-oss-120b:free"
 OPENROUTER_MODEL_FALLBACKS = ["meta-llama/llama-3.3-70b-instruct:free"]
+OPENROUTER_MODELS_PAYLOAD = [OPENROUTER_MODEL] + OPENROUTER_MODEL_FALLBACKS
+
+EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 OPENROUTER_MODELS_PAYLOAD = [OPENROUTER_MODEL] + OPENROUTER_MODEL_FALLBACKS
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
