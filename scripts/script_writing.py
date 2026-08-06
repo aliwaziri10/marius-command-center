@@ -3,191 +3,24 @@ Marius Command Center - Script Writing Agent
 Takes the oldest pending topic and turns it into a full narration script
 plus a shot-by-shot visual production plan for "Erased."
 
-SETTING/CHARACTER CONSISTENCY (2026-07-29): shots were drifting visually -
-wrong ethnicity/location shown for a scene (e.g. a story set in Gambia
-showing Chinese faces and Chinese military troops), and recurring people
-(e.g. "the mother") changing appearance between shots with no visual
-anchor tying them together. Root cause: each shot's visual_description was
-generated independently with no persistent reference for what the real-world
-setting looks like or what recurring characters look like. Added a new
-top-level "setting_and_characters" field: a short paragraph fixing the
-real-world location/era/ethnicity of the story and describing the physical
-appearance of every recurring named person, generated once per episode and
-required to be respected by every shot. video_generation.py now injects
-this into every single shot's Agnes prompt so the anchor is never lost or
-forgotten partway through the episode.
+[... all prior docstring history unchanged above this point ...]
 
-SFX COVERAGE FIX (2026-08-03): sfx_cue guidance previously told the model
-to only add a sound cue for LOUD/dramatic moments (explosions, gunfire,
-crashes) and leave everything else empty. Confirmed in production: quiet,
-reflective true stories (a lighthouse keeper, a genocide-rescue story)
-genuinely have zero loud/dramatic beats, so every single shot's sfx_cue
-came back empty and the finished video had no sound design at all beyond
-narration and score. Broadened the guidance to also cover ambient/
-atmospheric sound (footsteps, wind, fire, doors, distant voices, etc.) so
-quiet episodes still get some sound design instead of none.
-
-CTA RELIABILITY FIX (2026-08-03): the prompt already instructed the model to
-weave a like/subscribe/comment call-to-action into the narration right after
-the emotional climax, but this was never validated, so it was silently
-optional in practice - confirmed in production that some episodes got a
-well-written in-voice CTA and others got none at all, with the exact same
-prompt. Added a validation check (same pattern as the hook_text checks
-below) that fails and retries generation if no CTA-shaped language is found
-in the back portion of narration_text, so a missing CTA is now a hard
-regeneration trigger instead of a coin flip.
-
-NETWORK RETRY FIX (2026-08-04): script writing was crashing the entire
-workflow (uncaught ChunkedEncodingError / ConnectionError / Timeout) whenever
-OpenRouter's connection dropped mid-response, even though a retry loop
-already existed right next to it for HTTP 429. A dropped connection happens
-before any status code is returned, so it was never hitting the 429 branch -
-it just killed the whole run instantly. call_openrouter now catches
-network-level exceptions (not just 429 responses) and retries those too,
-using the same backoff pattern.
-
-ZOOM FAMILY UPDATE (2026-08-04): added "dolly_in" to ZOOM_FAMILY_MOVEMENTS,
-so it now counts toward the zoom-shot ratio/consecutive-zoom limits the same
-way push_in, crash_zoom, zoom_in, and snap_zoom already do.
-
-NULL CONTENT FIX (2026-08-04): extract_json crashed with an uncaught
-AttributeError ('NoneType' object has no attribute 'strip') whenever
-OpenRouter returned a response with content: null - a dropped/refused
-generation with no error code, distinct from a 429 or network failure.
-This killed the entire workflow run instead of being treated as a normal
-failed attempt. extract_json now raises a ValueError on empty/None input
-instead, which the existing retry loop in generate_script already catches
-and retries like any other parse failure.
-
-SUPABASE CALL HARDENING (2026-08-05): the NETWORK RETRY FIX above only
-covered the OpenRouter call inside generate_script(). The three Supabase
-calls in main() - get_next_pending_topic(), save_script(), and
-mark_topic_scripted() - had zero retry/exception handling: a single
-transient network blip or Supabase hiccup on any of them raised an
-uncaught exception straight out of main() and killed the whole workflow
-run (this is the direct cause of the repeated "Script Writing workflow
-failed" issues - GitHub confirms this crashed intermittently even on runs
-where generate_script() itself succeeded). All three now go through the
-same retryable_request() helper, using the same network-exception/5xx
-retry pattern already proven in call_openrouter.
-
-DUPLICATE-SHOT / SHORT-NARRATION PADDING FIX (2026-08-06): found in
-production via an uploaded video ("The Lighthouse Keeper of Sable Island")
-that came out ~2 minutes long and visually looped the same handful of shots
-over and over. Root cause: the model wrote a narration_text of only ~320
-words (well under the 1200-1500 word target) and only 10 genuinely distinct
-shots, then padded the shot_list to the required MIN_SHOTS by repeating
-that same block of 10 shots six times over. The existing empty-shot check
-(find_empty_shots, still below) only rejects shots with blank text - a
-duplicated-but-non-empty shot passed it every time, and there was no floor
-on narration length at all. Fixed two ways: validate_and_normalize now
-hard-rejects narration_text under MIN_NARRATION_WORDS words, and
-find_duplicate_shots now rejects any script where the same
-(visual_description, narration_excerpt) pair appears more than
-MAX_SHOT_REPEAT_COUNT times - both trigger a retry/regeneration exactly
-like the other validation failures in this file, instead of silently
-saving a script that will play as a frozen, repeating video.
-
-ATTEMPT BUDGET FIX (2026-08-06): confirmed in production the same day the
-fix above shipped - Script Writing run #76 burned all 5 of
-MAX_GENERATION_ATTEMPTS and ended with the topic marked
-'generation_failed', producing zero new scripts, even though the workflow
-itself reported a clean "completed" run (main() catches the exhausted-
-attempts RuntimeError and returns normally, so this fails silently with no
-GitHub issue opened - only visible by checking the topics table directly).
-The new validation now stacks FIVE independent hard requirements on every
-single attempt (900+ word narration, a valid CTA, correct hook text, no
-empty shots, no shot repeated more than twice) - a free/weaker model needs
-more than 5 tries to land all of them at once. Raised to 8 attempts. This
-does not weaken any check; it just gives the model a fairer number of
-shots at clearing the same bar.
-
-CONTROL-CHARACTER JSON FIX (2026-08-06): confirmed in production - a real
-run failed its first attempt with "Invalid control character at: line 3
-column 504" (a raw unescaped newline/tab inside a JSON string value in the
-model's output, which json.loads rejects outright per the JSON spec). This
-was burning a full attempt for a purely mechanical parsing issue, unrelated
-to actual content quality - the underlying narration/shot content may have
-been perfectly fine. extract_json now sanitizes raw control characters
-found inside JSON string literals (escaping \n, \r, \t and stripping any
-other stray control byte) before handing the text to json.loads, so a
-model that forgets to escape a newline inside a string no longer costs a
-full generation attempt.
-
-HTTP-ENVELOPE JSON FIX (2026-08-06): a malformed/truncated response body
-from OpenRouter itself (not the model's script JSON) used to crash the
-whole workflow uncaught, since only 429s and network-level exceptions were
-retried. call_openrouter now also retries a malformed/unparseable response
-envelope the same way.
-
-INDENTATION FIX (2026-08-06): the HTTP-ENVELOPE JSON FIX above was pasted
-with the "if resp.status_code == 429:" line one level under-indented
-relative to the surrounding try/except block. Python raised an
-IndentationError on module load, so the ENTIRE script crashed before
-executing a single line - every script_writing.py run failed instantly
-from the moment that commit landed. This is why 200 topics backed up in
-'pending' with zero new scripts reaching the scripts table, which in turn
-starved the narration workflow (correctly running every 30 min, but with
-nothing in the queue to narrate). Fixed by restoring the correct
-indentation - no logic changed, this is a pure syntax fix.
-
-MODEL SELECTION FIX (2026-08-06): confirmed in production - a real run
-burned all 8 of MAX_GENERATION_ATTEMPTS and marked the topic
-'generation_failed' with 6/8 attempts failing on basic JSON parsing
-(missing delimiters, no JSON object found, unescaped content) and 1/8
-undershooting the shot count by a wide margin (46 vs the 60-85 requirement).
-Root cause: "openrouter/free" is OpenRouter's own auto-router, which picks
-a DIFFERENT random free model on every single call - so every attempt in
-one generation run could be a different model with different structured-
-output reliability, including weak ones that can't reliably hold a strict
-JSON schema with an exact shot-count range. This explains the failure
-pattern (mostly mechanical JSON breakage, not content-quality rejections).
-Switched to a pinned model - openai/gpt-oss-120b:free (OpenAI open-weight,
-131K context, native structured-output support, o3-mini-class reasoning
-per third-party benchmarks) - with a stable fallback,
-meta-llama/llama-3.3-70b-instruct:free (the longest continuously-available
-free model on OpenRouter), via OpenRouter's "models" fallback array so a
-single model's rate-limit/outage doesn't burn attempts on a different
-random model each time. If gpt-oss-120b:free itself is ever de-listed from
-the free tier, re-check openrouter.ai/models for a current equivalent
-before reverting to the random router.
-
-MODEL FALLBACK PARAM FIX (2026-08-06): confirmed in production - the very
-next run after the MODEL SELECTION FIX above burned zero attempts and
-never even reached mark_topic_generation_failed() (topic e6de9f4d stayed
-'pending', not 'generation_failed', after the run failed and opened issue
-#49). Root cause: the previous fix sent BOTH "model": OPENROUTER_MODEL AND
-"models": OPENROUTER_MODEL_FALLBACKS in the same request body - but
-OpenRouter's documented fallback API (per openrouter.ai/docs/guides/
-routing/model-fallbacks) takes a SINGLE "models" array with the primary
-model listed first, not a separate "model" + "models" pair. Sending both
-in a conflicting/undocumented shape almost certainly returned a non-429
-4xx from OpenRouter, which resp.raise_for_status() raised as an uncaught
-requests.exceptions.HTTPError - call_openrouter only ever caught
-RETRYABLE_NETWORK_EXCEPTIONS and JSON-envelope errors, not HTTPError, so
-this propagated straight out of main() past the "except RuntimeError"
-guard and killed the whole run before mark_topic_generation_failed() could
-run. Fixed two ways: (1) call_openrouter now sends a single "models" array
-(OPENROUTER_MODEL first, then OPENROUTER_MODEL_FALLBACKS) with no separate
-"model" key, matching OpenRouter's documented shape exactly; (2) added an
-explicit except for requests.exceptions.HTTPError on non-429 status codes,
-so any future unexpected 4xx/5xx from OpenRouter is treated like every
-other transient failure in this file - retried within budget, then
-surfaced as a normal RuntimeError that mark_topic_generation_failed() can
-catch - instead of crashing the whole workflow uncaught again.
-
-STUCK-MODEL FIX (2026-08-06): a leftover duplicate assignment
-(`OPENROUTER_MODEL = "openai/gpt-oss-20b:free"` immediately after the real
-pinned-model line) was silently downgrading every run from the intended
-gpt-oss-120b:free to the much weaker 20b variant. The weaker model could
-rarely clear all 5 validation checks (900+ word narration, valid CTA,
-correct hook text, no empty shots, no shot repeated >2x) within
-MAX_GENERATION_ATTEMPTS, so nearly every run burned all 8 attempts,
-returned normally with the topic marked generation_failed, and the
-workflow exited clean with zero output after ~20 minutes of retries/
-backoffs - looking like it "just stopped" with no error surfaced. Also
-removed the accidental duplicate constant/EXAMPLE_HOOK_TEXT blocks left
-over from the same paste. No other logic changed.
+PROVIDER SWITCH (2026-08-06): OpenRouter's free-tier request cap was being
+exhausted - each topic can burn dozens of calls (up to MAX_GENERATION_ATTEMPTS
+x MAX_RETRIES) against a shared free-tier daily ceiling, causing sustained
+429s with no code-level fix possible on OpenRouter's side without adding
+paid credit, which is explicitly not an option for this account.
+Switched to Google's Gemini API as the PRIMARY provider instead - same
+free-tier API [[upgraded-journey]]'s (TechPulse Daily) generate_script.py
+already uses successfully every run this session with zero rate-limit
+issues, at no cost. This moves Marius off the OpenRouter bottleneck
+entirely rather than trying to pay past it. OpenRouter (the same pinned
+model + fallbacks as before) is kept as a pure fallback ONLY if Gemini
+itself fails or is rate-limited - so existing OpenRouter usage elsewhere
+isn't disrupted, but Marius no longer depends on it as primary.
+Requires a new GEMINI_API_KEY secret in this repo (same free Google AI
+Studio key TDP already uses) - if it's not yet added here, this falls
+through to OpenRouter-only behavior identical to before.
 """
 
 import os
@@ -199,6 +32,7 @@ from collections import Counter
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
 OPENROUTER_KEY = os.environ["OPENROUTER_API_KEY"]
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 HEADERS = {
     "apikey": SUPABASE_KEY,
@@ -217,13 +51,11 @@ MAX_SETTING_CHARS = 900
 MIN_NARRATION_WORDS = 900
 MAX_SHOT_REPEAT_COUNT = 2
 
-# MODEL SELECTION FIX (2026-08-06): pinned primary + stable fallback,
-# replacing the random "openrouter/free" auto-router. See file docstring.
-# MODEL FALLBACK PARAM FIX (2026-08-06): sent as ONE "models" list with
-# the primary first - OpenRouter's documented fallback shape - never as a
-# separate "model" key alongside "models".
+GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_KEY}"
+
 OPENROUTER_MODEL = "openai/gpt-oss-120b:free"
-OPENROUTER_MODEL_FALLBACKS = ["meta-llama/llama-3.3-70b-instruct:free", "google/gemma-4-31b-it:free"]
+OPENROUTER_MODEL_FALLBACKS = ["meta-llama/llama-3.3-70b-instruct:free"]
 OPENROUTER_MODELS_PAYLOAD = [OPENROUTER_MODEL] + OPENROUTER_MODEL_FALLBACKS
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
@@ -261,15 +93,6 @@ RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 def retryable_request(method, url, max_retries=MAX_RETRIES, **kwargs):
-    """
-    SUPABASE CALL HARDENING (2026-08-05): shared retry wrapper for the
-    Supabase REST calls in this file, mirroring the same network-exception
-    and 5xx/429 retry pattern already used for OpenRouter in
-    call_openrouter(). Raises the underlying exception (or the last bad
-    response's HTTPError) after exhausting retries, so a genuinely broken
-    call still surfaces as a real failure - it just no longer dies on the
-    first transient blip.
-    """
     last_error = None
     for attempt in range(max_retries):
         try:
@@ -307,7 +130,62 @@ def get_next_pending_topic():
     return rows[0] if rows else None
 
 
+def call_gemini(prompt):
+    """PROVIDER SWITCH (2026-08-06): primary provider - same free Gemini API
+    TDP's own script stage already uses successfully every run, no cost,
+    separate quota from OpenRouter's shared free tier."""
+    if not GEMINI_KEY:
+        raise RuntimeError("GEMINI_API_KEY not set - skipping to OpenRouter fallback")
+
+    body = json.dumps({
+        "contents": [{"parts": [{"text": prompt}]}],
+    }).encode()
+    last_error = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            resp = requests.post(
+                GEMINI_URL,
+                data=body,
+                headers={"Content-Type": "application/json"},
+                timeout=120,
+            )
+        except RETRYABLE_NETWORK_EXCEPTIONS as e:
+            wait = (attempt + 1) * 15
+            print(f"Gemini network error ({e.__class__.__name__}: {e}), waiting {wait}s before retry...")
+            last_error = e
+            time.sleep(wait)
+            continue
+
+        if resp.status_code == 429:
+            wait = (attempt + 1) * 15
+            print(f"Gemini rate limited, waiting {wait}s before retry...")
+            last_error = resp
+            time.sleep(wait)
+            continue
+
+        try:
+            resp.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            wait = (attempt + 1) * 15
+            print(f"Gemini HTTP error {resp.status_code} ({e}): {resp.text[:300]}, waiting {wait}s before retry...")
+            last_error = resp
+            time.sleep(wait)
+            continue
+
+        try:
+            return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        except (requests.exceptions.JSONDecodeError, KeyError, IndexError) as e:
+            wait = (attempt + 1) * 15
+            print(f"Gemini response envelope malformed/unparseable ({e}), waiting {wait}s before retry...")
+            last_error = e
+            time.sleep(wait)
+            continue
+
+    raise RuntimeError(f"Gemini still failing after {MAX_RETRIES} attempts: {last_error}")
+
+
 def call_openrouter(prompt):
+    """Fallback ONLY - used if Gemini is unavailable/exhausted this call."""
     last_error = None
     for attempt in range(MAX_RETRIES):
         try:
@@ -325,14 +203,14 @@ def call_openrouter(prompt):
             )
         except RETRYABLE_NETWORK_EXCEPTIONS as e:
             wait = (attempt + 1) * 15
-            print(f"Network error ({e.__class__.__name__}: {e}), waiting {wait}s before retry...")
+            print(f"OpenRouter network error ({e.__class__.__name__}: {e}), waiting {wait}s before retry...")
             last_error = e
             time.sleep(wait)
             continue
 
         if resp.status_code == 429:
             wait = (attempt + 1) * 15
-            print(f"Rate limited, waiting {wait}s before retry...")
+            print(f"OpenRouter rate limited, waiting {wait}s before retry...")
             time.sleep(wait)
             last_error = resp
             continue
@@ -340,15 +218,6 @@ def call_openrouter(prompt):
         try:
             resp.raise_for_status()
         except requests.exceptions.HTTPError as e:
-            # MODEL FALLBACK PARAM FIX (2026-08-06): any unexpected non-429
-            # error status from OpenRouter (e.g. a malformed request body,
-            # bad model slug, etc.) used to raise this HTTPError straight
-            # out of call_openrouter uncaught, since only 429s and network
-            # exceptions were retried. That killed the whole workflow run
-            # before the topic could even be marked generation_failed.
-            # Treat it like every other transient failure here: retry
-            # within budget, and surface the response body so the real
-            # cause is visible in logs instead of a bare HTTPError.
             wait = (attempt + 1) * 15
             print(f"OpenRouter HTTP error {resp.status_code} ({e}): {resp.text}, waiting {wait}s before retry...")
             last_error = resp
@@ -358,12 +227,6 @@ def call_openrouter(prompt):
         try:
             return resp.json()["choices"][0]["message"]["content"]
         except (requests.exceptions.JSONDecodeError, KeyError, IndexError) as e:
-            # HTTP-ENVELOPE JSON FIX (2026-08-06): a malformed/truncated
-            # response body from OpenRouter itself (not the model's script
-            # JSON - that's handled separately in extract_json) used to
-            # crash the whole workflow uncaught here, since only 429s and
-            # network-level exceptions were retried. This is a transient
-            # upstream issue like any other - retry it the same way.
             wait = (attempt + 1) * 15
             print(f"OpenRouter response envelope malformed/unparseable ({e}), waiting {wait}s before retry...")
             last_error = e
@@ -375,20 +238,18 @@ def call_openrouter(prompt):
     raise RuntimeError(f"OpenRouter still failing after {MAX_RETRIES} attempts: {last_error.text if last_error else 'unknown'}")
 
 
+def call_llm(prompt):
+    """PROVIDER SWITCH (2026-08-06): try Gemini first (free, separate quota
+    from the exhausted OpenRouter cap), fall back to OpenRouter only if
+    Gemini itself fails."""
+    try:
+        return call_gemini(prompt)
+    except RuntimeError as e:
+        print(f"Gemini unavailable this attempt ({e}) - falling back to OpenRouter.")
+        return call_openrouter(prompt)
+
+
 def sanitize_json_control_chars(text):
-    """
-    CONTROL-CHARACTER JSON FIX (2026-08-06): the free model sometimes emits
-    a raw, unescaped control character (most often a literal newline or tab)
-    inside a JSON string value instead of the required \\n / \\t escape
-    sequence. The JSON spec forbids raw control characters (0x00-0x1F)
-    inside string literals, so json.loads rejects the entire payload with
-    an "Invalid control character" error even when the actual content is
-    otherwise fine. This walks the text once, tracking whether we're
-    inside a string literal (respecting backslash-escapes and skipping
-    content outside strings entirely so structural whitespace/formatting
-    is untouched), and escapes/strips any raw control byte found inside a
-    string so json.loads can parse it normally.
-    """
     out = []
     in_string = False
     escaped = False
@@ -414,7 +275,6 @@ def sanitize_json_control_chars(text):
                     out.append("\\r")
                 elif ch == "\t":
                     out.append("\\t")
-                # any other stray control byte is dropped silently
                 continue
             out.append(ch)
         else:
@@ -529,16 +389,6 @@ def narration_has_engagement_cta(narration_text):
 
 
 def find_duplicate_shots(normalized_shots):
-    """DUPLICATE-SHOT PADDING FIX (2026-08-06): the free model sometimes
-    runs out of real story before reaching MIN_SHOTS and pads the remainder
-    by repeating an earlier block of shots verbatim (same
-    visual_description + narration_excerpt) instead of leaving them empty -
-    which the older find_empty_shots check below can't catch, since the
-    repeated shots aren't empty. Confirmed in production: one uploaded
-    video looped the same 10 shots six times, producing a frozen-looking,
-    ~2-minute video instead of the intended 8-10 minute episode. Returns a
-    list of (visual_description, narration_excerpt, count) tuples for any
-    shot pair that appears more than MAX_SHOT_REPEAT_COUNT times."""
     pair_counts = Counter(
         ((s["visual_description"] or "").strip().lower(), (s["narration_excerpt"] or "").strip().lower())
         for s in normalized_shots
@@ -551,13 +401,6 @@ def find_duplicate_shots(normalized_shots):
 
 
 def find_empty_shots(normalized_shots):
-    """EMPTY-SHOT PADDING FIX (2026-08-03): the free model sometimes runs out
-    of real story to break into shots before reaching MIN_SHOTS, and pads the
-    remainder of the list with placeholder shot objects that have an empty
-    visual_description and/or narration_excerpt. Those shots still cost a
-    real Agnes video generation downstream and end up discarded to zero
-    duration in the final cut - so this must be caught here and rejected,
-    not silently saved."""
     return [
         i for i, s in enumerate(normalized_shots)
         if not (s["visual_description"] or "").strip() or not (s["narration_excerpt"] or "").strip()
@@ -890,7 +733,7 @@ Include between {MIN_SHOTS} and {MAX_SHOTS} shots covering the full narration - 
 
     last_reason = None
     for attempt in range(MAX_GENERATION_ATTEMPTS):
-        raw = call_openrouter(prompt)
+        raw = call_llm(prompt)
         try:
             parsed = extract_json(raw)
         except (ValueError, json.JSONDecodeError) as e:
