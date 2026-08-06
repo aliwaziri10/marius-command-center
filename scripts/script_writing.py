@@ -130,6 +130,27 @@ from the moment that commit landed. This is why 200 topics backed up in
 starved the narration workflow (correctly running every 30 min, but with
 nothing in the queue to narrate). Fixed by restoring the correct
 indentation - no logic changed, this is a pure syntax fix.
+
+MODEL SELECTION FIX (2026-08-06): confirmed in production - a real run
+burned all 8 of MAX_GENERATION_ATTEMPTS and marked the topic
+'generation_failed' with 6/8 attempts failing on basic JSON parsing
+(missing delimiters, no JSON object found, unescaped content) and 1/8
+undershooting the shot count by a wide margin (46 vs the 60-85 requirement).
+Root cause: "openrouter/free" is OpenRouter's own auto-router, which picks
+a DIFFERENT random free model on every single call - so every attempt in
+one generation run could be a different model with different structured-
+output reliability, including weak ones that can't reliably hold a strict
+JSON schema with an exact shot-count range. This explains the failure
+pattern (mostly mechanical JSON breakage, not content-quality rejections).
+Switched to a pinned model - openai/gpt-oss-120b:free (OpenAI open-weight,
+131K context, native structured-output support, o3-mini-class reasoning
+per third-party benchmarks) - with a stable fallback,
+meta-llama/llama-3.3-70b-instruct:free (the longest continuously-available
+free model on OpenRouter), via OpenRouter's "models" fallback array so a
+single model's rate-limit/outage doesn't burn attempts on a different
+random model each time. If gpt-oss-120b:free itself is ever de-listed from
+the free tier, re-check openrouter.ai/models for a current equivalent
+before reverting to the random router.
 """
 
 import os
@@ -158,6 +179,11 @@ MIN_SETTING_CHARS = 40
 MAX_SETTING_CHARS = 900
 MIN_NARRATION_WORDS = 900
 MAX_SHOT_REPEAT_COUNT = 2
+
+# MODEL SELECTION FIX (2026-08-06): pinned primary + stable fallback,
+# replacing the random "openrouter/free" auto-router. See file docstring.
+OPENROUTER_MODEL = "openai/gpt-oss-120b:free"
+OPENROUTER_MODEL_FALLBACKS = ["meta-llama/llama-3.3-70b-instruct:free"]
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 
@@ -251,7 +277,8 @@ def call_openrouter(prompt):
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": "openrouter/free",
+                    "model": OPENROUTER_MODEL,
+                    "models": OPENROUTER_MODEL_FALLBACKS,
                     "messages": [{"role": "user", "content": prompt}],
                 },
                 timeout=90,
