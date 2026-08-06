@@ -1,6 +1,3 @@
-# Marius Command Center — Handoff Sheet
-Written: 2026-07-20, updated 2026-07-25, 2026-08-06, by Claude, verified live against Supabase and GitHub at time of writing.
-
 ## ⚠️⚠️ POST-MORTEM — READ BEFORE TOUCHING cron/timeout/concurrency/batch settings (2026-08-06)
 
 A Claude session touched `narration.yml`/`narration.py` cron, timeout, and
@@ -17,10 +14,9 @@ line:
    workflow processes (e.g. `char_length(narration_text)`, shot counts,
    percentiles) — not a single sample, not a guess.
 3. **Check `private` vs `public` repo status** via `GitHub:search_repositories`
-   (`"private": false/true` in the result) before reasoning about any
-   GitHub Actions minutes budget. Public repos = unlimited free minutes.
-   This repo (`aliwaziri10/marius-command-center`) is PUBLIC — confirmed
-   2026-08-06. Re-verify if it's ever made private.
+   (`"private": false/true` in the result) before reasoning about anything
+   related to run cost or limits. This repo (`aliwaziri10/marius-command-center`)
+   is PUBLIC — confirmed 2026-08-06. Re-verify if it's ever made private.
 4. **Do the arithmetic explicitly**: (real per-run duration) × (real
    throughput/week or /month) — and only then decide cron/timeout/batch
    numbers. Do not set a timeout shorter than the known worst-case runtime.
@@ -41,10 +37,8 @@ every 30 min based on doc claims alone, without pulling a real run log first
 confirmed via a live run log) was never the cron gap. A `timeout-minutes: 25`
 was then set on a job whose own just-read log showed a 64-minute real
 runtime — self-contradictory, would have killed every real run. Batch size
-(`MAX_SCRIPTS_PER_RUN`) was raised to 3 then walked back to 1 based on an
-assumed GitHub Actions 2,000 min/month budget that was NEVER CHECKED — the
-repo is public, so that budget doesn't exist and the whole worry (and the
-walk-back) was unnecessary churn caused by not verifying a checkable fact.
+(`MAX_SCRIPTS_PER_RUN`) was also raised and walked back reactively instead
+of being reasoned from real data the first time.
 
 **Current live settings as of 2026-08-06 (verify freshly before trusting):**
 - `narration.yml`: cron `*/30 * * * *`, `concurrency: group: narration,
