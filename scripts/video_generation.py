@@ -241,6 +241,7 @@ model has concrete nouns to avoid instead of a vague category.
 """
 
 import os
+import re
 import json
 import math
 import time
@@ -403,11 +404,49 @@ QUALITY_GUARD = (
 )
 
 
+# ROOT-CAUSE FIX (2026-08-07): content_flagged scripts (9404bc29 - Bosnian
+# siege, 716623f1 - Rwandan genocide, 92dec2f9 - Nazi-era Germany) were all
+# flagged on individually mundane shots (a ration stamp, a loaf of bread, a
+# boot-step tilt-up). The common trigger is setting_and_characters itself:
+# it's prepended to EVERY shot's prompt verbatim, and for this channel's
+# subject matter it routinely contains ethnic-group names and genocide/
+# war-crime context (Hutu, Tutsi, Bosniak, Serb, Nazi, SS, siege, ...).
+# The existing fallback retry stripped visual_description but kept this
+# same anchor unmodified - so a rejection caused by the anchor itself was
+# guaranteed to fail again on the fallback too, explaining the single-shot,
+# first-try-then-flagged pattern. FALLBACK_STRIP_KEYWORDS below is used only
+# on the fallback attempt to drop ethnicity/genocide/war-crime clauses from
+# the anchor so the retry has an actual chance of succeeding; the primary
+# (non-fallback) prompt is untouched and still gets full context.
+FALLBACK_STRIP_KEYWORDS = [
+    "hutu", "tutsi", "bosniak", "serb", "serbian", "croat", "nazi", "ss ",
+    "gestapo", "genocide", "ethnic", "siege", "concentration camp",
+    "holocaust", "massacre", "militia", "death camp", "war crime",
+]
+
+
+def _sanitize_anchor_for_fallback(anchor):
+    """Drops clauses/sentences containing ethnicity- or atrocity-related
+    keywords from an anchor string, for use only on the content-policy
+    fallback retry. Keeps whatever's left (era, location, physical
+    character description) so continuity/likeness isn't lost entirely."""
+    if not anchor:
+        return anchor
+    pieces = re.split(r'(?<=[.;])\s+', anchor)
+    kept = [
+        p for p in pieces
+        if not any(kw in p.lower() for kw in FALLBACK_STRIP_KEYWORDS)
+    ]
+    return " ".join(kept).strip()
+
+
 def build_agnes_prompt(shot, setting_and_characters="", use_fallback=False):
     shot_type = (shot.get("shot_type") or "medium").replace("_", " ")
     camera_movement = (shot.get("camera_movement") or "static").replace("_", " ")
     lens_effect = shot.get("lens_effect") or "none"
     anchor = (setting_and_characters or "").strip()
+    if use_fallback:
+        anchor = _sanitize_anchor_for_fallback(anchor)
 
     if use_fallback:
         parts = []
