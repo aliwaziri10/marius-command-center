@@ -233,7 +233,7 @@
       "functions": [
         {
           "name": "get_tts_model",
-          "line": 37,
+          "line": 42,
           "args": [],
           "calls": [
             "from_pretrained"
@@ -242,7 +242,7 @@
         },
         {
           "name": "split_into_segments",
-          "line": 44,
+          "line": 49,
           "args": [
             "narration_text"
           ],
@@ -254,7 +254,7 @@
         },
         {
           "name": "_max_plausible_duration",
-          "line": 55,
+          "line": 60,
           "args": [
             "text"
           ],
@@ -267,7 +267,7 @@
         },
         {
           "name": "synthesize_sentence",
-          "line": 60,
+          "line": 65,
           "args": [
             "text",
             "tts",
@@ -287,7 +287,7 @@
         },
         {
           "name": "synthesize_with_pauses",
-          "line": 94,
+          "line": 99,
           "args": [
             "narration_text",
             "tts"
@@ -305,7 +305,7 @@
         },
         {
           "name": "_assign_shots_to_sentences",
-          "line": 112,
+          "line": 117,
           "args": [
             "sentences",
             "shot_list"
@@ -324,7 +324,7 @@
         },
         {
           "name": "synthesize_per_sentence_with_shot_durations",
-          "line": 160,
+          "line": 165,
           "args": [
             "narration_text",
             "shot_list",
@@ -346,11 +346,14 @@
           "docstring": "Synthesizes narration one real SENTENCE at a time via Chatterbox."
         },
         {
-          "name": "main",
-          "line": 204,
-          "args": [],
+          "name": "narrate_one_script",
+          "line": 209,
+          "args": [
+            "supabase",
+            "tts",
+            "script"
+          ],
           "calls": [
-            "create_client",
             "eq",
             "execute",
             "export",
@@ -358,22 +361,38 @@
             "from_",
             "get",
             "get_public_url",
-            "get_tts_model",
             "isinstance",
             "len",
-            "limit",
             "loads",
             "open",
             "print",
             "pydub_normalize",
             "remove",
             "run",
-            "select",
             "synthesize_per_sentence_with_shot_durations",
             "synthesize_with_pauses",
             "table",
             "update",
             "upload"
+          ],
+          "docstring": "Runs the full narration pipeline for a single script row. Returns"
+        },
+        {
+          "name": "main",
+          "line": 267,
+          "args": [],
+          "calls": [
+            "create_client",
+            "eq",
+            "execute",
+            "exit",
+            "get_tts_model",
+            "len",
+            "limit",
+            "narrate_one_script",
+            "print",
+            "select",
+            "table"
           ],
           "docstring": ""
         }
