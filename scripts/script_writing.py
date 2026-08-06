@@ -175,6 +175,19 @@ so any future unexpected 4xx/5xx from OpenRouter is treated like every
 other transient failure in this file - retried within budget, then
 surfaced as a normal RuntimeError that mark_topic_generation_failed() can
 catch - instead of crashing the whole workflow uncaught again.
+
+STUCK-MODEL FIX (2026-08-06): a leftover duplicate assignment
+(`OPENROUTER_MODEL = "openai/gpt-oss-20b:free"` immediately after the real
+pinned-model line) was silently downgrading every run from the intended
+gpt-oss-120b:free to the much weaker 20b variant. The weaker model could
+rarely clear all 5 validation checks (900+ word narration, valid CTA,
+correct hook text, no empty shots, no shot repeated >2x) within
+MAX_GENERATION_ATTEMPTS, so nearly every run burned all 8 attempts,
+returned normally with the topic marked generation_failed, and the
+workflow exited clean with zero output after ~20 minutes of retries/
+backoffs - looking like it "just stopped" with no error surfaced. Also
+removed the accidental duplicate constant/EXAMPLE_HOOK_TEXT blocks left
+over from the same paste. No other logic changed.
 """
 
 import os
@@ -209,27 +222,8 @@ MAX_SHOT_REPEAT_COUNT = 2
 # MODEL FALLBACK PARAM FIX (2026-08-06): sent as ONE "models" list with
 # the primary first - OpenRouter's documented fallback shape - never as a
 # separate "model" key alongside "models".
-MAX_RETRIES = 4
-MIN_SHOTS = 60
-MAX_SHOTS = 85
-MAX_GENERATION_ATTEMPTS = 8
-MAX_HOOK_TEXT_CHARS = 40
-MAX_HOOK_TEXT_WORDS = 5
-MIN_SETTING_CHARS = 40
-MAX_SETTING_CHARS = 900
-MIN_NARRATION_WORDS = 900
-MAX_SHOT_REPEAT_COUNT = 2
-
-# MODEL SELECTION FIX (2026-08-06): pinned primary + stable fallback,
-# replacing the random "openrouter/free" auto-router. See file docstring.
-# MODEL FALLBACK PARAM FIX (2026-08-06): sent as ONE "models" list with
-# the primary first - OpenRouter's documented fallback shape - never as a
-# separate "model" key alongside "models".
 OPENROUTER_MODEL = "openai/gpt-oss-120b:free"
-OPENROUTER_MODEL = "openai/gpt-oss-20b:free"
 OPENROUTER_MODEL_FALLBACKS = ["meta-llama/llama-3.3-70b-instruct:free", "google/gemma-4-31b-it:free"]
-
-EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 OPENROUTER_MODELS_PAYLOAD = [OPENROUTER_MODEL] + OPENROUTER_MODEL_FALLBACKS
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
