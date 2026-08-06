@@ -34,7 +34,7 @@ MAX_SENTENCE_TTS_ATTEMPTS = 3
 # Max pending scripts to narrate in a single workflow run. Was hardcoded to
 # 1 - with narration now running every 30 min (was 2x/day), pulling only one
 # script per run wastes the tighter cron if more than one is pending.
-MAX_SCRIPTS_PER_RUN = 3
+MAX_SCRIPTS_PER_RUN = 1
 
 _tts_model = None
 
