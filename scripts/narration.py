@@ -31,6 +31,11 @@ MIN_PLAUSIBLE_WORDS_PER_SECOND = 1.6
 DURATION_SLACK_SECONDS = 1.0
 MAX_SENTENCE_TTS_ATTEMPTS = 3
 
+# Max pending scripts to narrate in a single workflow run. Was hardcoded to
+# 1 - with narration now running every 30 min (was 2x/day), pulling only one
+# script per run wastes the tighter cron if more than one is pending.
+MAX_SCRIPTS_PER_RUN = 3
+
 _tts_model = None
 
 
@@ -201,16 +206,10 @@ def synthesize_per_sentence_with_shot_durations(narration_text, shot_list, tts):
     return combined, shot_durations
 
 
-def main():
-    supabase = create_client(SUPABASE_URL, SUPABASE_SECRET_KEY)
-
-    # 1. Get one pending script
-    result = supabase.table("scripts").select("*").eq("status", "pending").limit(1).execute()
-    if not result.data:
-        print("No pending scripts found. Exiting.")
-        return
-
-    script = result.data[0]
+def narrate_one_script(supabase, tts, script):
+    """Runs the full narration pipeline for a single script row. Returns
+    True on success, False on failure (logged, not raised, so one bad
+    script in a batch doesn't stop the rest)."""
     script_id = script["id"]
     narration_text = script["narration_text"]
     shot_list = script.get("shot_list")
@@ -218,66 +217,76 @@ def main():
         shot_list = json.loads(shot_list)
     print(f"Narrating script id={script_id}, length={len(narration_text)} chars, {len(shot_list or [])} shots")
 
+    try:
+        shot_durations = None
+        if shot_list:
+            combined_audio, shot_durations = synthesize_per_sentence_with_shot_durations(
+                narration_text, shot_list, tts
+            )
+        else:
+            combined_audio = synthesize_with_pauses(narration_text, tts)
+
+        combined_audio = pydub_normalize(combined_audio)
+
+        raw_filename = f"narration_{script_id}_raw.wav"
+        output_filename = f"narration_{script_id}.wav"
+        combined_audio.export(raw_filename, format="wav")
+
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", raw_filename, "-filter:a", f"atempo={SLOWDOWN_FACTOR}", output_filename],
+            check=True, capture_output=True,
+        )
+        os.remove(raw_filename)
+        print(f"Audio written to {output_filename}")
+
+        with open(output_filename, "rb") as f:
+            supabase.storage.from_("narration").upload(
+                output_filename,
+                f,
+                {"content-type": "audio/wav", "upsert": "true"}
+            )
+        public_url = supabase.storage.from_("narration").get_public_url(output_filename)
+        print(f"Uploaded. Public URL: {public_url}")
+
+        update_payload = {
+            "status": "images_generated",
+            "narration_url": public_url
+        }
+        if shot_durations is not None:
+            slowdown = float(SLOWDOWN_FACTOR)
+            update_payload["shot_durations"] = [d / slowdown for d in shot_durations]
+        supabase.table("scripts").update(update_payload).eq("id", script_id).execute()
+        print(f"Script {script_id} status updated to 'images_generated'.")
+        return True
+
+    except Exception as e:
+        print(f"ERROR narrating script {script_id}: {e}", file=sys.stderr)
+        return False
+
+
+def main():
+    supabase = create_client(SUPABASE_URL, SUPABASE_SECRET_KEY)
+
+    # 1. Get a batch of pending scripts (was limit(1) - narration now runs
+    # every 30 min instead of 2x/day, so pulling only one per run would
+    # waste the tighter cron whenever more than one script is pending).
+    result = supabase.table("scripts").select("*").eq("status", "pending").limit(MAX_SCRIPTS_PER_RUN).execute()
+    if not result.data:
+        print("No pending scripts found. Exiting.")
+        return
+
+    print(f"Found {len(result.data)} pending script(s) to narrate this run.")
     tts = get_tts_model()
 
-    # 2. Generate narration audio via Chatterbox, one real sentence at a
-    # time (natural prosody, no mid-sentence fragment resets). If
-    # shot_list is available, each sentence's real measured duration is
-    # distributed across the shots inside it for accurate video-sync
-    # timing. Falls back to the whole-text sentence-split method (no
-    # shot durations) if shot_list isn't available yet.
-    shot_durations = None
-    if shot_list:
-        combined_audio, shot_durations = synthesize_per_sentence_with_shot_durations(
-            narration_text, shot_list, tts
-        )
-    else:
-        combined_audio = synthesize_with_pauses(narration_text, tts)
+    success_count = 0
+    for script in result.data:
+        if narrate_one_script(supabase, tts, script):
+            success_count += 1
 
-    # 2b. Normalize loudness to a consistent, normal level.
-    combined_audio = pydub_normalize(combined_audio)
-
-    raw_filename = f"narration_{script_id}_raw.wav"
-    output_filename = f"narration_{script_id}.wav"
-    combined_audio.export(raw_filename, format="wav")
-
-    # 2c. Slow down slightly for pacing (pitch preserved via ffmpeg atempo),
-    # matching the -5% rate used under Edge TTS.
-    subprocess.run(
-        ["ffmpeg", "-y", "-i", raw_filename, "-filter:a", f"atempo={SLOWDOWN_FACTOR}", output_filename],
-        check=True, capture_output=True,
-    )
-    os.remove(raw_filename)
-    print(f"Audio written to {output_filename}")
-
-    # 3. Upload to Supabase storage bucket 'narration'
-    with open(output_filename, "rb") as f:
-        supabase.storage.from_("narration").upload(
-            output_filename,
-            f,
-            {"content-type": "audio/wav", "upsert": "true"}
-        )
-    public_url = supabase.storage.from_("narration").get_public_url(output_filename)
-    print(f"Uploaded. Public URL: {public_url}")
-
-    # 4. Update script status, narration URL, and real per-shot timing.
-    update_payload = {
-        "status": "images_generated",
-        "narration_url": public_url
-    }
-    if shot_durations is not None:
-        # Shot durations were measured BEFORE the final atempo slowdown -
-        # scale them by the same factor so they still match the exported,
-        # slowed-down audio.
-        slowdown = float(SLOWDOWN_FACTOR)
-        update_payload["shot_durations"] = [d / slowdown for d in shot_durations]
-    supabase.table("scripts").update(update_payload).eq("id", script_id).execute()
-    print("Script status updated to 'images_generated'. Done.")
+    print(f"Done. {success_count}/{len(result.data)} script(s) narrated successfully.")
+    if success_count < len(result.data):
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        sys.exit(1)
+    main()
