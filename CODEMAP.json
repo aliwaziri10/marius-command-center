@@ -408,7 +408,7 @@
       "functions": [
         {
           "name": "retryable_request",
-          "line": 196,
+          "line": 222,
           "args": [
             "method",
             "url",
@@ -427,7 +427,7 @@
         },
         {
           "name": "get_next_pending_topic",
-          "line": 232,
+          "line": 258,
           "args": [],
           "calls": [
             "json",
@@ -437,7 +437,7 @@
         },
         {
           "name": "call_openrouter",
-          "line": 243,
+          "line": 269,
           "args": [
             "prompt"
           ],
@@ -456,7 +456,7 @@
         },
         {
           "name": "sanitize_json_control_chars",
-          "line": 294,
+          "line": 321,
           "args": [
             "text"
           ],
@@ -469,7 +469,7 @@
         },
         {
           "name": "extract_json",
-          "line": 343,
+          "line": 370,
           "args": [
             "raw_text"
           ],
@@ -488,7 +488,7 @@
         },
         {
           "name": "normalize_shot",
-          "line": 372,
+          "line": 399,
           "args": [
             "shot",
             "index"
@@ -500,7 +500,7 @@
         },
         {
           "name": "normalize_hook_text",
-          "line": 397,
+          "line": 424,
           "args": [
             "result"
           ],
@@ -515,7 +515,7 @@
         },
         {
           "name": "hook_text_matches_prompt_example",
-          "line": 413,
+          "line": 440,
           "args": [
             "hook_text"
           ],
@@ -529,7 +529,7 @@
         },
         {
           "name": "hook_text_too_long_to_glance",
-          "line": 420,
+          "line": 447,
           "args": [
             "hook_text"
           ],
@@ -541,7 +541,7 @@
         },
         {
           "name": "hook_text_matches_story",
-          "line": 425,
+          "line": 452,
           "args": [
             "hook_text",
             "narration_text"
@@ -557,7 +557,7 @@
         },
         {
           "name": "narration_has_engagement_cta",
-          "line": 439,
+          "line": 466,
           "args": [
             "narration_text"
           ],
@@ -569,7 +569,7 @@
         },
         {
           "name": "find_duplicate_shots",
-          "line": 447,
+          "line": 474,
           "args": [
             "normalized_shots"
           ],
@@ -583,7 +583,7 @@
         },
         {
           "name": "find_empty_shots",
-          "line": 469,
+          "line": 496,
           "args": [
             "normalized_shots"
           ],
@@ -595,7 +595,7 @@
         },
         {
           "name": "validate_and_normalize",
-          "line": 483,
+          "line": 510,
           "args": [
             "result"
           ],
@@ -621,7 +621,7 @@
         },
         {
           "name": "generate_script",
-          "line": 592,
+          "line": 619,
           "args": [
             "title",
             "angle"
@@ -638,7 +638,7 @@
         },
         {
           "name": "save_script",
-          "line": 827,
+          "line": 854,
           "args": [
             "topic_id",
             "narration_text",
@@ -655,7 +655,7 @@
         },
         {
           "name": "mark_topic_scripted",
-          "line": 846,
+          "line": 873,
           "args": [
             "topic_id"
           ],
@@ -666,7 +666,7 @@
         },
         {
           "name": "mark_topic_generation_failed",
-          "line": 856,
+          "line": 883,
           "args": [
             "topic_id",
             "reason"
@@ -679,7 +679,7 @@
         },
         {
           "name": "main",
-          "line": 870,
+          "line": 897,
           "args": [],
           "calls": [
             "generate_script",
@@ -694,7 +694,7 @@
         },
         {
           "name": "_simplify",
-          "line": 414,
+          "line": 441,
           "args": [
             "s"
           ],
