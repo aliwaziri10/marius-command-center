@@ -1,0 +1,40 @@
+name: Update CODEMAP.json
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**.py"
+      - ".github/workflows/codemap.yml"
+      - "generate_codemap.py"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  codemap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Generate CODEMAP.json
+        run: python generate_codemap.py .
+
+      - name: Commit CODEMAP.json if changed
+        run: |
+          git config user.name "codemap-bot"
+          git config user.email "codemap-bot@users.noreply.github.com"
+          git add CODEMAP.json
+          if git diff --cached --quiet; then
+            echo "No changes to CODEMAP.json"
+          else
+            git commit -m "chore: auto-update CODEMAP.json"
+            git push
+          fi
