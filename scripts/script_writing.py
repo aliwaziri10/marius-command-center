@@ -226,8 +226,8 @@ MAX_SHOT_REPEAT_COUNT = 2
 # the primary first - OpenRouter's documented fallback shape - never as a
 # separate "model" key alongside "models".
 OPENROUTER_MODEL = "openai/gpt-oss-120b:free"
-OPENROUTER_MODEL_FALLBACKS = ["meta-llama/llama-3.3-70b-instruct:free"]
-OPENROUTER_MODELS_PAYLOAD = [OPENROUTER_MODEL] + OPENROUTER_MODEL_FALLBACKS
+OPENROUTER_MODEL = "openai/gpt-oss-20b:free"
+OPENROUTER_MODEL_FALLBACKS = ["meta-llama/llama-3.3-70b-instruct:free", "google/gemma-4-31b-it:free"]
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 OPENROUTER_MODELS_PAYLOAD = [OPENROUTER_MODEL] + OPENROUTER_MODEL_FALLBACKS
