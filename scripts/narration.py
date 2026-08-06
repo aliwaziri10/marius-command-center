@@ -2,10 +2,11 @@ import os
 import re
 import sys
 import json
+import time
+import asyncio
 import subprocess
+import edge_tts
 from supabase import create_client
-import torchaudio
-from chatterbox.tts import ChatterboxTTS
 from pydub import AudioSegment
 from pydub.effects import normalize as pydub_normalize
 
@@ -13,20 +14,27 @@ from pydub.effects import normalize as pydub_normalize
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SECRET_KEY = os.environ["SUPABASE_SECRET_KEY"]
 
-# Chatterbox - replaces Edge TTS. Switched after a side-by-side comparison
-# found Chatterbox has noticeably more natural prosody/"feel". Same switch
-# already made on TechPulse.
-SLOWDOWN_FACTOR = "0.95"  # ~5% slower, pitch preserved (was RATE="-5%" under Edge TTS)
+# EDGE TTS REVERT (2026-08-06): reverted off Chatterbox (local neural TTS,
+# too slow/heavy on a GitHub-hosted CPU runner - real cause of workflow
+# runs stalling ~25 minutes then getting killed by the runner) and off the
+# earlier Kokoro engine before that. Back to edge-tts: a lightweight HTTPS
+# call to Microsoft's Edge TTS service, no local model, no GPU/CPU cost.
+VOICE = "en-US-GuyNeural"
+
+# Speech rate passed directly to edge-tts per sentence. Edge TTS supports a
+# native rate parameter, so no separate ffmpeg atempo pass is needed here
+# (that was only required for Chatterbox, which has no rate control).
+RATE = "-5%"
 
 # Pause after EVERY sentence, per Zia's explicit instruction - not just
 # paragraph breaks. 1-2s per pause.
 PAUSE_SECONDS_MIN = 1.0
 PAUSE_SECONDS_MAX = 2.0
 
-# STUTTER/DUPLICATE GUARD: carried over from the Edge TTS version. Sanity-
-# checks a synthesized sentence's duration against a rough expected speaking
-# pace for its word count, and retries if the clip looks glitched
-# (duplicated/restarted audio). Generic safety net, not backend-specific.
+# STUTTER/DUPLICATE GUARD: carried over from prior engines. Sanity-checks a
+# synthesized sentence's duration against a rough expected speaking pace for
+# its word count, and retries if the clip looks glitched. Kept as a generic
+# safety net even though edge-tts is far less prone to this than Chatterbox.
 MIN_PLAUSIBLE_WORDS_PER_SECOND = 1.6
 DURATION_SLACK_SECONDS = 1.0
 MAX_SENTENCE_TTS_ATTEMPTS = 3
@@ -35,15 +43,6 @@ MAX_SENTENCE_TTS_ATTEMPTS = 3
 # 1 - with narration now running every 30 min (was 2x/day), pulling only one
 # script per run wastes the tighter cron if more than one is pending.
 MAX_SCRIPTS_PER_RUN = 1
-
-_tts_model = None
-
-
-def get_tts_model():
-    global _tts_model
-    if _tts_model is None:
-        _tts_model = ChatterboxTTS.from_pretrained(device="cpu")
-    return _tts_model
 
 
 def split_into_segments(narration_text):
@@ -62,22 +61,26 @@ def _max_plausible_duration(text):
     return (word_count / MIN_PLAUSIBLE_WORDS_PER_SECOND) + DURATION_SLACK_SECONDS
 
 
-def synthesize_sentence(text, tts, tmp_path):
-    """One real Chatterbox TTS call per full sentence - correct prosody/
-    intonation, no mid-sentence resets. Returns a pydub AudioSegment.
+async def _synthesize_edge(text, out_path):
+    communicate = edge_tts.Communicate(text, VOICE, rate=RATE)
+    await communicate.save(out_path)
+
+
+def synthesize_sentence(text, tmp_path):
+    """One edge-tts call per full sentence - correct prosody/intonation, no
+    mid-sentence resets. Returns a pydub AudioSegment.
 
     STUTTER/DUPLICATE GUARD: validates the synthesized clip's duration
     against a rough expected-speaking-pace ceiling for that sentence's word
-    count, retrying if the clip looks glitched (duplicated/restarted audio)
-    instead of trusting it blindly.
+    count, retrying if the clip looks glitched instead of trusting it
+    blindly.
     """
     max_plausible = _max_plausible_duration(text)
     last_duration = None
     clip = None
 
     for attempt in range(MAX_SENTENCE_TTS_ATTEMPTS):
-        wav = tts.generate(text)
-        torchaudio.save(tmp_path, wav, tts.sr)
+        asyncio.run(_synthesize_edge(text, tmp_path))
         clip = AudioSegment.from_file(tmp_path)
         duration_seconds = len(clip) / 1000.0
         last_duration = duration_seconds
@@ -96,7 +99,7 @@ def synthesize_sentence(text, tts, tmp_path):
     return clip
 
 
-def synthesize_with_pauses(narration_text, tts):
+def synthesize_with_pauses(narration_text):
     """Synthesizes narration sentence-by-sentence and concatenates them
     with a real silence gap (1-2s) after every sentence. Used only when
     no shot_list is available yet (fallback path)."""
@@ -105,7 +108,7 @@ def synthesize_with_pauses(narration_text, tts):
 
     combined = AudioSegment.silent(duration=0)
     for i, segment in enumerate(segments):
-        clip = synthesize_sentence(segment, tts, f"/tmp/sent_{i}.wav")
+        clip = synthesize_sentence(segment, f"/tmp/sent_{i}.mp3")
         combined += clip
         if i < len(segments) - 1:
             pause_len = PAUSE_SECONDS_MIN if i % 2 == 0 else PAUSE_SECONDS_MAX
@@ -162,11 +165,11 @@ def _assign_shots_to_sentences(sentences, shot_list):
     return contributions, sentence_bounds
 
 
-def synthesize_per_sentence_with_shot_durations(narration_text, shot_list, tts):
-    """Synthesizes narration one real SENTENCE at a time via Chatterbox.
-    Each full sentence gets ONE natural TTS call (correct prosody/
-    intonation, no mid-sentence resets), with a real 1-2s pause only at
-    real sentence boundaries.
+def synthesize_per_sentence_with_shot_durations(narration_text, shot_list):
+    """Synthesizes narration one real SENTENCE at a time via edge-tts. Each
+    full sentence gets ONE natural TTS call (correct prosody/intonation, no
+    mid-sentence resets), with a real 1-2s pause only at real sentence
+    boundaries.
 
     Per-shot video-sync timing still works: each sentence's single real
     measured audio duration is distributed across the shots that fall
@@ -179,7 +182,7 @@ def synthesize_per_sentence_with_shot_durations(narration_text, shot_list, tts):
     sentence_durations = []
 
     for i, sentence in enumerate(sentences):
-        clip = synthesize_sentence(sentence, tts, f"/tmp/sent_{i}.wav")
+        clip = synthesize_sentence(sentence, f"/tmp/sent_{i}.mp3")
         combined += clip
         sentence_durations.append(len(clip) / 1000.0)
 
@@ -206,7 +209,7 @@ def synthesize_per_sentence_with_shot_durations(narration_text, shot_list, tts):
     return combined, shot_durations
 
 
-def narrate_one_script(supabase, tts, script):
+def narrate_one_script(supabase, script):
     """Runs the full narration pipeline for a single script row. Returns
     True on success, False on failure (logged, not raised, so one bad
     script in a batch doesn't stop the rest)."""
@@ -221,22 +224,15 @@ def narrate_one_script(supabase, tts, script):
         shot_durations = None
         if shot_list:
             combined_audio, shot_durations = synthesize_per_sentence_with_shot_durations(
-                narration_text, shot_list, tts
+                narration_text, shot_list
             )
         else:
-            combined_audio = synthesize_with_pauses(narration_text, tts)
+            combined_audio = synthesize_with_pauses(narration_text)
 
         combined_audio = pydub_normalize(combined_audio)
 
-        raw_filename = f"narration_{script_id}_raw.wav"
         output_filename = f"narration_{script_id}.wav"
-        combined_audio.export(raw_filename, format="wav")
-
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", raw_filename, "-filter:a", f"atempo={SLOWDOWN_FACTOR}", output_filename],
-            check=True, capture_output=True,
-        )
-        os.remove(raw_filename)
+        combined_audio.export(output_filename, format="wav")
         print(f"Audio written to {output_filename}")
 
         with open(output_filename, "rb") as f:
@@ -253,8 +249,7 @@ def narrate_one_script(supabase, tts, script):
             "narration_url": public_url
         }
         if shot_durations is not None:
-            slowdown = float(SLOWDOWN_FACTOR)
-            update_payload["shot_durations"] = [d / slowdown for d in shot_durations]
+            update_payload["shot_durations"] = shot_durations
         supabase.table("scripts").update(update_payload).eq("id", script_id).execute()
         print(f"Script {script_id} status updated to 'images_generated'.")
         return True
@@ -276,11 +271,10 @@ def main():
         return
 
     print(f"Found {len(result.data)} pending script(s) to narrate this run.")
-    tts = get_tts_model()
 
     success_count = 0
     for script in result.data:
-        if narrate_one_script(supabase, tts, script):
+        if narrate_one_script(supabase, script):
             success_count += 1
 
     print(f"Done. {success_count}/{len(result.data)} script(s) narrated successfully.")
