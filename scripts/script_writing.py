@@ -101,6 +101,18 @@ empty shots, no shot repeated more than twice) - a free/weaker model needs
 more than 5 tries to land all of them at once. Raised to 8 attempts. This
 does not weaken any check; it just gives the model a fairer number of
 shots at clearing the same bar.
+
+CONTROL-CHARACTER JSON FIX (2026-08-06): confirmed in production - a real
+run failed its first attempt with "Invalid control character at: line 3
+column 504" (a raw unescaped newline/tab inside a JSON string value in the
+model's output, which json.loads rejects outright per the JSON spec). This
+was burning a full attempt for a purely mechanical parsing issue, unrelated
+to actual content quality - the underlying narration/shot content may have
+been perfectly fine. extract_json now sanitizes raw control characters
+found inside JSON string literals (escaping \n, \r, \t and stripping any
+other stray control byte) before handing the text to json.loads, so a
+model that forgets to escape a newline inside a string no longer costs a
+full generation attempt.
 """
 
 import os
@@ -248,6 +260,55 @@ def call_openrouter(prompt):
     raise RuntimeError(f"OpenRouter still rate-limited after {MAX_RETRIES} attempts: {last_error.text if last_error else 'unknown'}")
 
 
+def sanitize_json_control_chars(text):
+    """
+    CONTROL-CHARACTER JSON FIX (2026-08-06): the free model sometimes emits
+    a raw, unescaped control character (most often a literal newline or tab)
+    inside a JSON string value instead of the required \\n / \\t escape
+    sequence. The JSON spec forbids raw control characters (0x00-0x1F)
+    inside string literals, so json.loads rejects the entire payload with
+    an "Invalid control character" error even when the actual content is
+    otherwise fine. This walks the text once, tracking whether we're
+    inside a string literal (respecting backslash-escapes and skipping
+    content outside strings entirely so structural whitespace/formatting
+    is untouched), and escapes/strips any raw control byte found inside a
+    string so json.loads can parse it normally.
+    """
+    out = []
+    in_string = False
+    escaped = False
+    for ch in text:
+        code = ord(ch)
+        if in_string:
+            if escaped:
+                out.append(ch)
+                escaped = False
+                continue
+            if ch == "\\":
+                out.append(ch)
+                escaped = True
+                continue
+            if ch == '"':
+                out.append(ch)
+                in_string = False
+                continue
+            if code < 0x20:
+                if ch == "\n":
+                    out.append("\\n")
+                elif ch == "\r":
+                    out.append("\\r")
+                elif ch == "\t":
+                    out.append("\\t")
+                # any other stray control byte is dropped silently
+                continue
+            out.append(ch)
+        else:
+            if ch == '"':
+                in_string = True
+            out.append(ch)
+    return "".join(out)
+
+
 def extract_json(raw_text):
     if not raw_text:
         raise ValueError("Model returned empty/None content (likely a dropped or refused generation).")
@@ -268,7 +329,13 @@ def extract_json(raw_text):
     if start == -1 or end == -1 or end < start:
         raise ValueError("No JSON object found in model output.")
 
-    return json.loads(text[start:end + 1])
+    candidate = text[start:end + 1]
+    try:
+        return json.loads(candidate)
+    except json.JSONDecodeError as e:
+        if "Invalid control character" not in str(e):
+            raise
+        return json.loads(sanitize_json_control_chars(candidate))
 
 
 def normalize_shot(shot, index):
