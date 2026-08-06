@@ -5,5 +5,4 @@ moviepy
 Pillow
 numpy
 pydub
-chatterbox-tts
-torchaudio
+edge-tts
