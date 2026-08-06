@@ -246,13 +246,28 @@ def call_openrouter(prompt):
             time.sleep(wait)
             continue
 
-        if resp.status_code == 429:
+      if resp.status_code == 429:
             wait = (attempt + 1) * 15
             print(f"Rate limited, waiting {wait}s before retry...")
             time.sleep(wait)
             last_error = resp
             continue
         resp.raise_for_status()
+
+        try:
+            return resp.json()["choices"][0]["message"]["content"]
+        except (requests.exceptions.JSONDecodeError, KeyError, IndexError) as e:
+            # HTTP-ENVELOPE JSON FIX (2026-08-06): a malformed/truncated
+            # response body from OpenRouter itself (not the model's script
+            # JSON - that's handled separately in extract_json) used to
+            # crash the whole workflow uncaught here, since only 429s and
+            # network-level exceptions were retried. This is a transient
+            # upstream issue like any other - retry it the same way.
+            wait = (attempt + 1) * 15
+            print(f"OpenRouter response envelope malformed/unparseable ({e}), waiting {wait}s before retry...")
+            last_error = e
+            time.sleep(wait)
+            continue
         return resp.json()["choices"][0]["message"]["content"]
 
     if isinstance(last_error, Exception) and not hasattr(last_error, "text"):
