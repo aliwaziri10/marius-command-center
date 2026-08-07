@@ -35,7 +35,7 @@ HEADERS = {
 NUM_NEW_TOPICS = 3
 MAX_RETRIES = 4
 
-GEMINI_MODEL = "gemini-3.5-flash-lite"
+GEMINI_MODEL = "gemini-3.5-flash"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_KEY}"
 
 
