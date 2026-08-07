@@ -3,24 +3,21 @@ Marius Command Center - Script Writing Agent
 Takes the oldest pending topic and turns it into a full narration script
 plus a shot-by-shot visual production plan for "Erased."
 
-[... all prior docstring history unchanged above this point ...]
-
 PROVIDER SWITCH (2026-08-06): OpenRouter's free-tier request cap was being
 exhausted - each topic can burn dozens of calls (up to MAX_GENERATION_ATTEMPTS
 x MAX_RETRIES) against a shared free-tier daily ceiling, causing sustained
 429s with no code-level fix possible on OpenRouter's side without adding
 paid credit, which is explicitly not an option for this account.
 Switched to Google's Gemini API as the PRIMARY provider instead - same
-free-tier API [[upgraded-journey]]'s (TechPulse Daily) generate_script.py
-already uses successfully every run this session with zero rate-limit
-issues, at no cost. This moves Marius off the OpenRouter bottleneck
-entirely rather than trying to pay past it. OpenRouter (the same pinned
-model + fallbacks as before) is kept as a pure fallback ONLY if Gemini
-itself fails or is rate-limited - so existing OpenRouter usage elsewhere
-isn't disrupted, but Marius no longer depends on it as primary.
-Requires a new GEMINI_API_KEY secret in this repo (same free Google AI
-Studio key TDP already uses) - if it's not yet added here, this falls
-through to OpenRouter-only behavior identical to before.
+free-tier API TechPulse Daily's generate_script.py already uses successfully
+every run this session with zero rate-limit issues, at no cost. This moves
+Marius off the OpenRouter bottleneck entirely rather than trying to pay past
+it. OpenRouter (the same pinned model + fallbacks as before) is kept as a
+pure fallback ONLY if Gemini itself fails or is rate-limited - so existing
+OpenRouter usage elsewhere isn't disrupted, but Marius no longer depends on
+it as primary. Requires the new GEMINI_API_KEY secret in this repo (same
+free Google AI Studio key TDP already uses) - if it's not yet added here,
+this falls through to OpenRouter-only behavior identical to before.
 """
 
 import os
