@@ -405,7 +405,7 @@
       "functions": [
         {
           "name": "retryable_request",
-          "line": 92,
+          "line": 80,
           "args": [
             "method",
             "url",
@@ -424,7 +424,7 @@
         },
         {
           "name": "get_next_pending_topic",
-          "line": 119,
+          "line": 107,
           "args": [],
           "calls": [
             "json",
@@ -433,8 +433,8 @@
           "docstring": ""
         },
         {
-          "name": "call_gemini",
-          "line": 130,
+          "name": "call_llm",
+          "line": 118,
           "args": [
             "prompt"
           ],
@@ -449,43 +449,11 @@
             "range",
             "sleep"
           ],
-          "docstring": "PROVIDER SWITCH (2026-08-06): primary provider - same free Gemini API"
-        },
-        {
-          "name": "call_openrouter",
-          "line": 184,
-          "args": [
-            "prompt"
-          ],
-          "calls": [
-            "RuntimeError",
-            "hasattr",
-            "isinstance",
-            "json",
-            "post",
-            "print",
-            "raise_for_status",
-            "range",
-            "sleep"
-          ],
-          "docstring": "Fallback ONLY - used if Gemini is unavailable/exhausted this call."
-        },
-        {
-          "name": "call_llm",
-          "line": 238,
-          "args": [
-            "prompt"
-          ],
-          "calls": [
-            "call_gemini",
-            "call_openrouter",
-            "print"
-          ],
-          "docstring": "PROVIDER SWITCH (2026-08-06): try Gemini first (free, separate quota"
+          "docstring": "PROVIDER SWITCH (2026-08-06): Gemini only - OpenRouter removed"
         },
         {
           "name": "sanitize_json_control_chars",
-          "line": 249,
+          "line": 169,
           "args": [
             "text"
           ],
@@ -498,7 +466,7 @@
         },
         {
           "name": "extract_json",
-          "line": 284,
+          "line": 204,
           "args": [
             "raw_text"
           ],
@@ -517,7 +485,7 @@
         },
         {
           "name": "normalize_shot",
-          "line": 313,
+          "line": 233,
           "args": [
             "shot",
             "index"
@@ -529,7 +497,7 @@
         },
         {
           "name": "normalize_hook_text",
-          "line": 338,
+          "line": 258,
           "args": [
             "result"
           ],
@@ -544,7 +512,7 @@
         },
         {
           "name": "hook_text_matches_prompt_example",
-          "line": 354,
+          "line": 274,
           "args": [
             "hook_text"
           ],
@@ -558,7 +526,7 @@
         },
         {
           "name": "hook_text_too_long_to_glance",
-          "line": 361,
+          "line": 281,
           "args": [
             "hook_text"
           ],
@@ -570,7 +538,7 @@
         },
         {
           "name": "hook_text_matches_story",
-          "line": 366,
+          "line": 286,
           "args": [
             "hook_text",
             "narration_text"
@@ -586,7 +554,7 @@
         },
         {
           "name": "narration_has_engagement_cta",
-          "line": 380,
+          "line": 300,
           "args": [
             "narration_text"
           ],
@@ -598,7 +566,7 @@
         },
         {
           "name": "find_duplicate_shots",
-          "line": 388,
+          "line": 308,
           "args": [
             "normalized_shots"
           ],
@@ -612,7 +580,7 @@
         },
         {
           "name": "find_empty_shots",
-          "line": 400,
+          "line": 320,
           "args": [
             "normalized_shots"
           ],
@@ -624,7 +592,7 @@
         },
         {
           "name": "validate_and_normalize",
-          "line": 407,
+          "line": 327,
           "args": [
             "result"
           ],
@@ -650,7 +618,7 @@
         },
         {
           "name": "generate_script",
-          "line": 516,
+          "line": 436,
           "args": [
             "title",
             "angle"
@@ -667,7 +635,7 @@
         },
         {
           "name": "save_script",
-          "line": 751,
+          "line": 671,
           "args": [
             "topic_id",
             "narration_text",
@@ -684,7 +652,7 @@
         },
         {
           "name": "mark_topic_scripted",
-          "line": 770,
+          "line": 690,
           "args": [
             "topic_id"
           ],
@@ -695,7 +663,7 @@
         },
         {
           "name": "mark_topic_generation_failed",
-          "line": 780,
+          "line": 700,
           "args": [
             "topic_id",
             "reason"
@@ -708,7 +676,7 @@
         },
         {
           "name": "main",
-          "line": 794,
+          "line": 714,
           "args": [],
           "calls": [
             "generate_script",
@@ -723,7 +691,7 @@
         },
         {
           "name": "_simplify",
-          "line": 355,
+          "line": 275,
           "args": [
             "s"
           ],
@@ -737,7 +705,6 @@
       ],
       "env_vars": [
         "GEMINI_API_KEY",
-        "OPENROUTER_API_KEY",
         "SUPABASE_SECRET_KEY",
         "SUPABASE_URL"
       ],
