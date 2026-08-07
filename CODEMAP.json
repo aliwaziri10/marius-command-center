@@ -8,6 +8,7 @@
     "FREELLM_API_KEY",
     "FREELLM_API_URL",
     "FREESOUND_API_KEY",
+    "GEMINI_API_KEY",
     "HF_TOKEN",
     "OPENROUTER_API_KEY",
     "SUPABASE_SECRET_KEY",
@@ -232,17 +233,8 @@
       "path": "scripts/narration.py",
       "functions": [
         {
-          "name": "get_tts_model",
-          "line": 42,
-          "args": [],
-          "calls": [
-            "from_pretrained"
-          ],
-          "docstring": ""
-        },
-        {
           "name": "split_into_segments",
-          "line": 49,
+          "line": 48,
           "args": [
             "narration_text"
           ],
@@ -254,7 +246,7 @@
         },
         {
           "name": "_max_plausible_duration",
-          "line": 60,
+          "line": 59,
           "args": [
             "text"
           ],
@@ -266,31 +258,42 @@
           "docstring": ""
         },
         {
-          "name": "synthesize_sentence",
-          "line": 65,
+          "name": "_synthesize_edge",
+          "line": 64,
           "args": [
             "text",
-            "tts",
+            "out_path"
+          ],
+          "calls": [
+            "Communicate",
+            "save"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "synthesize_sentence",
+          "line": 69,
+          "args": [
+            "text",
             "tmp_path"
           ],
           "calls": [
             "_max_plausible_duration",
+            "_synthesize_edge",
             "from_file",
-            "generate",
             "len",
             "print",
             "range",
-            "save",
+            "run",
             "split"
           ],
-          "docstring": "One real Chatterbox TTS call per full sentence - correct prosody/"
+          "docstring": "One edge-tts call per full sentence - correct prosody/intonation, no"
         },
         {
           "name": "synthesize_with_pauses",
-          "line": 99,
+          "line": 102,
           "args": [
-            "narration_text",
-            "tts"
+            "narration_text"
           ],
           "calls": [
             "enumerate",
@@ -305,7 +308,7 @@
         },
         {
           "name": "_assign_shots_to_sentences",
-          "line": 117,
+          "line": 120,
           "args": [
             "sentences",
             "shot_list"
@@ -324,11 +327,10 @@
         },
         {
           "name": "synthesize_per_sentence_with_shot_durations",
-          "line": 165,
+          "line": 168,
           "args": [
             "narration_text",
-            "shot_list",
-            "tts"
+            "shot_list"
           ],
           "calls": [
             "_assign_shots_to_sentences",
@@ -343,21 +345,19 @@
             "sum",
             "synthesize_sentence"
           ],
-          "docstring": "Synthesizes narration one real SENTENCE at a time via Chatterbox."
+          "docstring": "Synthesizes narration one real SENTENCE at a time via edge-tts. Each"
         },
         {
           "name": "narrate_one_script",
-          "line": 209,
+          "line": 212,
           "args": [
             "supabase",
-            "tts",
             "script"
           ],
           "calls": [
             "eq",
             "execute",
             "export",
-            "float",
             "from_",
             "get",
             "get_public_url",
@@ -367,8 +367,6 @@
             "open",
             "print",
             "pydub_normalize",
-            "remove",
-            "run",
             "synthesize_per_sentence_with_shot_durations",
             "synthesize_with_pauses",
             "table",
@@ -379,14 +377,13 @@
         },
         {
           "name": "main",
-          "line": 267,
+          "line": 262,
           "args": [],
           "calls": [
             "create_client",
             "eq",
             "execute",
             "exit",
-            "get_tts_model",
             "len",
             "limit",
             "narrate_one_script",
@@ -408,7 +405,7 @@
       "functions": [
         {
           "name": "retryable_request",
-          "line": 250,
+          "line": 92,
           "args": [
             "method",
             "url",
@@ -423,11 +420,11 @@
             "request",
             "sleep"
           ],
-          "docstring": "SUPABASE CALL HARDENING (2026-08-05): shared retry wrapper for the"
+          "docstring": ""
         },
         {
           "name": "get_next_pending_topic",
-          "line": 286,
+          "line": 119,
           "args": [],
           "calls": [
             "json",
@@ -436,8 +433,27 @@
           "docstring": ""
         },
         {
+          "name": "call_gemini",
+          "line": 130,
+          "args": [
+            "prompt"
+          ],
+          "calls": [
+            "RuntimeError",
+            "dumps",
+            "encode",
+            "json",
+            "post",
+            "print",
+            "raise_for_status",
+            "range",
+            "sleep"
+          ],
+          "docstring": "PROVIDER SWITCH (2026-08-06): primary provider - same free Gemini API"
+        },
+        {
           "name": "call_openrouter",
-          "line": 297,
+          "line": 184,
           "args": [
             "prompt"
           ],
@@ -452,11 +468,24 @@
             "range",
             "sleep"
           ],
-          "docstring": ""
+          "docstring": "Fallback ONLY - used if Gemini is unavailable/exhausted this call."
+        },
+        {
+          "name": "call_llm",
+          "line": 238,
+          "args": [
+            "prompt"
+          ],
+          "calls": [
+            "call_gemini",
+            "call_openrouter",
+            "print"
+          ],
+          "docstring": "PROVIDER SWITCH (2026-08-06): try Gemini first (free, separate quota"
         },
         {
           "name": "sanitize_json_control_chars",
-          "line": 365,
+          "line": 249,
           "args": [
             "text"
           ],
@@ -465,11 +494,11 @@
             "join",
             "ord"
           ],
-          "docstring": "CONTROL-CHARACTER JSON FIX (2026-08-06): the free model sometimes emits"
+          "docstring": ""
         },
         {
           "name": "extract_json",
-          "line": 414,
+          "line": 284,
           "args": [
             "raw_text"
           ],
@@ -488,7 +517,7 @@
         },
         {
           "name": "normalize_shot",
-          "line": 443,
+          "line": 313,
           "args": [
             "shot",
             "index"
@@ -500,7 +529,7 @@
         },
         {
           "name": "normalize_hook_text",
-          "line": 468,
+          "line": 338,
           "args": [
             "result"
           ],
@@ -515,7 +544,7 @@
         },
         {
           "name": "hook_text_matches_prompt_example",
-          "line": 484,
+          "line": 354,
           "args": [
             "hook_text"
           ],
@@ -529,7 +558,7 @@
         },
         {
           "name": "hook_text_too_long_to_glance",
-          "line": 491,
+          "line": 361,
           "args": [
             "hook_text"
           ],
@@ -541,7 +570,7 @@
         },
         {
           "name": "hook_text_matches_story",
-          "line": 496,
+          "line": 366,
           "args": [
             "hook_text",
             "narration_text"
@@ -557,7 +586,7 @@
         },
         {
           "name": "narration_has_engagement_cta",
-          "line": 510,
+          "line": 380,
           "args": [
             "narration_text"
           ],
@@ -569,7 +598,7 @@
         },
         {
           "name": "find_duplicate_shots",
-          "line": 518,
+          "line": 388,
           "args": [
             "normalized_shots"
           ],
@@ -579,11 +608,11 @@
             "lower",
             "strip"
           ],
-          "docstring": "DUPLICATE-SHOT PADDING FIX (2026-08-06): the free model sometimes"
+          "docstring": ""
         },
         {
           "name": "find_empty_shots",
-          "line": 540,
+          "line": 400,
           "args": [
             "normalized_shots"
           ],
@@ -591,11 +620,11 @@
             "enumerate",
             "strip"
           ],
-          "docstring": "EMPTY-SHOT PADDING FIX (2026-08-03): the free model sometimes runs out"
+          "docstring": ""
         },
         {
           "name": "validate_and_normalize",
-          "line": 554,
+          "line": 407,
           "args": [
             "result"
           ],
@@ -621,14 +650,14 @@
         },
         {
           "name": "generate_script",
-          "line": 663,
+          "line": 516,
           "args": [
             "title",
             "angle"
           ],
           "calls": [
             "RuntimeError",
-            "call_openrouter",
+            "call_llm",
             "extract_json",
             "print",
             "range",
@@ -638,7 +667,7 @@
         },
         {
           "name": "save_script",
-          "line": 898,
+          "line": 751,
           "args": [
             "topic_id",
             "narration_text",
@@ -655,7 +684,7 @@
         },
         {
           "name": "mark_topic_scripted",
-          "line": 917,
+          "line": 770,
           "args": [
             "topic_id"
           ],
@@ -666,7 +695,7 @@
         },
         {
           "name": "mark_topic_generation_failed",
-          "line": 927,
+          "line": 780,
           "args": [
             "topic_id",
             "reason"
@@ -679,7 +708,7 @@
         },
         {
           "name": "main",
-          "line": 941,
+          "line": 794,
           "args": [],
           "calls": [
             "generate_script",
@@ -694,7 +723,7 @@
         },
         {
           "name": "_simplify",
-          "line": 485,
+          "line": 355,
           "args": [
             "s"
           ],
@@ -707,6 +736,7 @@
         }
       ],
       "env_vars": [
+        "GEMINI_API_KEY",
         "OPENROUTER_API_KEY",
         "SUPABASE_SECRET_KEY",
         "SUPABASE_URL"
@@ -1265,7 +1295,7 @@
       "functions": [
         {
           "name": "round_to_valid_frames",
-          "line": 363,
+          "line": 364,
           "args": [
             "num_frames"
           ],
@@ -1277,7 +1307,7 @@
         },
         {
           "name": "get_ready_scripts",
-          "line": 375,
+          "line": 376,
           "args": [
             "limit"
           ],
@@ -1290,7 +1320,7 @@
         },
         {
           "name": "download_file",
-          "line": 385,
+          "line": 386,
           "args": [
             "url",
             "out_path"
@@ -1304,14 +1334,30 @@
           "docstring": ""
         },
         {
+          "name": "_sanitize_anchor_for_fallback",
+          "line": 428,
+          "args": [
+            "anchor"
+          ],
+          "calls": [
+            "any",
+            "join",
+            "lower",
+            "split",
+            "strip"
+          ],
+          "docstring": "Drops clauses/sentences containing ethnicity- or atrocity-related"
+        },
+        {
           "name": "build_agnes_prompt",
-          "line": 406,
+          "line": 443,
           "args": [
             "shot",
             "setting_and_characters",
             "use_fallback"
           ],
           "calls": [
+            "_sanitize_anchor_for_fallback",
             "any",
             "append",
             "get",
@@ -1324,7 +1370,7 @@
         },
         {
           "name": "build_character_reference_prompt",
-          "line": 440,
+          "line": 479,
           "args": [
             "setting_and_characters"
           ],
@@ -1336,7 +1382,7 @@
         },
         {
           "name": "generate_character_reference",
-          "line": 451,
+          "line": 490,
           "args": [
             "script"
           ],
@@ -1358,7 +1404,7 @@
         },
         {
           "name": "upload_reference_image",
-          "line": 532,
+          "line": 571,
           "args": [
             "script_id",
             "file_name",
@@ -1374,7 +1420,7 @@
         },
         {
           "name": "extract_last_frame_url",
-          "line": 553,
+          "line": 592,
           "args": [
             "script_id",
             "shot_index",
@@ -1396,7 +1442,7 @@
         },
         {
           "name": "get_continuity_anchor",
-          "line": 578,
+          "line": 617,
           "args": [
             "script",
             "video_urls"
@@ -1413,7 +1459,7 @@
         },
         {
           "name": "create_agnes_task",
-          "line": 601,
+          "line": 640,
           "args": [
             "prompt",
             "num_frames",
@@ -1434,7 +1480,7 @@
         },
         {
           "name": "extract_video_url",
-          "line": 643,
+          "line": 682,
           "args": [
             "data"
           ],
@@ -1449,7 +1495,7 @@
         },
         {
           "name": "poll_agnes_task",
-          "line": 654,
+          "line": 693,
           "args": [
             "video_id",
             "max_wait",
@@ -1470,7 +1516,7 @@
         },
         {
           "name": "_generate_one_segment",
-          "line": 682,
+          "line": 721,
           "args": [
             "shot",
             "segment_duration",
@@ -1493,7 +1539,7 @@
         },
         {
           "name": "_extract_last_frame_local",
-          "line": 701,
+          "line": 740,
           "args": [
             "video_path"
           ],
@@ -1510,7 +1556,7 @@
         },
         {
           "name": "_upload_local_image_for_anchor",
-          "line": 715,
+          "line": 754,
           "args": [
             "script_id",
             "tag",
@@ -1524,7 +1570,7 @@
         },
         {
           "name": "generate_shot_clip",
-          "line": 725,
+          "line": 764,
           "args": [
             "shot",
             "target_duration",
@@ -1554,7 +1600,7 @@
         },
         {
           "name": "fit_clip_to_duration",
-          "line": 806,
+          "line": 845,
           "args": [
             "clip",
             "target"
@@ -1571,7 +1617,7 @@
         },
         {
           "name": "fit_audio_to_duration",
-          "line": 816,
+          "line": 855,
           "args": [
             "audio_clip",
             "target"
@@ -1585,7 +1631,7 @@
         },
         {
           "name": "upload_clip",
-          "line": 824,
+          "line": 863,
           "args": [
             "script_id",
             "index",
@@ -1602,7 +1648,7 @@
         },
         {
           "name": "save_progress",
-          "line": 845,
+          "line": 884,
           "args": [
             "script_id",
             "video_urls",
@@ -1616,7 +1662,7 @@
         },
         {
           "name": "mark_content_flagged",
-          "line": 855,
+          "line": 894,
           "args": [
             "script_id",
             "shot_index",
@@ -1631,7 +1677,7 @@
         },
         {
           "name": "compute_shot_durations",
-          "line": 866,
+          "line": 905,
           "args": [
             "shot_list",
             "total_duration"
@@ -1646,7 +1692,7 @@
         },
         {
           "name": "get_shot_durations",
-          "line": 872,
+          "line": 911,
           "args": [
             "script",
             "shot_list",
@@ -1665,7 +1711,7 @@
         },
         {
           "name": "compute_shot_start_times",
-          "line": 885,
+          "line": 924,
           "args": [
             "shot_durations"
           ],
@@ -1676,7 +1722,7 @@
         },
         {
           "name": "compute_target_bitrate",
-          "line": 894,
+          "line": 933,
           "args": [
             "duration_seconds",
             "target_mb",
@@ -1690,7 +1736,7 @@
         },
         {
           "name": "poll_ace_music_task",
-          "line": 901,
+          "line": 940,
           "args": [
             "task_id",
             "out_path",
@@ -1713,7 +1759,7 @@
         },
         {
           "name": "generate_background_music",
-          "line": 940,
+          "line": 979,
           "args": [
             "prompt",
             "duration",
@@ -1734,7 +1780,7 @@
         },
         {
           "name": "generate_background_music_musicgen",
-          "line": 974,
+          "line": 1013,
           "args": [
             "prompt",
             "duration",
@@ -1755,7 +1801,7 @@
         },
         {
           "name": "search_freesound_sfx",
-          "line": 1015,
+          "line": 1054,
           "args": [
             "query",
             "out_path"
@@ -1770,7 +1816,7 @@
         },
         {
           "name": "apply_safety_limiter",
-          "line": 1050,
+          "line": 1089,
           "args": [
             "audio_clip",
             "ceiling"
@@ -1787,7 +1833,7 @@
         },
         {
           "name": "extract_original_clip_audio",
-          "line": 1070,
+          "line": 1109,
           "args": [
             "video_clips",
             "shot_durations",
@@ -1806,7 +1852,7 @@
         },
         {
           "name": "build_audio_mix",
-          "line": 1087,
+          "line": 1126,
           "args": [
             "narration_path",
             "music_mood",
@@ -1838,7 +1884,7 @@
         },
         {
           "name": "_load_caption_font",
-          "line": 1127,
+          "line": 1166,
           "args": [
             "size"
           ],
@@ -1852,7 +1898,7 @@
         },
         {
           "name": "_wrap_caption_text",
-          "line": 1138,
+          "line": 1177,
           "args": [
             "text",
             "font",
@@ -1869,7 +1915,7 @@
         },
         {
           "name": "render_caption_image",
-          "line": 1155,
+          "line": 1194,
           "args": [
             "text",
             "video_width",
@@ -1894,7 +1940,7 @@
         },
         {
           "name": "build_caption_clip",
-          "line": 1201,
+          "line": 1240,
           "args": [
             "text",
             "start",
@@ -1913,7 +1959,7 @@
         },
         {
           "name": "build_caption_clips",
-          "line": 1215,
+          "line": 1254,
           "args": [
             "shot_list",
             "shot_durations",
@@ -1934,7 +1980,7 @@
         },
         {
           "name": "assemble_final_video",
-          "line": 1228,
+          "line": 1267,
           "args": [
             "script_id",
             "video_urls",
@@ -1978,7 +2024,7 @@
         },
         {
           "name": "upload_video",
-          "line": 1311,
+          "line": 1350,
           "args": [
             "script_id",
             "file_path"
@@ -1995,7 +2041,7 @@
         },
         {
           "name": "mark_video_generated",
-          "line": 1335,
+          "line": 1374,
           "args": [
             "script_id",
             "video_url",
@@ -2010,7 +2056,7 @@
         },
         {
           "name": "process_script",
-          "line": 1349,
+          "line": 1388,
           "args": [
             "script",
             "shot_limit"
@@ -2047,7 +2093,7 @@
         },
         {
           "name": "main",
-          "line": 1499,
+          "line": 1538,
           "args": [],
           "calls": [
             "get_ready_scripts",
