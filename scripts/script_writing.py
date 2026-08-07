@@ -40,7 +40,7 @@ MAX_SETTING_CHARS = 900
 MIN_NARRATION_WORDS = 900
 MAX_SHOT_REPEAT_COUNT = 2
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.5-flash-lite"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_KEY}"
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
