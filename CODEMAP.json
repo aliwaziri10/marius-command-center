@@ -10,7 +10,6 @@
     "FREESOUND_API_KEY",
     "GEMINI_API_KEY",
     "HF_TOKEN",
-    "OPENROUTER_API_KEY",
     "SUPABASE_SECRET_KEY",
     "SUPABASE_URL",
     "X",
@@ -1166,7 +1165,7 @@
       "functions": [
         {
           "name": "get_existing_titles",
-          "line": 33,
+          "line": 42,
           "args": [],
           "calls": [
             "get",
@@ -1176,13 +1175,15 @@
           "docstring": ""
         },
         {
-          "name": "call_openrouter",
-          "line": 43,
+          "name": "call_gemini",
+          "line": 52,
           "args": [
             "prompt"
           ],
           "calls": [
             "RuntimeError",
+            "dumps",
+            "encode",
             "json",
             "post",
             "print",
@@ -1190,16 +1191,16 @@
             "range",
             "sleep"
           ],
-          "docstring": "Call OpenRouter's free auto-router, retrying with backoff on 429s."
+          "docstring": "Sole provider - OpenRouter removed. Retries with backoff on 429s"
         },
         {
           "name": "generate_topics",
-          "line": 71,
+          "line": 104,
           "args": [
             "existing_titles"
           ],
           "calls": [
-            "call_openrouter",
+            "call_gemini",
             "join",
             "loads",
             "split",
@@ -1210,7 +1211,7 @@
         },
         {
           "name": "save_topic",
-          "line": 97,
+          "line": 130,
           "args": [
             "title",
             "angle"
@@ -1224,7 +1225,7 @@
         },
         {
           "name": "main",
-          "line": 108,
+          "line": 141,
           "args": [],
           "calls": [
             "generate_topics",
@@ -1240,7 +1241,7 @@
         }
       ],
       "env_vars": [
-        "OPENROUTER_API_KEY",
+        "GEMINI_API_KEY",
         "SUPABASE_SECRET_KEY",
         "SUPABASE_URL"
       ],
