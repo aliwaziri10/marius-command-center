@@ -4,20 +4,13 @@ Takes the oldest pending topic and turns it into a full narration script
 plus a shot-by-shot visual production plan for "Erased."
 
 PROVIDER SWITCH (2026-08-06): OpenRouter's free-tier request cap was being
-exhausted - each topic can burn dozens of calls (up to MAX_GENERATION_ATTEMPTS
-x MAX_RETRIES) against a shared free-tier daily ceiling, causing sustained
-429s with no code-level fix possible on OpenRouter's side without adding
-paid credit, which is explicitly not an option for this account.
-Switched to Google's Gemini API as the PRIMARY provider instead - same
-free-tier API TechPulse Daily's generate_script.py already uses successfully
-every run this session with zero rate-limit issues, at no cost. This moves
-Marius off the OpenRouter bottleneck entirely rather than trying to pay past
-it. OpenRouter (the same pinned model + fallbacks as before) is kept as a
-pure fallback ONLY if Gemini itself fails or is rate-limited - so existing
-OpenRouter usage elsewhere isn't disrupted, but Marius no longer depends on
-it as primary. Requires the new GEMINI_API_KEY secret in this repo (same
-free Google AI Studio key TDP already uses) - if it's not yet added here,
-this falls through to OpenRouter-only behavior identical to before.
+exhausted, causing sustained 429s. First fix kept OpenRouter as a fallback
+behind Gemini. Zia then asked directly why keep a provider that's already
+proven unreliable at all, even as a fallback - fair point, since a run that
+falls through to OpenRouter just re-hits the same rate-limit wall. Removed
+OpenRouter entirely. Gemini (same free key/approach TDP's
+generate_script.py already uses successfully) is now the ONLY provider.
+Requires the GEMINI_API_KEY secret in this repo (already added).
 """
 
 import os
@@ -28,8 +21,7 @@ from collections import Counter
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
-OPENROUTER_KEY = os.environ["OPENROUTER_API_KEY"]
-GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_KEY = os.environ["GEMINI_API_KEY"]
 
 HEADERS = {
     "apikey": SUPABASE_KEY,
@@ -50,10 +42,6 @@ MAX_SHOT_REPEAT_COUNT = 2
 
 GEMINI_MODEL = "gemini-2.5-flash"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_KEY}"
-
-OPENROUTER_MODEL = "openai/gpt-oss-120b:free"
-OPENROUTER_MODEL_FALLBACKS = ["meta-llama/llama-3.3-70b-instruct:free"]
-OPENROUTER_MODELS_PAYLOAD = [OPENROUTER_MODEL] + OPENROUTER_MODEL_FALLBACKS
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 
@@ -127,13 +115,10 @@ def get_next_pending_topic():
     return rows[0] if rows else None
 
 
-def call_gemini(prompt):
-    """PROVIDER SWITCH (2026-08-06): primary provider - same free Gemini API
-    TDP's own script stage already uses successfully every run, no cost,
-    separate quota from OpenRouter's shared free tier."""
-    if not GEMINI_KEY:
-        raise RuntimeError("GEMINI_API_KEY not set - skipping to OpenRouter fallback")
-
+def call_llm(prompt):
+    """PROVIDER SWITCH (2026-08-06): Gemini only - OpenRouter removed
+    entirely per Zia, since keeping an already-unreliable fallback just
+    means occasional runs still hit the same rate-limit wall."""
     body = json.dumps({
         "contents": [{"parts": [{"text": prompt}]}],
     }).encode()
@@ -179,71 +164,6 @@ def call_gemini(prompt):
             continue
 
     raise RuntimeError(f"Gemini still failing after {MAX_RETRIES} attempts: {last_error}")
-
-
-def call_openrouter(prompt):
-    """Fallback ONLY - used if Gemini is unavailable/exhausted this call."""
-    last_error = None
-    for attempt in range(MAX_RETRIES):
-        try:
-            resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "models": OPENROUTER_MODELS_PAYLOAD,
-                    "messages": [{"role": "user", "content": prompt}],
-                },
-                timeout=90,
-            )
-        except RETRYABLE_NETWORK_EXCEPTIONS as e:
-            wait = (attempt + 1) * 15
-            print(f"OpenRouter network error ({e.__class__.__name__}: {e}), waiting {wait}s before retry...")
-            last_error = e
-            time.sleep(wait)
-            continue
-
-        if resp.status_code == 429:
-            wait = (attempt + 1) * 15
-            print(f"OpenRouter rate limited, waiting {wait}s before retry...")
-            time.sleep(wait)
-            last_error = resp
-            continue
-
-        try:
-            resp.raise_for_status()
-        except requests.exceptions.HTTPError as e:
-            wait = (attempt + 1) * 15
-            print(f"OpenRouter HTTP error {resp.status_code} ({e}): {resp.text}, waiting {wait}s before retry...")
-            last_error = resp
-            time.sleep(wait)
-            continue
-
-        try:
-            return resp.json()["choices"][0]["message"]["content"]
-        except (requests.exceptions.JSONDecodeError, KeyError, IndexError) as e:
-            wait = (attempt + 1) * 15
-            print(f"OpenRouter response envelope malformed/unparseable ({e}), waiting {wait}s before retry...")
-            last_error = e
-            time.sleep(wait)
-            continue
-
-    if isinstance(last_error, Exception) and not hasattr(last_error, "text"):
-        raise RuntimeError(f"OpenRouter still failing after {MAX_RETRIES} attempts: {last_error}")
-    raise RuntimeError(f"OpenRouter still failing after {MAX_RETRIES} attempts: {last_error.text if last_error else 'unknown'}")
-
-
-def call_llm(prompt):
-    """PROVIDER SWITCH (2026-08-06): try Gemini first (free, separate quota
-    from the exhausted OpenRouter cap), fall back to OpenRouter only if
-    Gemini itself fails."""
-    try:
-        return call_gemini(prompt)
-    except RuntimeError as e:
-        print(f"Gemini unavailable this attempt ({e}) - falling back to OpenRouter.")
-        return call_openrouter(prompt)
 
 
 def sanitize_json_control_chars(text):
