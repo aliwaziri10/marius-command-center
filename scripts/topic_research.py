@@ -7,8 +7,14 @@ Duplicate-checking is built in from the start (unlike Nova's early bug):
 it fetches every existing topic title before generating new ones, and asks
 the AI to avoid them, then double-checks the results itself.
 
-Uses OpenRouter's auto-router (openrouter/free) with retries, so a busy
-individual free model doesn't fail the whole run.
+PROVIDER SWITCH (2026-08-07): OpenRouter removed entirely, same as
+script_writing.py. Zia's standing decision - OpenRouter caused repeated
+free-tier model churn/outages across the pipeline, so it's dropped
+everywhere, not just where it broke first. Gemini (same free
+GEMINI_API_KEY already used by script_writing.py) is now the sole
+provider - also a stronger, more consistent writer for this kind of
+creative/narrative generation task than whatever model OpenRouter's
+auto-router happens to route to.
 """
 
 import os
@@ -18,7 +24,7 @@ import requests
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
-OPENROUTER_KEY = os.environ["OPENROUTER_API_KEY"]
+GEMINI_KEY = os.environ["GEMINI_API_KEY"]
 
 HEADERS = {
     "apikey": SUPABASE_KEY,
@@ -28,6 +34,9 @@ HEADERS = {
 
 NUM_NEW_TOPICS = 3
 MAX_RETRIES = 4
+
+GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_KEY}"
 
 
 def get_existing_titles():
@@ -40,32 +49,56 @@ def get_existing_titles():
     return [row["title"] for row in resp.json()]
 
 
-def call_openrouter(prompt):
-    """Call OpenRouter's free auto-router, retrying with backoff on 429s."""
+def call_gemini(prompt):
+    """Sole provider - OpenRouter removed. Retries with backoff on 429s
+    and transient errors, same pattern as script_writing.py's call_llm."""
+    body = json.dumps({
+        "contents": [{"parts": [{"text": prompt}]}],
+    }).encode()
     last_error = None
     for attempt in range(MAX_RETRIES):
-        resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "openrouter/free",
-                "messages": [{"role": "user", "content": prompt}],
-            },
-            timeout=60,
-        )
+        try:
+            resp = requests.post(
+                GEMINI_URL,
+                data=body,
+                headers={"Content-Type": "application/json"},
+                timeout=90,
+            )
+        except (requests.exceptions.ChunkedEncodingError,
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout) as e:
+            wait = (attempt + 1) * 15
+            print(f"Gemini network error ({e.__class__.__name__}: {e}), waiting {wait}s before retry...")
+            last_error = e
+            time.sleep(wait)
+            continue
+
         if resp.status_code == 429:
             wait = (attempt + 1) * 15
-            print(f"Rate limited, waiting {wait}s before retry...")
-            time.sleep(wait)
+            print(f"Gemini rate limited, waiting {wait}s before retry...")
             last_error = resp
+            time.sleep(wait)
             continue
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
 
-    raise RuntimeError(f"OpenRouter still rate-limited after {MAX_RETRIES} attempts: {last_error.text if last_error else 'unknown'}")
+        try:
+            resp.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            wait = (attempt + 1) * 15
+            print(f"Gemini HTTP error {resp.status_code} ({e}): {resp.text[:300]}, waiting {wait}s before retry...")
+            last_error = resp
+            time.sleep(wait)
+            continue
+
+        try:
+            return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        except (requests.exceptions.JSONDecodeError, KeyError, IndexError) as e:
+            wait = (attempt + 1) * 15
+            print(f"Gemini response envelope malformed/unparseable ({e}), waiting {wait}s before retry...")
+            last_error = e
+            time.sleep(wait)
+            continue
+
+    raise RuntimeError(f"Gemini still failing after {MAX_RETRIES} attempts: {last_error}")
 
 
 def generate_topics(existing_titles):
@@ -86,7 +119,7 @@ no other text, in this exact format:
   {{"title": "Short episode title", "angle": "2-3 sentence description of the real story and why it matters"}}
 ]"""
 
-    content = call_openrouter(prompt).strip()
+    content = call_gemini(prompt).strip()
     if content.startswith("```"):
         content = content.split("```")[1]
         if content.startswith("json"):
