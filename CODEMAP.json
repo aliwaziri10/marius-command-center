@@ -404,7 +404,7 @@
       "functions": [
         {
           "name": "retryable_request",
-          "line": 80,
+          "line": 112,
           "args": [
             "method",
             "url",
@@ -423,7 +423,7 @@
         },
         {
           "name": "get_next_pending_topic",
-          "line": 107,
+          "line": 139,
           "args": [],
           "calls": [
             "json",
@@ -433,7 +433,7 @@
         },
         {
           "name": "call_llm",
-          "line": 118,
+          "line": 150,
           "args": [
             "prompt"
           ],
@@ -452,7 +452,7 @@
         },
         {
           "name": "sanitize_json_control_chars",
-          "line": 169,
+          "line": 201,
           "args": [
             "text"
           ],
@@ -465,7 +465,7 @@
         },
         {
           "name": "extract_json",
-          "line": 204,
+          "line": 236,
           "args": [
             "raw_text"
           ],
@@ -484,19 +484,20 @@
         },
         {
           "name": "normalize_shot",
-          "line": 233,
+          "line": 265,
           "args": [
             "shot",
             "index"
           ],
           "calls": [
-            "get"
+            "get",
+            "strip"
           ],
           "docstring": ""
         },
         {
           "name": "normalize_hook_text",
-          "line": 258,
+          "line": 292,
           "args": [
             "result"
           ],
@@ -511,7 +512,7 @@
         },
         {
           "name": "hook_text_matches_prompt_example",
-          "line": 274,
+          "line": 308,
           "args": [
             "hook_text"
           ],
@@ -525,7 +526,7 @@
         },
         {
           "name": "hook_text_too_long_to_glance",
-          "line": 281,
+          "line": 315,
           "args": [
             "hook_text"
           ],
@@ -537,7 +538,7 @@
         },
         {
           "name": "hook_text_matches_story",
-          "line": 286,
+          "line": 320,
           "args": [
             "hook_text",
             "narration_text"
@@ -553,7 +554,7 @@
         },
         {
           "name": "narration_has_engagement_cta",
-          "line": 300,
+          "line": 334,
           "args": [
             "narration_text"
           ],
@@ -565,7 +566,7 @@
         },
         {
           "name": "find_duplicate_shots",
-          "line": 308,
+          "line": 342,
           "args": [
             "normalized_shots"
           ],
@@ -579,7 +580,7 @@
         },
         {
           "name": "find_empty_shots",
-          "line": 320,
+          "line": 354,
           "args": [
             "normalized_shots"
           ],
@@ -590,15 +591,57 @@
           "docstring": ""
         },
         {
+          "name": "find_continuation_language_shots",
+          "line": 361,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "append",
+            "enumerate",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_missing_onscreen_text_shots",
+          "line": 372,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "any",
+            "append",
+            "enumerate",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_excessive_consecutive_subject",
+          "line": 381,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "enumerate",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
           "name": "validate_and_normalize",
-          "line": 327,
+          "line": 396,
           "args": [
             "result"
           ],
           "calls": [
             "enumerate",
+            "find_continuation_language_shots",
             "find_duplicate_shots",
             "find_empty_shots",
+            "find_excessive_consecutive_subject",
+            "find_missing_onscreen_text_shots",
             "get",
             "hook_text_matches_prompt_example",
             "hook_text_matches_story",
@@ -617,7 +660,7 @@
         },
         {
           "name": "generate_script",
-          "line": 436,
+          "line": 538,
           "args": [
             "title",
             "angle"
@@ -634,7 +677,7 @@
         },
         {
           "name": "save_script",
-          "line": 671,
+          "line": 826,
           "args": [
             "topic_id",
             "narration_text",
@@ -651,7 +694,7 @@
         },
         {
           "name": "mark_topic_scripted",
-          "line": 690,
+          "line": 845,
           "args": [
             "topic_id"
           ],
@@ -662,7 +705,7 @@
         },
         {
           "name": "mark_topic_generation_failed",
-          "line": 700,
+          "line": 855,
           "args": [
             "topic_id",
             "reason"
@@ -675,7 +718,7 @@
         },
         {
           "name": "main",
-          "line": 714,
+          "line": 869,
           "args": [],
           "calls": [
             "generate_script",
@@ -690,7 +733,7 @@
         },
         {
           "name": "_simplify",
-          "line": 275,
+          "line": 309,
           "args": [
             "s"
           ],
