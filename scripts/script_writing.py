@@ -32,7 +32,7 @@ HEADERS = {
 MAX_RETRIES = 4
 MIN_SHOTS = 60
 MAX_SHOTS = 85
-MAX_GENERATION_ATTEMPTS = 8
+MAX_GENERATION_ATTEMPTS = 10
 MAX_HOOK_TEXT_CHARS = 40
 MAX_HOOK_TEXT_WORDS = 5
 MIN_SETTING_CHARS = 40
@@ -401,7 +401,8 @@ def validate_and_normalize(result):
     if narration_word_count < MIN_NARRATION_WORDS:
         return False, (
             f"narration_text is only {narration_word_count} words - need at least "
-            f"{MIN_NARRATION_WORDS} (target is 1200-1500 for an 8-10 minute episode). "
+            f"{MIN_NARRATION_WORDS} (aim for 1700-2000 for a 10-12 minute episode - "
+            f"never write close to the floor). "
             f"A short narration doesn't have enough real story content to fill "
             f"{MIN_SHOTS}+ distinct shots and forces padding the shot list with "
             f"repeated shots instead of real coverage."
@@ -587,13 +588,15 @@ Only after these opening beats should the script settle into the normal
 narrative arc. No channel intro, no "welcome back," no restating the title -
 go straight into the stake.
 
-Write a complete 8-10 minute narration script of AT LEAST 1200 words
-(target 1200-1500 words) with this opening structure, a clear narrative arc
-through the rest of the story, and a reflective closing line. This length is
-a hard requirement, not a suggestion - a short narration doesn't have enough
-real content to fill the shot list below without repeating shots, and will
-be rejected. If you don't know enough real detail about this specific story
-to reach 1200 words, expand on documented historical context, setting, and
+Write a complete 10-12 minute narration script of AT LEAST {MIN_NARRATION_WORDS}
+words - aim for 1700-2000 words, not the bare minimum, since narration close
+to the floor keeps failing validation and wasting generation attempts. Use
+the opening structure above, build a clear narrative arc through the rest
+of the story, and end with a reflective closing line. This length is a hard
+requirement, not a suggestion - a short narration doesn't have enough real
+content to fill the shot list below without repeating shots, and will be
+rejected. If you don't know enough real detail about this specific story
+to reach {MIN_NARRATION_WORDS} words, expand on documented historical context, setting, and
 the emotional experience of the people involved - do not pad with repetition
 or filler, and do not submit a short script expecting it to be padded later.
 
@@ -801,11 +804,27 @@ format:
   ]
 }}
 
-Include between {MIN_SHOTS} and {MAX_SHOTS} shots covering the full narration - every shot must be distinct, never repeat an earlier shot."""
+Include between {MIN_SHOTS} and {MAX_SHOTS} shots covering the full narration - every shot must be distinct, never repeat an earlier shot.
+
+FINAL CHECK before you output: for every shot whose visual_description
+mentions a newspaper, letter, sign, document, headline, inscription,
+poster, map, book, plaque, telegram, postcard, banner, ledger, diary,
+certificate, or gravestone/tombstone - you MUST fill in
+required_onscreen_text with the exact wording, or rewrite that shot so no
+readable text is the focus. A shot with one of those words present and
+required_onscreen_text left empty will be rejected outright."""
 
     last_reason = None
     for attempt in range(MAX_GENERATION_ATTEMPTS):
-        raw = call_llm(prompt)
+        try:
+            raw = call_llm(prompt)
+        except RuntimeError as e:
+            last_reason = f"Gemini call failed: {e}"
+            print(f"Attempt {attempt + 1}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
+            wait = (attempt + 1) * 20
+            print(f"Backing off {wait}s before next full attempt...")
+            time.sleep(wait)
+            continue
         try:
             parsed = extract_json(raw)
         except (ValueError, json.JSONDecodeError) as e:
