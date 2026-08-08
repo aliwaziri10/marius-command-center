@@ -69,6 +69,38 @@ ZOOM_FAMILY_MOVEMENTS = {"push_in", "crash_zoom", "zoom_in", "snap_zoom", "dolly
 MAX_ZOOM_SHOT_RATIO = 0.32
 MAX_CONSECUTIVE_ZOOM_SHOTS = 2
 
+MAX_CONSECUTIVE_SAME_SUBJECT = 3
+
+# Phrases that signal a shot is describing an action IN PROGRESS or asking
+# the video model to continue an action across a cut, rather than showing
+# an already-resolved, stable end state. This is a real, observed failure
+# mode: shots written this way either freeze/glitch mid-action or force the
+# next shot to "continue" motion the model can't actually carry across an
+# independent generation, and objects morph mid-motion (a cup becomes a
+# ball mid-air) when an action is described as spanning the whole shot.
+CONTINUATION_BANNED_PHRASES = (
+    "continues to", "continues ", "then walks", "then runs", "then turns",
+    "then opens", "then reaches", "then picks", "then lifts", "then carries",
+    "then hands", "then pours", "still walking", "still running", "still turning",
+    "begins to walk", "begins to run", "begins to turn", "begins to open",
+    "starts to walk", "starts to run", "starts to turn", "starts to open",
+    "walking toward", "walking to ", "walks toward", "walks to ",
+    "running toward", "running to ", "runs toward", "runs to ",
+    "turning to", "turns to face", "reaching for", "reaches for",
+    "picks up and carries", "lifts and carries", "carries the",
+    "hands over the", "pours the", "opens the door and", "proceeds to",
+)
+
+# Keywords that mean a shot is deliberately showing readable text - if any
+# of these appear in visual_description, required_onscreen_text must be
+# filled in with the exact wording, so it can be validated/enforced
+# downstream instead of hoping the video model renders it correctly.
+ONSCREEN_TEXT_KEYWORDS = (
+    "newspaper", "letter", "document", "sign", "headline", "inscription",
+    "poster", "map", "book", "plaque", "telegram", "postcard", "banner",
+    "ledger", "diary", "certificate", "gravestone", "tombstone",
+)
+
 RETRYABLE_NETWORK_EXCEPTIONS = (
     requests.exceptions.ChunkedEncodingError,
     requests.exceptions.ConnectionError,
@@ -252,6 +284,8 @@ def normalize_shot(shot, index):
         "camera_reason": shot.get("camera_reason", ""),
         "lens_effect": lens_effect,
         "sfx_cue": shot.get("sfx_cue", ""),
+        "primary_subject": (shot.get("primary_subject") or "").strip(),
+        "required_onscreen_text": (shot.get("required_onscreen_text") or "").strip(),
     }
 
 
@@ -322,6 +356,41 @@ def find_empty_shots(normalized_shots):
         i for i, s in enumerate(normalized_shots)
         if not (s["visual_description"] or "").strip() or not (s["narration_excerpt"] or "").strip()
     ]
+
+
+def find_continuation_language_shots(normalized_shots):
+    hits = []
+    for i, s in enumerate(normalized_shots):
+        desc = (s["visual_description"] or "").lower()
+        for phrase in CONTINUATION_BANNED_PHRASES:
+            if phrase in desc:
+                hits.append((i, phrase))
+                break
+    return hits
+
+
+def find_missing_onscreen_text_shots(normalized_shots):
+    hits = []
+    for i, s in enumerate(normalized_shots):
+        desc = (s["visual_description"] or "").lower()
+        if any(kw in desc for kw in ONSCREEN_TEXT_KEYWORDS) and not s["required_onscreen_text"]:
+            hits.append(i)
+    return hits
+
+
+def find_excessive_consecutive_subject(normalized_shots):
+    run_subject = None
+    run_length = 0
+    for i, s in enumerate(normalized_shots):
+        subject = s["primary_subject"].lower()
+        if subject and subject == run_subject:
+            run_length += 1
+        else:
+            run_subject = subject
+            run_length = 1 if subject else 0
+        if run_length > MAX_CONSECUTIVE_SAME_SUBJECT:
+            return i, run_subject, run_length
+    return None
 
 
 def validate_and_normalize(result):
@@ -410,6 +479,39 @@ def validate_and_normalize(result):
         return False, (
             f"{max_consecutive_zoom} zoom-in-family shots in a row (max {MAX_CONSECUTIVE_ZOOM_SHOTS}) "
             f"- too claustrophobic back to back, spread zoom movements out through the episode"
+        )
+
+    continuation_hits = find_continuation_language_shots(normalized_shots)
+    if continuation_hits:
+        worst_i, worst_phrase = continuation_hits[0]
+        return False, (
+            f"{len(continuation_hits)} shot(s) describe an action IN PROGRESS or "
+            f"continuing across a cut instead of an already-resolved end state "
+            f"(first at shot {worst_i}, phrase {worst_phrase!r}) - every shot must "
+            f"show the action already complete/stable (e.g. 'already holding the "
+            f"letter', not 'reaches for the letter'). This causes objects to morph "
+            f"mid-action and forces the next shot to fake-continue motion it never "
+            f"actually generated."
+        )
+
+    missing_text_hits = find_missing_onscreen_text_shots(normalized_shots)
+    if missing_text_hits:
+        return False, (
+            f"{len(missing_text_hits)} shot(s) deliberately show a newspaper/letter/"
+            f"sign/document/etc. (first at shot {missing_text_hits[0]}) but "
+            f"required_onscreen_text is empty - either state the exact wording that "
+            f"must appear, or rewrite visual_description so no readable text is the "
+            f"focus of the shot."
+        )
+
+    excessive_subject = find_excessive_consecutive_subject(normalized_shots)
+    if excessive_subject:
+        idx, subject, run_length = excessive_subject
+        return False, (
+            f"'{subject}' is the primary_subject of {run_length} consecutive shots "
+            f"ending at shot {idx} (max {MAX_CONSECUTIVE_SAME_SUBJECT}) - cut away to "
+            f"a different subject, angle, or B-roll before returning to this "
+            f"character, instead of holding on the same face shot after shot."
         )
 
     result["shot_list"] = normalized_shots
@@ -557,6 +659,50 @@ any recurring person described there must match their fixed appearance in
 every shot they appear in. Do not introduce a different ethnicity, region,
 or unplanned recurring character partway through.
 
+DOCUMENTARY SHOT INDEPENDENCE (HARD RULE): write the shot list as a
+documentary editor, not a movie storyboard. Every shot must be a complete,
+independent visual composition that starts from an already-stable moment
+and makes sense on its own, without depending on the shot before or after
+it. Never write a shot as a continuation of physical motion from the
+previous one, and never leave an action unresolved expecting the next shot
+to finish it - each shot must reach a complete, stable end state within
+itself (the door already open, the letter already unfolded, the cup
+already set down). Do not use words like walking, running, turning,
+opening, reaching, continues, then, next, still, or begins to when
+describing what's happening RIGHT NOW in the shot - instead describe the
+subject already in position: "standing beside the open door," "already
+seated at the table," "holding the letter, already unfolded."
+
+OBJECT INTEGRITY: every object named in a shot must remain that same
+object for the whole shot - never describe an action mid-transformation.
+This is what causes a cup to visibly become a different object mid-air.
+Favor "already holding," "already placed," "already resting on" phrasing
+over active verbs like "lifts," "pours," "hands over," which invite the
+video model to try to render (and lose track of) motion it can't sustain.
+
+CUTAWAY DISCIPLINE: the same character must not appear as the
+primary_subject of more than 3 consecutive shots. Frequently cut to B-roll
+- landscapes, buildings, documents, objects, hands, tools, crowds, weather,
+architecture - so the camera doesn't stay locked on one face shot after
+shot. Whenever the same character reappears after a cutaway, change the
+camera angle, framing, and body orientation so it doesn't look like a
+continuation of the earlier shot, but keep their fixed physical
+description (age, hair, facial hair, clothing, any distinguishing feature)
+IDENTICAL to what's stated in "setting_and_characters" every single time -
+never let the described appearance drift between shots.
+
+LEGIBLE ON-SCREEN TEXT: if a shot deliberately shows readable text (a
+newspaper headline, a letter, a sign, a document, an inscription), you
+must state the exact required wording in "required_onscreen_text" so it
+can be verified/overlaid correctly, and describe it explicitly in
+visual_description (e.g. "a period newspaper clearly displays the
+headline 'THE BATTLE OF LONDON'"). If no specific wording is required by
+the story, do NOT make readable text the focus of the shot at all - AI
+video generation cannot reliably render legible text, so prefer angling,
+partial obscuring (a hand over part of the page), or shallow focus for any
+document/sign that doesn't need to be read, rather than a clean flat shot
+of text the model will likely garble.
+
 For each shot, provide:
 - "shot_type": one of "wide", "medium", "close_up", "extreme_close_up",
   "establishing", "detail_insert"
@@ -571,6 +717,13 @@ For each shot, provide:
   "none" - use sparingly and only where it heightens the moment (e.g.
   shallow_depth_of_field on an emotional close-up, lens_flare on a
   triumphant reveal). Most shots should be "none".
+- "primary_subject": a short consistent tag for the main character/subject
+  of this shot (e.g. "the soldier", "the mother"), matching how they're
+  named in setting_and_characters. Use "" (empty string) for pure B-roll
+  shots with no named recurring character in frame (landscapes, objects,
+  documents, crowds).
+- "required_onscreen_text": if this shot deliberately shows readable text,
+  the exact wording that must appear, correctly spelled. Otherwise "".
 
 PACING RHYTHM (Gen Z attention span - keep it moving):
 - Default to quick shots (roughly 2-4 seconds of narration each). Avoid long
@@ -641,7 +794,9 @@ format:
       "camera_movement": "push_in",
       "camera_reason": "Why this movement fits this beat",
       "lens_effect": "none",
-      "sfx_cue": ""
+      "sfx_cue": "",
+      "primary_subject": "",
+      "required_onscreen_text": ""
     }}
   ]
 }}
