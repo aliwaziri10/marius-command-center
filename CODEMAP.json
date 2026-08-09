@@ -401,10 +401,362 @@
     },
     {
       "path": "scripts/script_writing.py",
-      "parse_error": "unmatched ')' (script_writing.py, line 902)",
-      "functions": [],
-      "env_vars": [],
-      "tables": []
+      "functions": [
+        {
+          "name": "retryable_request",
+          "line": 124,
+          "args": [
+            "method",
+            "url",
+            "max_retries"
+          ],
+          "calls": [
+            "RuntimeError",
+            "isinstance",
+            "print",
+            "raise_for_status",
+            "range",
+            "request",
+            "sleep"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "get_next_pending_topic",
+          "line": 151,
+          "args": [],
+          "calls": [
+            "json",
+            "retryable_request"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "call_llm",
+          "line": 162,
+          "args": [
+            "prompt"
+          ],
+          "calls": [
+            "RuntimeError",
+            "dumps",
+            "encode",
+            "json",
+            "post",
+            "print",
+            "raise_for_status",
+            "range",
+            "sleep"
+          ],
+          "docstring": "PROVIDER SWITCH (2026-08-06): Gemini only - OpenRouter removed"
+        },
+        {
+          "name": "sanitize_json_control_chars",
+          "line": 213,
+          "args": [
+            "text"
+          ],
+          "calls": [
+            "append",
+            "join",
+            "ord"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "extract_json",
+          "line": 248,
+          "args": [
+            "raw_text"
+          ],
+          "calls": [
+            "ValueError",
+            "find",
+            "loads",
+            "rfind",
+            "sanitize_json_control_chars",
+            "split",
+            "startswith",
+            "str",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "normalize_shot",
+          "line": 277,
+          "args": [
+            "shot",
+            "index"
+          ],
+          "calls": [
+            "get",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "normalize_hook_text",
+          "line": 304,
+          "args": [
+            "result"
+          ],
+          "calls": [
+            "get",
+            "len",
+            "rsplit",
+            "rstrip",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "hook_text_matches_prompt_example",
+          "line": 320,
+          "args": [
+            "hook_text"
+          ],
+          "calls": [
+            "_simplify",
+            "isalnum",
+            "join",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "hook_text_too_long_to_glance",
+          "line": 327,
+          "args": [
+            "hook_text"
+          ],
+          "calls": [
+            "len",
+            "split"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "hook_text_matches_story",
+          "line": 332,
+          "args": [
+            "hook_text",
+            "narration_text"
+          ],
+          "calls": [
+            "any",
+            "len",
+            "lower",
+            "split",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "narration_has_engagement_cta",
+          "line": 346,
+          "args": [
+            "narration_text"
+          ],
+          "calls": [
+            "any",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_duplicate_shots",
+          "line": 354,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "Counter",
+            "items",
+            "lower",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_empty_shots",
+          "line": 366,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "enumerate",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_continuation_language_shots",
+          "line": 373,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "append",
+            "enumerate",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_missing_onscreen_text_shots",
+          "line": 384,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "any",
+            "append",
+            "enumerate",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_excessive_consecutive_subject",
+          "line": 393,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "enumerate",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "validate_and_normalize",
+          "line": 408,
+          "args": [
+            "result"
+          ],
+          "calls": [
+            "enumerate",
+            "find_continuation_language_shots",
+            "find_duplicate_shots",
+            "find_empty_shots",
+            "find_excessive_consecutive_subject",
+            "find_missing_onscreen_text_shots",
+            "get",
+            "hook_text_matches_prompt_example",
+            "hook_text_matches_story",
+            "hook_text_too_long_to_glance",
+            "isinstance",
+            "len",
+            "max",
+            "narration_has_engagement_cta",
+            "normalize_hook_text",
+            "normalize_shot",
+            "split",
+            "strip",
+            "sum"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "generate_script",
+          "line": 551,
+          "args": [
+            "title",
+            "angle"
+          ],
+          "calls": [
+            "InfraFailure",
+            "RuntimeError",
+            "call_llm",
+            "extract_json",
+            "print",
+            "range",
+            "sleep",
+            "validate_and_normalize"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "save_script",
+          "line": 865,
+          "args": [
+            "topic_id",
+            "narration_text",
+            "shot_list",
+            "music_mood",
+            "hook_text",
+            "setting_and_characters"
+          ],
+          "calls": [
+            "print",
+            "retryable_request"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "mark_topic_scripted",
+          "line": 884,
+          "args": [
+            "topic_id"
+          ],
+          "calls": [
+            "retryable_request"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "mark_topic_generation_failed",
+          "line": 894,
+          "args": [
+            "topic_id",
+            "reason"
+          ],
+          "calls": [
+            "print",
+            "retryable_request",
+            "str"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 908,
+          "args": [],
+          "calls": [
+            "generate_script",
+            "get_next_pending_topic",
+            "mark_topic_generation_failed",
+            "mark_topic_scripted",
+            "print",
+            "save_script",
+            "str"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_simplify",
+          "line": 321,
+          "args": [
+            "s"
+          ],
+          "calls": [
+            "isalnum",
+            "join",
+            "lower"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "GEMINI_API_KEY",
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": [
+        "scripts",
+        "topics"
+      ]
     },
     {
       "path": "scripts/test_narration_edgetts.py",
