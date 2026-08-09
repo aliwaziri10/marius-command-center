@@ -109,6 +109,18 @@ RETRYABLE_NETWORK_EXCEPTIONS = (
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
+class InfraFailure(RuntimeError):
+    """Raised when every generation attempt failed purely because Gemini
+    never returned a usable response (rate limits, network errors, or a
+    malformed response envelope on every single attempt) - meaning the
+    topic's actual content was never evaluated at all. This must NOT be
+    treated the same as a real content failure: the topic itself did
+    nothing wrong, so it must stay 'pending' for the next scheduled run
+    to retry once Gemini's quota/availability recovers, instead of being
+    permanently blacklisted as generation_failed."""
+    pass
+
+
 def retryable_request(method, url, max_retries=MAX_RETRIES, **kwargs):
     last_error = None
     for attempt in range(max_retries):
@@ -815,6 +827,7 @@ readable text is the focus. A shot with one of those words present and
 required_onscreen_text left empty will be rejected outright."""
 
     last_reason = None
+    ever_reached_content = False
     for attempt in range(MAX_GENERATION_ATTEMPTS):
         try:
             raw = call_llm(prompt)
@@ -825,6 +838,7 @@ required_onscreen_text left empty will be rejected outright."""
             print(f"Backing off {wait}s before next full attempt...")
             time.sleep(wait)
             continue
+        ever_reached_content = True
         try:
             parsed = extract_json(raw)
         except (ValueError, json.JSONDecodeError) as e:
@@ -839,6 +853,12 @@ required_onscreen_text left empty will be rejected outright."""
         last_reason = result
         print(f"Attempt {attempt + 1}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
 
+    if not ever_reached_content:
+        raise InfraFailure(
+            f"Gemini never returned a usable response in {MAX_GENERATION_ATTEMPTS} "
+            f"attempts (pure API/rate-limit failure - topic content was never "
+            f"actually evaluated). Last reason: {last_reason}"
+        )
     raise RuntimeError(f"Script generation failed after {MAX_GENERATION_ATTEMPTS} attempts. Last reason: {last_reason}")
 
 
@@ -894,6 +914,10 @@ def main():
     print(f"Writing script for: {topic['title']}")
     try:
         result = generate_script(topic["title"], topic["angle"])
+    except InfraFailure as e:
+        print(f"Gemini infra failure, not the topic's fault - leaving topic {topic['id']} as "
+              f"pending so the next scheduled run retries it: {e}")
+        return
     except RuntimeError as e:
         mark_topic_generation_failed(topic["id"], str(e))
         return
