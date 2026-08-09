@@ -896,8 +896,9 @@ def mark_topic_generation_failed(topic_id, reason):
         "PATCH",
         f"{SUPABASE_URL}/rest/v1/topics?id=eq.{topic_id}",
         headers=HEADERS,
-        json={"status": "generation_failed"},
+        json={"status": "generation_failed", "last_failure_reason": str(reason)[:2000]},
         timeout=30,
+    )
     )
     print(f"Topic {topic_id} marked generation_failed - will be skipped by future runs until manually "
           f"reset. Last reason: {reason}")
