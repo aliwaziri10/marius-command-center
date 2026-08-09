@@ -899,7 +899,6 @@ def mark_topic_generation_failed(topic_id, reason):
         json={"status": "generation_failed", "last_failure_reason": str(reason)[:2000]},
         timeout=30,
     )
-    )
     print(f"Topic {topic_id} marked generation_failed - will be skipped by future runs until manually "
           f"reset. Last reason: {reason}")
     print(f"FIX: review/reword the topic's title or angle in the topics table for {topic_id}, then "
