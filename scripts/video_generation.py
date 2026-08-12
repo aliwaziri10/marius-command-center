@@ -1,11 +1,4 @@
-{
-  "owner": "aliwaziri10",
-  "repo": "marius-command-center",
-  "path": "scripts/video_generation.py",
-  "branch": "main",
-  "sha": "4c4c6d3273cff898ee5bf19b2ef566318882c7f1",
-  "message": "Add 3-tier content-policy fallback (anchor-free last resort) - fixes scripts flagging even with no ethnicity/atrocity content",
-  "content": "\"\"\"
+"""
 Marius Command Center - Video Generation Agent
 Takes the oldest script with images generated and generates one real AI
 video clip per shot using Agnes AI, sized to match narration timing, then
@@ -56,8 +49,8 @@ error.
 
 LIGHTING FIX (2026-07-19): Agnes prompts had no lighting/exposure cue at
 all, so the model defaulted to moody/underlit documentary-style footage
-on nearly every shot. build_agnes_prompt now appends a \"well-lit, balanced
-exposure\" cue automatically, UNLESS the shot's own visual_description
+on nearly every shot. build_agnes_prompt now appends a "well-lit, balanced
+exposure" cue automatically, UNLESS the shot's own visual_description
 already implies a deliberately dark scene (night, dusk, shadow, etc.) -
 in which case we leave it alone so genuinely dark scenes aren't forced
 bright.
@@ -118,7 +111,7 @@ now pulls the CANDIDATE_POOL_SIZE oldest ready scripts and works through
 them in order within the same run.
 
 CAPTIONS REMOVED (2026-07-21): burned-in narration captions were showing up
-on screen over the finished video (\"The Courier of the Siege\" upload) -
+on screen over the finished video ("The Courier of the Siege" upload) -
 Zia wants video only, no visible script text. assemble_final_video no
 longer composites caption_clips onto the final video. The caption-building
 functions are left in place, just unused, in case this is wanted back in
@@ -129,8 +122,8 @@ candidate made ZERO progress (fully overloaded on its first shot). It did
 NOT help when a candidate was healthy and slowly working - process_script
 used to return as soon as ANY shot succeeded, taking a full CLIP_BATCH_LIMIT
 batch (up to 8 shots) from whichever script was oldest, then main() stopped
-the entire run right there. Confirmed in production: \"The Laundress of
-Lawrence\" (63 shots, oldest ready script) consumed every single run's full
+the entire run right there. Confirmed in production: "The Laundress of
+Lawrence" (63 shots, oldest ready script) consumed every single run's full
 shot budget for over a week straight, while 13 other fully-scripted episodes
 behind it sat at 0/N shots the entire time - a slow-but-working script
 starved everything else just as badly as a fully-stalled one did.
@@ -151,22 +144,22 @@ SFX were turned up, so music was drowning out narration in every video.
 Restored to spec: NARRATION_VOLUME=1.0, MUSIC_VOLUME=0.18, SFX_VOLUME=0.85.
 
 LIGHTING FIX PART 2 (2026-07-29): the 2026-07-19 lighting fix appended
-\"well-lit, balanced exposure\" at the END of the prompt, after the full
+"well-lit, balanced exposure" at the END of the prompt, after the full
 visual_description. Video generation models weight earlier tokens more
 heavily, so a long moody documentary-style description up front (fog,
 smoke, archives, etc. - none of which trip DARK_SCENE_KEYWORDS but still
 read as visually dark) was drowning out a lighting cue tacked on at the
 back, and nearly every shot was still rendering underlit. build_agnes_prompt
-now puts a stronger \"bright natural daylight, high-key lighting,
-well-exposed, vivid colors\" cue FIRST in the prompt instead of last,
+now puts a stronger "bright natural daylight, high-key lighting,
+well-exposed, vivid colors" cue FIRST in the prompt instead of last,
 for shots that don't already imply a deliberately dark scene.
 
 ONE-TAKE / ANCHOR / ANACHRONISM FIX (2026-07-29): three related fixes based
-on direct feedback after watching a finished \"Erased\" upload:
+on direct feedback after watching a finished "Erased" upload:
 1. Shots longer than MAX_CLIP_SECONDS were being split into multiple
    SEPARATE Agnes generations of the same prompt and stitched together -
    since Agnes has no memory between calls, each independent generation
-   rendered its own random camera angle, so a single \"shot\" visibly cut
+   rendered its own random camera angle, so a single "shot" visibly cut
    between 2-3 unrelated takes instead of playing as one continuous shot.
    generate_shot_clip now generates exactly ONE take (up to the cap) and
    extends any remaining duration by holding its final frame instead.
@@ -176,9 +169,9 @@ on direct feedback after watching a finished \"Erased\" upload:
    claiming this was wired up - it wasn't. It is now threaded through
    generate_shot_clip -> _generate_one_segment -> build_agnes_prompt, so
    every shot's prompt is anchored to the episode's real setting/era.
-3. Added an explicit ANACHRONISM_GUARD (\"no modern technology, no cars, no
-   drones, no modern clothing, no digital devices\") and QUALITY_GUARD
-   (\"shot on film, vivid saturated color, no sepia, no CGI look\") to every
+3. Added an explicit ANACHRONISM_GUARD ("no modern technology, no cars, no
+   drones, no modern clothing, no digital devices") and QUALITY_GUARD
+   ("shot on film, vivid saturated color, no sepia, no CGI look") to every
    prompt, to stop modern-day objects/vehicles leaking into historical
    scenes and to push back against Agnes's tendency toward a flat,
    desaturated, synthetic-looking default grade.
@@ -199,13 +192,13 @@ mode for video) and both still within the $0/free-tier ceiling:
    guards. The resulting image URL is stored in scripts.character_reference_url
    (new column) so it's generated at most once per script, ever - reused
    on every resumed run.
-2. Every shot's Agnes video call now passes an \"image\" anchor: shot 0 uses
+2. Every shot's Agnes video call now passes an "image" anchor: shot 0 uses
    the character reference image; every shot after that uses the LAST
    FRAME of the previous shot's own clip (extracted via moviepy, uploaded
    to storage, passed as image-to-video input). This chains shots visually
    frame-to-frame instead of generating each one blind, which is the same
-   mechanism Agnes's own docs describe for maintaining \"consistent character
-   identity\" and \"natural camera movement\" across a sequence. On resume
+   mechanism Agnes's own docs describe for maintaining "consistent character
+   identity" and "natural camera movement" across a sequence. On resume
    (script picked up mid-way through a later run), the anchor is
    reconstructed by downloading the most recently completed clip and
    extracting its last frame, so continuity isn't lost across run
@@ -213,14 +206,14 @@ mode for video) and both still within the $0/free-tier ceiling:
 This does NOT use true keyframe-interpolation mode (which needs a known
 END frame, which we don't have ahead of generation) - it uses Agnes's
 image-to-video mode with a single starting anchor image, which is the
-correct mode for \"continue from here\" rather than \"interpolate between
-two known points\".
+correct mode for "continue from here" rather than "interpolate between
+two known points".
 
 UPLOAD UPSERT FIX (2026-07-31): upload_clip/upload_reference_image/
 upload_video used plain PUT with no upsert flag, so re-uploading to a
 path that already exists (e.g. a script manually reset back to shot 0
 for regeneration) fails with a duplicate-object conflict and crashes the
-whole run instead of overwriting. All three now send \"x-upsert: true\" so
+whole run instead of overwriting. All three now send "x-upsert: true" so
 regenerating an already-existing script's clips/reference/final video
 always succeeds.
 
@@ -230,7 +223,7 @@ overflow past MAX_CLIP_SECONDS.
 
 FREEZE-FRAME ROUNDING FIX (2026-08-03): round_to_valid_frames() used
 round-to-nearest when snapping a target frame count to Agnes's valid
-\"8n+1\" frame grid, which rounds DOWN roughly half the time - producing a
+"8n+1" frame grid, which rounds DOWN roughly half the time - producing a
 clip up to ~0.3s shorter than the requested duration, silently eaten by a
 frozen last frame at assembly time. Zia confirmed a persistent ~0.5s
 freeze on every shot despite the 2026-08-01 chain-extension fix, which
@@ -239,8 +232,8 @@ rounding shortfall. Switched to ceiling rounding so every generated clip
 is always >= its target duration - nothing left to freeze except
 sub-frame (a few milliseconds) remainders.
 
-ANACHRONISM GUARD STRENGTHENED (2026-08-03): a generic \"no digital
-devices\" phrase in ANACHRONISM_GUARD wasn't specific enough - Agnes
+ANACHRONISM GUARD STRENGTHENED (2026-08-03): a generic "no digital
+devices" phrase in ANACHRONISM_GUARD wasn't specific enough - Agnes
 rendered people sitting behind laptops in a 1994 Rwanda scene despite it.
 Added explicit named objects (laptops, computers, smartphones, tablets,
 screens/monitors, modern furniture, electrical wiring, plastic) so the
@@ -258,8 +251,8 @@ _sanitize_anchor_for_fallback (strips clauses containing a fixed keyword
 list). This was only a PARTIAL fix.
 
 3-TIER FALLBACK (2026-08-12): all 4 scripts reset after the 2026-08-07 fix
-landed re-flagged anyway - including \"The Mechanic Who Kept Solidarity
-Rolling\" (82eb9746, 1980s communist Poland), which has ZERO ethnicity or
+landed re-flagged anyway - including "The Mechanic Who Kept Solidarity
+Rolling" (82eb9746, 1980s communist Poland), which has ZERO ethnicity or
 atrocity content in its setting_and_characters at all. This proves the
 single sanitized-anchor fallback was never a complete fix: whatever Agnes
 is actually reacting to on some shots isn't fully captured by the
@@ -273,7 +266,7 @@ lighting/quality/anachronism guards). Only if that ultra-generic prompt is
 STILL rejected does the shot actually fail and the script get flagged -
 which should now be rare to the point of near-zero, since tier 2 carries
 no story-specific content whatsoever for Agnes to react to.
-\"\"\"
+"""
 
 import os
 import re
@@ -300,37 +293,37 @@ FADE_IN_SECONDS = 0.75
 FADE_OUT_SECONDS = 1.5
 TRAIL_SECONDS = 3.0
 
-SUPABASE_URL = os.environ[\"SUPABASE_URL\"]
-SUPABASE_KEY = os.environ[\"SUPABASE_SECRET_KEY\"]
-AGNES_API_KEY = os.environ[\"AGNES_API_KEY\"]
-FREESOUND_API_KEY = os.environ.get(\"FREESOUND_API_KEY\")
-ACE_MUSIC_API_KEY = os.environ.get(\"ACE_MUSIC_API_KEY\")
-HF_TOKEN = os.environ.get(\"HF_TOKEN\")
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
+AGNES_API_KEY = os.environ["AGNES_API_KEY"]
+FREESOUND_API_KEY = os.environ.get("FREESOUND_API_KEY")
+ACE_MUSIC_API_KEY = os.environ.get("ACE_MUSIC_API_KEY")
+HF_TOKEN = os.environ.get("HF_TOKEN")
 
 HEADERS = {
-    \"apikey\": SUPABASE_KEY,
-    \"Authorization\": f\"Bearer {SUPABASE_KEY}\",
-    \"Content-Type\": \"application/json\",
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
 }
 
-AGNES_BASE = \"https://apihub.agnes-ai.com/v1\"
-AGNES_POLL_URL = \"https://apihub.agnes-ai.com/agnesapi\"
-AGNES_IMAGE_URL = f\"{AGNES_BASE}/images/generations\"
+AGNES_BASE = "https://apihub.agnes-ai.com/v1"
+AGNES_POLL_URL = "https://apihub.agnes-ai.com/agnesapi"
+AGNES_IMAGE_URL = f"{AGNES_BASE}/images/generations"
 AGNES_HEADERS = {
-    \"Authorization\": f\"Bearer {AGNES_API_KEY}\",
-    \"Content-Type\": \"application/json\",
+    "Authorization": f"Bearer {AGNES_API_KEY}",
+    "Content-Type": "application/json",
 }
 
-ACE_MUSIC_BASES = [\"https://api.acemusic.ai\", \"https://ai.acemusic.ai\"]
+ACE_MUSIC_BASES = ["https://api.acemusic.ai", "https://ai.acemusic.ai"]
 ACE_MUSIC_HEADERS = {
-    \"Authorization\": f\"Bearer {ACE_MUSIC_API_KEY}\",
-    \"Content-Type\": \"application/json\",
+    "Authorization": f"Bearer {ACE_MUSIC_API_KEY}",
+    "Content-Type": "application/json",
 }
 
-HF_MUSICGEN_URL = \"https://api-inference.huggingface.co/models/facebook/musicgen-small\"
+HF_MUSICGEN_URL = "https://api-inference.huggingface.co/models/facebook/musicgen-small"
 
-VIDEO_BUCKET = \"videos\"
-CLIP_BUCKET = \"video_clips\"
+VIDEO_BUCKET = "videos"
+CLIP_BUCKET = "video_clips"
 WIDTH, HEIGHT = 1280, 720
 FRAME_RATE = 24
 MIN_FRAMES = 49
@@ -357,7 +350,7 @@ CLIP_VERIFY_RETRY_WAIT = 5
 # SMOOTH-EXTENSION FIX (2026-08-01): when a shot (or the final trail) needs
 # more duration than one Agnes generation can produce (MAX_CLIP_SECONDS),
 # this used to freeze the last frame for the remainder - visible as a
-# \"stuck\" still image, happening at every sentence-boundary pause across
+# "stuck" still image, happening at every sentence-boundary pause across
 # an episode plus every single video's outro. MAX_CHAIN_SEGMENTS caps how
 # many additional REAL Agnes clips we'll chain (each anchored to the
 # previous clip's own last frame, same mechanism as cross-shot continuity)
@@ -368,14 +361,14 @@ CLIP_VERIFY_RETRY_WAIT = 5
 MAX_CHAIN_SEGMENTS = 3
 
 DARK_SCENE_KEYWORDS = (
-    \"night\", \"dark\", \"dim\", \"shadow\", \"silhouette\", \"dusk\", \"twilight\",
-    \"candlelit\", \"moonlit\", \"underground\", \"cave\", \"storm\", \"eclipse\",
-    \"blackout\", \"gloom\",
+    "night", "dark", "dim", "shadow", "silhouette", "dusk", "twilight",
+    "candlelit", "moonlit", "underground", "cave", "storm", "eclipse",
+    "blackout", "gloom",
 )
 
 CAPTION_FONT_PATHS = [
-    \"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf\",
-    \"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf\",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
 ]
 CAPTION_FONT_SIZE = 28
 CAPTION_MAX_WIDTH_RATIO = 0.70
@@ -410,7 +403,7 @@ def round_to_valid_frames(num_frames):
 
 def get_ready_scripts(limit=CANDIDATE_POOL_SIZE):
     resp = requests.get(
-        f\"{SUPABASE_URL}/rest/v1/scripts?status=eq.images_generated&order=created_at.asc&limit={limit}\",
+        f"{SUPABASE_URL}/rest/v1/scripts?status=eq.images_generated&order=created_at.asc&limit={limit}",
         headers=HEADERS,
         timeout=30,
     )
@@ -421,21 +414,21 @@ def get_ready_scripts(limit=CANDIDATE_POOL_SIZE):
 def download_file(url, out_path):
     r = requests.get(url, timeout=120)
     r.raise_for_status()
-    with open(out_path, \"wb\") as f:
+    with open(out_path, "wb") as f:
         f.write(r.content)
     return out_path
 
 
 ANACHRONISM_GUARD = (
-    \"historically accurate to this exact time period and setting, no modern technology, \"
-    \"no cars, no drones, no modern clothing, no digital devices, no anachronistic objects of any kind, \"
-    \"no laptops, no computers, no smartphones, no tablets, no screens or monitors of any kind, \"
-    \"no modern furniture, no electrical wiring or outlets, no plastic objects\"
+    "historically accurate to this exact time period and setting, no modern technology, "
+    "no cars, no drones, no modern clothing, no digital devices, no anachronistic objects of any kind, "
+    "no laptops, no computers, no smartphones, no tablets, no screens or monitors of any kind, "
+    "no modern furniture, no electrical wiring or outlets, no plastic objects"
 )
 
 QUALITY_GUARD = (
-    \"shot on film, natural film grain, vivid saturated color, no sepia tone, \"
-    \"no heavy desaturation, no muted documentary color grading, no artificial CGI look, no plastic skin\"
+    "shot on film, natural film grain, vivid saturated color, no sepia tone, "
+    "no heavy desaturation, no muted documentary color grading, no artificial CGI look, no plastic skin"
 )
 
 
@@ -450,29 +443,29 @@ QUALITY_GUARD = (
 # ethnicity/genocide/war-crime clauses from the anchor. Confirmed (2026-08-12)
 # this is NOT a complete fix on its own - see TIER 2 below.
 FALLBACK_STRIP_KEYWORDS = [
-    \"hutu\", \"tutsi\", \"bosniak\", \"serb\", \"serbian\", \"croat\", \"nazi\", \"ss \",
-    \"gestapo\", \"genocide\", \"ethnic\", \"siege\", \"concentration camp\",
-    \"holocaust\", \"massacre\", \"militia\", \"death camp\", \"war crime\",
+    "hutu", "tutsi", "bosniak", "serb", "serbian", "croat", "nazi", "ss ",
+    "gestapo", "genocide", "ethnic", "siege", "concentration camp",
+    "holocaust", "massacre", "militia", "death camp", "war crime",
 ]
 
 
 def _sanitize_anchor_for_fallback(anchor):
-    \"\"\"Drops clauses/sentences containing ethnicity- or atrocity-related
+    """Drops clauses/sentences containing ethnicity- or atrocity-related
     keywords from an anchor string, for use only on content-policy fallback
     tier 1. Keeps whatever's left (era, location, physical character
-    description) so continuity/likeness isn't lost entirely.\"\"\"
+    description) so continuity/likeness isn't lost entirely."""
     if not anchor:
         return anchor
-    pieces = re.split(r'(?<=[.;])\\s+', anchor)
+    pieces = re.split(r'(?<=[.;])\s+', anchor)
     kept = [
         p for p in pieces
         if not any(kw in p.lower() for kw in FALLBACK_STRIP_KEYWORDS)
     ]
-    return \" \".join(kept).strip()
+    return " ".join(kept).strip()
 
 
-def build_agnes_prompt(shot, setting_and_characters=\"\", fallback_level=0):
-    \"\"\"
+def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
+    """
     fallback_level 0 (primary): full anchor + full visual_description.
     fallback_level 1: sanitized anchor (ethnicity/atrocity clauses stripped
         via _sanitize_anchor_for_fallback) + generic shot-type description,
@@ -480,68 +473,68 @@ def build_agnes_prompt(shot, setting_and_characters=\"\", fallback_level=0):
     fallback_level 2 (2026-08-12, TIER 2): ULTRA-SAFE - drops the anchor
         entirely, not just sanitizes it. Added because content_flagged
         scripts kept recurring even on stories with NO ethnicity/atrocity
-        words whatsoever (e.g. \"The Mechanic Who Kept Solidarity Rolling\",
+        words whatsoever (e.g. "The Mechanic Who Kept Solidarity Rolling",
         a 1980s communist Poland story with no ethnic/atrocity content in
         its anchor at all) - proving the level-1 keyword list doesn't cover
         every trigger Agnes reacts to on some shots. Level 2 carries zero
         episode-specific content (no names, no location, no ethnicity) so
         a single stubborn shot can no longer take down the whole episode.
-    \"\"\"
-    shot_type = (shot.get(\"shot_type\") or \"medium\").replace(\"_\", \" \")
-    camera_movement = (shot.get(\"camera_movement\") or \"static\").replace(\"_\", \" \")
-    lens_effect = shot.get(\"lens_effect\") or \"none\"
-    anchor = (setting_and_characters or \"\").strip()
+    """
+    shot_type = (shot.get("shot_type") or "medium").replace("_", " ")
+    camera_movement = (shot.get("camera_movement") or "static").replace("_", " ")
+    lens_effect = shot.get("lens_effect") or "none"
+    anchor = (setting_and_characters or "").strip()
 
     if fallback_level == 0:
-        visual = shot.get(\"visual_description\", \"\").strip()
+        visual = shot.get("visual_description", "").strip()
         parts = []
         if anchor:
             parts.append(anchor)
         if not any(kw in visual.lower() for kw in DARK_SCENE_KEYWORDS):
-            parts.append(\"bright natural daylight, high-key lighting, well-exposed, vivid colors\")
+            parts.append("bright natural daylight, high-key lighting, well-exposed, vivid colors")
         parts.append(QUALITY_GUARD)
         parts.append(ANACHRONISM_GUARD)
         parts.append(visual)
-        parts.append(f\"{shot_type} shot\")
+        parts.append(f"{shot_type} shot")
     elif fallback_level == 1:
         anchor = _sanitize_anchor_for_fallback(anchor)
         parts = []
         if anchor:
             parts.append(anchor)
-        parts.append(\"bright natural daylight, high-key lighting, well-exposed\")
+        parts.append("bright natural daylight, high-key lighting, well-exposed")
         parts.append(QUALITY_GUARD)
         parts.append(ANACHRONISM_GUARD)
-        parts.append(f\"{shot_type} cinematic documentary shot\")
+        parts.append(f"{shot_type} cinematic documentary shot")
     else:
         parts = [
-            \"generic historical documentary reenactment scene, unspecified period figures\",
-            \"bright natural daylight, high-key lighting, well-exposed\",
+            "generic historical documentary reenactment scene, unspecified period figures",
+            "bright natural daylight, high-key lighting, well-exposed",
             QUALITY_GUARD,
             ANACHRONISM_GUARD,
-            f\"{shot_type} cinematic documentary shot\",
+            f"{shot_type} cinematic documentary shot",
         ]
 
-    if camera_movement != \"static\":
-        parts.append(f\"camera {camera_movement}\")
-    if lens_effect != \"none\":
-        parts.append(lens_effect.replace(\"_\", \" \"))
+    if camera_movement != "static":
+        parts.append(f"camera {camera_movement}")
+    if lens_effect != "none":
+        parts.append(lens_effect.replace("_", " "))
 
-    return \", \".join(p for p in parts if p)
+    return ", ".join(p for p in parts if p)
 
 
 def build_character_reference_prompt(setting_and_characters):
     parts = [
         setting_and_characters.strip(),
-        \"character reference portrait, full figure visible, neutral pose, clear face and clothing detail\",
-        \"bright natural daylight, high-key lighting, well-exposed, vivid colors\",
+        "character reference portrait, full figure visible, neutral pose, clear face and clothing detail",
+        "bright natural daylight, high-key lighting, well-exposed, vivid colors",
         QUALITY_GUARD,
         ANACHRONISM_GUARD,
     ]
-    return \", \".join(p for p in parts if p)
+    return ", ".join(p for p in parts if p)
 
 
 def generate_character_reference(script):
-    \"\"\"
+    """
     Generates ONE reference image per script (via agnes-image-2.1-flash),
     anchored to the episode's setting_and_characters text, so every shot's
     video call has a consistent character/setting to hold onto instead of
@@ -551,15 +544,15 @@ def generate_character_reference(script):
     text to anchor to, or if Agnes's image endpoint fails after retries -
     the pipeline still works without it, just without the consistency
     boost.
-    \"\"\"
-    script_id = script[\"id\"]
-    existing = script.get(\"character_reference_url\")
+    """
+    script_id = script["id"]
+    existing = script.get("character_reference_url")
     if existing:
         return existing
 
-    anchor = (script.get(\"setting_and_characters\") or \"\").strip()
+    anchor = (script.get("setting_and_characters") or "").strip()
     if not anchor:
-        print(\"No setting_and_characters text on this script - skipping character reference image.\")
+        print("No setting_and_characters text on this script - skipping character reference image.")
         return None
 
     prompt = build_character_reference_prompt(anchor)
@@ -571,121 +564,121 @@ def generate_character_reference(script):
                 AGNES_IMAGE_URL,
                 headers=AGNES_HEADERS,
                 json={
-                    \"model\": \"agnes-image-2.1-flash\",
-                    \"prompt\": prompt,
-                    \"size\": f\"{WIDTH}x{HEIGHT}\",
-                    \"extra_body\": {\"response_format\": \"url\"},
+                    "model": "agnes-image-2.1-flash",
+                    "prompt": prompt,
+                    "size": f"{WIDTH}x{HEIGHT}",
+                    "extra_body": {"response_format": "url"},
                 },
                 timeout=60,
             )
         except requests.RequestException as e:
             last_error_text = str(e)
-            print(f\"Character reference image request raised an exception (attempt {attempt + 1}/{AGNES_IMAGE_MAX_RETRIES}): {e}\")
+            print(f"Character reference image request raised an exception (attempt {attempt + 1}/{AGNES_IMAGE_MAX_RETRIES}): {e}")
             time.sleep(10 * (attempt + 1))
             continue
 
         if resp.status_code in AGNES_RETRYABLE_CODES:
             last_error_text = resp.text
-            print(f\"Character reference image transient error {resp.status_code} (attempt {attempt + 1}/{AGNES_IMAGE_MAX_RETRIES}): {resp.text}\")
+            print(f"Character reference image transient error {resp.status_code} (attempt {attempt + 1}/{AGNES_IMAGE_MAX_RETRIES}): {resp.text}")
             time.sleep(10 * (attempt + 1))
             continue
 
         if resp.status_code >= 400:
-            print(f\"Character reference image generation failed permanently ({resp.status_code}): {resp.text} - continuing without a reference image.\")
+            print(f"Character reference image generation failed permanently ({resp.status_code}): {resp.text} - continuing without a reference image.")
             return None
 
         data = resp.json()
         image_url = None
-        for entry in data.get(\"data\", []):
-            if isinstance(entry, dict) and entry.get(\"url\"):
-                image_url = entry[\"url\"]
+        for entry in data.get("data", []):
+            if isinstance(entry, dict) and entry.get("url"):
+                image_url = entry["url"]
                 break
         if not image_url:
-            image_url = data.get(\"url\")
+            image_url = data.get("url")
 
         if not image_url:
-            print(f\"Character reference image response had no usable URL: {data} - continuing without a reference image.\")
+            print(f"Character reference image response had no usable URL: {data} - continuing without a reference image.")
             return None
 
         resp2 = requests.patch(
-            f\"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}\",
+            f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
             headers=HEADERS,
-            json={\"character_reference_url\": image_url},
+            json={"character_reference_url": image_url},
             timeout=30,
         )
         resp2.raise_for_status()
-        print(f\"Character reference image generated and saved for script {script_id}.\")
+        print(f"Character reference image generated and saved for script {script_id}.")
         return image_url
 
-    print(f\"Character reference image generation exhausted all retries ({last_error_text}) - continuing without one.\")
+    print(f"Character reference image generation exhausted all retries ({last_error_text}) - continuing without one.")
     return None
 
 
 def upload_reference_image(script_id, file_name, local_path):
-    with open(local_path, \"rb\") as f:
+    with open(local_path, "rb") as f:
         file_bytes = f.read()
-    dest = f\"{script_id}/refs/{file_name}\"
+    dest = f"{script_id}/refs/{file_name}"
     resp = requests.put(
-        f\"{SUPABASE_URL}/storage/v1/object/{CLIP_BUCKET}/{dest}\",
+        f"{SUPABASE_URL}/storage/v1/object/{CLIP_BUCKET}/{dest}",
         headers={
-            \"apikey\": SUPABASE_KEY,
-            \"Authorization\": f\"Bearer {SUPABASE_KEY}\",
-            \"Content-Type\": \"image/png\",
-            \"x-upsert\": \"true\",
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "image/png",
+            "x-upsert": "true",
         },
         data=file_bytes,
         timeout=60,
     )
     if resp.status_code >= 400:
-        print(f\"Reference frame upload failed - status {resp.status_code}: {resp.text}\")
+        print(f"Reference frame upload failed - status {resp.status_code}: {resp.text}")
         return None
-    return f\"{SUPABASE_URL}/storage/v1/object/public/{CLIP_BUCKET}/{dest}\"
+    return f"{SUPABASE_URL}/storage/v1/object/public/{CLIP_BUCKET}/{dest}"
 
 
 def extract_last_frame_url(script_id, shot_index, local_video_path):
-    \"\"\"
+    """
     Pulls the final frame of a just-generated (or already-downloaded) shot
-    clip and uploads it as a small PNG, so it can be passed as the \"image\"
+    clip and uploads it as a small PNG, so it can be passed as the "image"
     anchor for the NEXT shot's Agnes call - this is what chains shots
     together visually instead of each one being generated blind. Fails
     soft (returns None) on any error, same fail-soft pattern as
     music/SFX/captions elsewhere in this file - continuity is a quality
     improvement, not something that should ever crash a run.
-    \"\"\"
+    """
     try:
         clip = VideoFileClip(local_video_path)
         frame = clip.get_frame(max(clip.duration - 1 / FRAME_RATE, 0))
         clip.close()
         img = Image.fromarray(frame)
-        png_path = local_video_path.replace(\".mp4\", \"_lastframe.png\")
+        png_path = local_video_path.replace(".mp4", "_lastframe.png")
         img.save(png_path)
-        url = upload_reference_image(script_id, f\"shot_{shot_index:03d}_lastframe.png\", png_path)
+        url = upload_reference_image(script_id, f"shot_{shot_index:03d}_lastframe.png", png_path)
         os.remove(png_path)
         return url
     except Exception as e:
-        print(f\"Could not extract/upload last frame for shot {shot_index}, continuing without a continuity anchor for the next shot: {e}\")
+        print(f"Could not extract/upload last frame for shot {shot_index}, continuing without a continuity anchor for the next shot: {e}")
         return None
 
 
 def get_continuity_anchor(script, video_urls):
-    \"\"\"
+    """
     Reconstructs the correct anchor image for the NEXT shot to generate:
     - if at least one shot is already done, downloads the most recently
       completed clip and extracts its last frame (this is what makes
       continuity survive across resumed runs, not just within one run)
     - otherwise falls back to the script's character reference image
       (generating it if it doesn't exist yet)
-    \"\"\"
+    """
     if video_urls:
         try:
-            tmp_path = \"/tmp/_anchor_source.mp4\"
+            tmp_path = "/tmp/_anchor_source.mp4"
             download_file(video_urls[-1], tmp_path)
-            url = extract_last_frame_url(script[\"id\"], len(video_urls) - 1, tmp_path)
+            url = extract_last_frame_url(script["id"], len(video_urls) - 1, tmp_path)
             os.remove(tmp_path)
             if url:
                 return url
         except Exception as e:
-            print(f\"Could not rebuild continuity anchor from the last completed clip, falling back to character reference: {e}\")
+            print(f"Could not rebuild continuity anchor from the last completed clip, falling back to character reference: {e}")
 
     return generate_character_reference(script)
 
@@ -695,50 +688,50 @@ def create_agnes_task(prompt, num_frames, image_url=None):
 
     for attempt in range(AGNES_MAX_RETRIES):
         payload = {
-            \"model\": \"agnes-video-v2.0\",
-            \"prompt\": prompt,
-            \"height\": HEIGHT,
-            \"width\": WIDTH,
-            \"num_frames\": num_frames,
-            \"frame_rate\": FRAME_RATE,
+            "model": "agnes-video-v2.0",
+            "prompt": prompt,
+            "height": HEIGHT,
+            "width": WIDTH,
+            "num_frames": num_frames,
+            "frame_rate": FRAME_RATE,
         }
         if image_url:
-            payload[\"image\"] = image_url
+            payload["image"] = image_url
 
         resp = requests.post(
-            f\"{AGNES_BASE}/videos\",
+            f"{AGNES_BASE}/videos",
             headers=AGNES_HEADERS,
             json=payload,
             timeout=60,
         )
 
-        if resp.status_code == 400 and \"content_policy_violation\" in resp.text:
+        if resp.status_code == 400 and "content_policy_violation" in resp.text:
             raise ContentPolicyRejection(resp.text)
 
         if resp.status_code in AGNES_RETRYABLE_CODES:
             last_error_text = resp.text
             wait = 20 * (attempt + 1)
-            print(f\"AGNES transient error {resp.status_code} (attempt {attempt + 1}/{AGNES_MAX_RETRIES}): {resp.text}\")
-            print(f\"Retrying in {wait}s...\")
+            print(f"AGNES transient error {resp.status_code} (attempt {attempt + 1}/{AGNES_MAX_RETRIES}): {resp.text}")
+            print(f"Retrying in {wait}s...")
             time.sleep(wait)
             continue
 
         if resp.status_code >= 400:
-            print(f\"AGNES ERROR {resp.status_code}: {resp.text}\")
+            print(f"AGNES ERROR {resp.status_code}: {resp.text}")
         resp.raise_for_status()
         data = resp.json()
-        return data.get(\"video_id\") or data.get(\"id\") or data.get(\"task_id\")
+        return data.get("video_id") or data.get("id") or data.get("task_id")
 
-    raise AgnesOverloadedError(f\"Agnes still failing after {AGNES_MAX_RETRIES} attempts: {last_error_text}\")
+    raise AgnesOverloadedError(f"Agnes still failing after {AGNES_MAX_RETRIES} attempts: {last_error_text}")
 
 
 def extract_video_url(data):
-    for key in (\"video_url\", \"url\", \"remixed_from_video_id\"):
+    for key in ("video_url", "url", "remixed_from_video_id"):
         val = data.get(key)
-        if isinstance(val, str) and val.startswith(\"http\"):
+        if isinstance(val, str) and val.startswith("http"):
             return val
     for val in data.values():
-        if isinstance(val, str) and val.startswith(\"http\") and val.endswith(\".mp4\"):
+        if isinstance(val, str) and val.startswith("http") and val.endswith(".mp4"):
             return val
     return None
 
@@ -748,30 +741,30 @@ def poll_agnes_task(video_id, max_wait=300, interval=10):
     while waited < max_wait:
         resp = requests.get(
             AGNES_POLL_URL,
-            params={\"video_id\": video_id, \"model_name\": \"agnes-video-v2.0\"},
+            params={"video_id": video_id, "model_name": "agnes-video-v2.0"},
             headers=AGNES_HEADERS,
             timeout=30,
         )
-        if resp.status_code == 400 and \"content_policy_violation\" in resp.text:
+        if resp.status_code == 400 and "content_policy_violation" in resp.text:
             raise ContentPolicyRejection(resp.text)
         if resp.status_code >= 400:
-            print(f\"AGNES POLL ERROR {resp.status_code}: {resp.text}\")
+            print(f"AGNES POLL ERROR {resp.status_code}: {resp.text}")
         resp.raise_for_status()
         data = resp.json()
-        status = data.get(\"status\")
-        if status == \"completed\":
+        status = data.get("status")
+        if status == "completed":
             url = extract_video_url(data)
             if url:
                 return url
-            raise RuntimeError(f\"Completed but no video URL found: {data}\")
-        if status == \"failed\":
-            raise RuntimeError(f\"Agnes generation failed: {data}\")
+            raise RuntimeError(f"Completed but no video URL found: {data}")
+        if status == "failed":
+            raise RuntimeError(f"Agnes generation failed: {data}")
         time.sleep(interval)
         waited += interval
-    raise AgnesOverloadedError(f\"Agnes generation timed out after {max_wait}s for video_id {video_id}\")
+    raise AgnesOverloadedError(f"Agnes generation timed out after {max_wait}s for video_id {video_id}")
 
 
-def _generate_one_segment(shot, segment_duration, out_path, setting_and_characters=\"\", anchor_image_url=None):
+def _generate_one_segment(shot, segment_duration, out_path, setting_and_characters="", anchor_image_url=None):
     raw_frames = int(segment_duration * FRAME_RATE)
     raw_frames = max(MIN_FRAMES, min(MAX_FRAMES, raw_frames))
     num_frames = round_to_valid_frames(raw_frames)
@@ -781,13 +774,13 @@ def _generate_one_segment(shot, segment_duration, out_path, setting_and_characte
     try:
         video_id = create_agnes_task(prompt, num_frames, image_url=anchor_image_url)
     except ContentPolicyRejection:
-        print(\"Content policy rejection on primary prompt - retrying with sanitized-anchor fallback (tier 1)...\")
+        print("Content policy rejection on primary prompt - retrying with sanitized-anchor fallback (tier 1)...")
         try:
             fallback_prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=1)
             video_id = create_agnes_task(fallback_prompt, num_frames, image_url=anchor_image_url)
         except ContentPolicyRejection:
-            print(\"Sanitized-anchor fallback ALSO rejected - retrying once more with a fully generic, \"
-                  \"anchor-free prompt (tier 2, last resort before giving up on this shot)...\")
+            print("Sanitized-anchor fallback ALSO rejected - retrying once more with a fully generic, "
+                  "anchor-free prompt (tier 2, last resort before giving up on this shot)...")
             ultra_prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=2)
             video_id = create_agnes_task(ultra_prompt, num_frames, image_url=anchor_image_url)
 
@@ -797,31 +790,31 @@ def _generate_one_segment(shot, segment_duration, out_path, setting_and_characte
 
 
 def _extract_last_frame_local(video_path):
-    \"\"\"Extracts the last frame of a local clip file and uploads it nowhere -
+    """Extracts the last frame of a local clip file and uploads it nowhere -
     returns a local PNG path for immediate reuse as the next Agnes anchor
     within the same shot's chain-extension. Separate from
     extract_last_frame_url (which uploads to storage) because chain
-    segments are purely intra-shot and never need to survive a resumed run.\"\"\"
+    segments are purely intra-shot and never need to survive a resumed run."""
     clip = VideoFileClip(video_path)
     frame = clip.get_frame(max(clip.duration - 1 / FRAME_RATE, 0))
     clip.close()
-    png_path = video_path.replace(\".mp4\", \"_lastframe.png\")
+    png_path = video_path.replace(".mp4", "_lastframe.png")
     Image.fromarray(frame).save(png_path)
     return png_path
 
 
 def _upload_local_image_for_anchor(script_id, tag, png_path):
-    \"\"\"Chain-extension anchors must be passed to Agnes as a URL (same as
+    """Chain-extension anchors must be passed to Agnes as a URL (same as
     every other anchor in this file), so the local last-frame PNG gets
     uploaded to storage just like extract_last_frame_url does, then
-    removed locally.\"\"\"
+    removed locally."""
     url = upload_reference_image(script_id, tag, png_path)
     os.remove(png_path)
     return url
 
 
-def generate_shot_clip(shot, target_duration, out_path, setting_and_characters=\"\", anchor_image_url=None, script_id=None):
-    \"\"\"
+def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="", anchor_image_url=None, script_id=None):
+    """
     ONE-TAKE FIX (2026-07-29): a shot longer than MAX_CLIP_SECONDS used to
     be split into multiple SEPARATE, INDEPENDENT Agnes generations of the
     same prompt and stitched back to back - each one rendering its own
@@ -829,13 +822,13 @@ def generate_shot_clip(shot, target_duration, out_path, setting_and_characters=\
 
     SMOOTH-EXTENSION FIX (2026-08-01, supersedes the freeze-hold approach
     used between 2026-07-29 and 2026-08-01): freeze-holding the final frame
-    for the overflow portion technically kept the shot as \"one take\", but
+    for the overflow portion technically kept the shot as "one take", but
     it meant every shot that ran even slightly over the ~7s per-generation
     cap froze visibly for the rest of its duration. Because narration.py
     folds each sentence-boundary pause (1-2s) into whichever shot sits at
     that boundary, this was triggering constantly throughout an episode,
-    not just occasionally - this is the root cause of the \"rigid, not
-    smooth\" feedback on finished videos.
+    not just occasionally - this is the root cause of the "rigid, not
+    smooth" feedback on finished videos.
 
     Now: the first ~MAX_CLIP_SECONDS is one real Agnes take exactly as
     before. Any remaining duration is covered by chaining up to
@@ -849,7 +842,7 @@ def generate_shot_clip(shot, target_duration, out_path, setting_and_characters=\
     anchor_image_url: the starting frame for the FIRST segment only -
     either the episode's character reference (shot 0) or the previous
     shot's own last frame (every shot after that).
-    \"\"\"
+    """
     capped_duration = min(target_duration, MAX_CLIP_SECONDS)
     _generate_one_segment(shot, capped_duration, out_path, setting_and_characters, anchor_image_url=anchor_image_url)
 
@@ -861,21 +854,21 @@ def generate_shot_clip(shot, target_duration, out_path, setting_and_characters=\
     current_anchor_path = out_path
     chain_used = 0
 
-    print(f\"Shot needs {target_duration:.1f}s (over the ~{MAX_CLIP_SECONDS:.1f}s per-generation cap) - \"
-          f\"chaining real continuation clips for the remaining {remaining:.1f}s instead of freezing.\")
+    print(f"Shot needs {target_duration:.1f}s (over the ~{MAX_CLIP_SECONDS:.1f}s per-generation cap) - "
+          f"chaining real continuation clips for the remaining {remaining:.1f}s instead of freezing.")
 
     while remaining > 0.05 and chain_used < MAX_CHAIN_SEGMENTS:
         seg_duration = min(remaining, MAX_CLIP_SECONDS)
-        seg_out_path = out_path.replace(\".mp4\", f\"_chain{chain_used + 1}.mp4\")
+        seg_out_path = out_path.replace(".mp4", f"_chain{chain_used + 1}.mp4")
         try:
             local_frame_path = _extract_last_frame_local(current_anchor_path)
             chain_anchor_url = _upload_local_image_for_anchor(
-                script_id or \"unknown\", f\"chain_{os.path.basename(seg_out_path)}\", local_frame_path
+                script_id or "unknown", f"chain_{os.path.basename(seg_out_path)}", local_frame_path
             )
             _generate_one_segment(shot, seg_duration, seg_out_path, setting_and_characters, anchor_image_url=chain_anchor_url)
         except (ContentPolicyRejection, AgnesOverloadedError, Exception) as e:
-            print(f\"Chain-extension segment {chain_used + 1} failed ({e}) - falling back to a freeze-hold \"
-                  f\"for the remaining {remaining:.1f}s instead of losing the whole shot.\")
+            print(f"Chain-extension segment {chain_used + 1} failed ({e}) - falling back to a freeze-hold "
+                  f"for the remaining {remaining:.1f}s instead of losing the whole shot.")
             break
 
         segment_paths.append(seg_out_path)
@@ -884,13 +877,13 @@ def generate_shot_clip(shot, target_duration, out_path, setting_and_characters=\
         chain_used += 1
 
     clips = [VideoFileClip(p) for p in segment_paths]
-    combined = concatenate_videoclips(clips, method=\"compose\")
+    combined = concatenate_videoclips(clips, method="compose")
 
     if remaining > 0.05:
         combined = fit_clip_to_duration(combined, combined.duration + remaining)
 
-    tmp_path = out_path.replace(\".mp4\", \"_extended.mp4\")
-    combined.write_videofile(tmp_path, fps=FRAME_RATE, codec=\"libx264\", audio=False, threads=2, logger=None)
+    tmp_path = out_path.replace(".mp4", "_extended.mp4")
+    combined.write_videofile(tmp_path, fps=FRAME_RATE, codec="libx264", audio=False, threads=2, logger=None)
     for c in clips:
         c.close()
     for p in segment_paths[1:]:
@@ -920,31 +913,31 @@ def fit_audio_to_duration(audio_clip, target):
 
 
 def upload_clip(script_id, index, file_path):
-    file_name = f\"{script_id}/shot_{index:03d}.mp4\"
-    with open(file_path, \"rb\") as f:
+    file_name = f"{script_id}/shot_{index:03d}.mp4"
+    with open(file_path, "rb") as f:
         file_bytes = f.read()
     resp = requests.put(
-        f\"{SUPABASE_URL}/storage/v1/object/{CLIP_BUCKET}/{file_name}\",
+        f"{SUPABASE_URL}/storage/v1/object/{CLIP_BUCKET}/{file_name}",
         headers={
-            \"apikey\": SUPABASE_KEY,
-            \"Authorization\": f\"Bearer {SUPABASE_KEY}\",
-            \"Content-Type\": \"video/mp4\",
-            \"x-upsert\": \"true\",
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "video/mp4",
+            "x-upsert": "true",
         },
         data=file_bytes,
         timeout=300,
     )
     if resp.status_code >= 400:
-        print(f\"Clip upload failed - status {resp.status_code}: {resp.text}\")
+        print(f"Clip upload failed - status {resp.status_code}: {resp.text}")
     resp.raise_for_status()
-    return f\"{SUPABASE_URL}/storage/v1/object/public/{CLIP_BUCKET}/{file_name}\"
+    return f"{SUPABASE_URL}/storage/v1/object/public/{CLIP_BUCKET}/{file_name}"
 
 
 def save_progress(script_id, video_urls, next_index):
     resp = requests.patch(
-        f\"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}\",
+        f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
         headers=HEADERS,
-        json={\"video_urls\": video_urls, \"video_next_index\": next_index},
+        json={"video_urls": video_urls, "video_next_index": next_index},
         timeout=30,
     )
     resp.raise_for_status()
@@ -952,31 +945,31 @@ def save_progress(script_id, video_urls, next_index):
 
 def mark_content_flagged(script_id, shot_index, reason):
     resp = requests.patch(
-        f\"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}\",
+        f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
         headers=HEADERS,
-        json={\"status\": \"content_flagged\"},
+        json={"status": "content_flagged"},
         timeout=30,
     )
     resp.raise_for_status()
-    print(f\"Script {script_id} marked content_flagged (shot {shot_index + 1}) - will be skipped by future runs until manually reset. Reason: {reason}\")
+    print(f"Script {script_id} marked content_flagged (shot {shot_index + 1}) - will be skipped by future runs until manually reset. Reason: {reason}")
 
 
 def compute_shot_durations(shot_list, total_duration):
-    weights = [max(len(s.get(\"narration_excerpt\", \"\")), 20) for s in shot_list]
+    weights = [max(len(s.get("narration_excerpt", "")), 20) for s in shot_list]
     total_weight = sum(weights)
     return [(weight / total_weight) * total_duration for weight in weights]
 
 
 def get_shot_durations(script, shot_list, audio_clip):
-    stored = script.get(\"shot_durations\")
+    stored = script.get("shot_durations")
     if (
         isinstance(stored, list)
         and len(stored) == len(shot_list)
         and all(isinstance(d, (int, float)) and d >= 0 for d in stored)
     ):
-        print(\"Using real per-shot narration durations from shot_durations column.\")
+        print("Using real per-shot narration durations from shot_durations column.")
         return list(stored)
-    print(\"shot_durations column missing/invalid for this script - falling back to text-length estimate.\")
+    print("shot_durations column missing/invalid for this script - falling back to text-length estimate.")
     return compute_shot_durations(shot_list, audio_clip.duration)
 
 
@@ -993,155 +986,155 @@ def compute_target_bitrate(duration_seconds, target_mb=42, audio_kbps=128):
     target_bits = target_mb * 8 * 1024 * 1024
     audio_bits = audio_kbps * 1000 * duration_seconds
     video_bits = max(target_bits - audio_bits, 300_000 * duration_seconds)
-    return f\"{int(video_bits / duration_seconds / 1000)}k\"
+    return f"{int(video_bits / duration_seconds / 1000)}k"
 
 
 def poll_ace_music_task(task_id, out_path, base_url=None, max_wait=180, interval=8):
     waited = 0
     while waited < max_wait:
         resp = requests.post(
-            f\"{base_url}/query_result\",
+            f"{base_url}/query_result",
             headers=ACE_MUSIC_HEADERS,
-            json={\"task_id_list\": [task_id]},
+            json={"task_id_list": [task_id]},
             timeout=30,
         )
         if resp.status_code >= 400:
-            print(f\"ACE MUSIC POLL ERROR ({base_url}) {resp.status_code}: {resp.text}\")
+            print(f"ACE MUSIC POLL ERROR ({base_url}) {resp.status_code}: {resp.text}")
             return None
-        entries = resp.json().get(\"data\", [])
+        entries = resp.json().get("data", [])
         if not entries:
             time.sleep(interval)
             waited += interval
             continue
         entry = entries[0]
-        status = entry.get(\"status\")
+        status = entry.get("status")
         if status == 1:
-            result_list = json.loads(entry.get(\"result\", \"[]\"))
-            if not result_list or not result_list[0].get(\"file\"):
-                print(f\"ACE Music task succeeded but no file in result: {result_list}\")
+            result_list = json.loads(entry.get("result", "[]"))
+            if not result_list or not result_list[0].get("file"):
+                print(f"ACE Music task succeeded but no file in result: {result_list}")
                 return None
-            file_path = result_list[0][\"file\"]
-            audio_resp = requests.get(f\"{base_url}{file_path}\", timeout=60)
+            file_path = result_list[0]["file"]
+            audio_resp = requests.get(f"{base_url}{file_path}", timeout=60)
             audio_resp.raise_for_status()
-            with open(out_path, \"wb\") as f:
+            with open(out_path, "wb") as f:
                 f.write(audio_resp.content)
             return out_path
         if status == 2:
-            print(f\"ACE Music task failed: {entry}\")
+            print(f"ACE Music task failed: {entry}")
             return None
         time.sleep(interval)
         waited += interval
-    print(f\"ACE Music task {task_id} timed out after {max_wait}s\")
+    print(f"ACE Music task {task_id} timed out after {max_wait}s")
     return None
 
 
 def generate_background_music(prompt, duration, out_path):
     if not ACE_MUSIC_API_KEY:
-        print(\"No ACE_MUSIC_API_KEY set - skipping background music.\")
+        print("No ACE_MUSIC_API_KEY set - skipping background music.")
         return None
 
     for base in ACE_MUSIC_BASES:
         try:
             resp = requests.post(
-                f\"{base}/release_task\",
+                f"{base}/release_task",
                 headers=ACE_MUSIC_HEADERS,
                 json={
-                    \"prompt\": prompt,
-                    \"audio_duration\": max(10, min(int(duration) + 5, 600)),
-                    \"thinking\": True,
+                    "prompt": prompt,
+                    "audio_duration": max(10, min(int(duration) + 5, 600)),
+                    "thinking": True,
                 },
                 timeout=60,
             )
             if resp.status_code >= 400:
-                print(f\"ACE MUSIC ERROR ({base}) {resp.status_code}: {resp.text}\")
+                print(f"ACE MUSIC ERROR ({base}) {resp.status_code}: {resp.text}")
                 continue
-            task_id = resp.json().get(\"data\", {}).get(\"task_id\")
+            task_id = resp.json().get("data", {}).get("task_id")
             if not task_id:
-                print(f\"ACE Music response had no task_id ({base}): {resp.json()}\")
+                print(f"ACE Music response had no task_id ({base}): {resp.json()}")
                 continue
             result = poll_ace_music_task(task_id, out_path, base_url=base)
             if result:
                 return result
         except Exception as e:
-            print(f\"ACE Music generation raised an exception on {base}, trying next host: {e}\")
+            print(f"ACE Music generation raised an exception on {base}, trying next host: {e}")
 
-    print(\"Every ACE Music host failed - trying free Hugging Face MusicGen fallback.\")
+    print("Every ACE Music host failed - trying free Hugging Face MusicGen fallback.")
     return generate_background_music_musicgen(prompt, duration, out_path)
 
 
 def generate_background_music_musicgen(prompt, duration, out_path):
     if not HF_TOKEN:
-        print(\"No HF_TOKEN set - skipping MusicGen fallback, continuing without background music.\")
+        print("No HF_TOKEN set - skipping MusicGen fallback, continuing without background music.")
         return None
     try:
         resp = requests.post(
             HF_MUSICGEN_URL,
-            headers={\"Authorization\": f\"Bearer {HF_TOKEN}\"},
-            json={\"inputs\": prompt},
+            headers={"Authorization": f"Bearer {HF_TOKEN}"},
+            json={"inputs": prompt},
             timeout=120,
         )
         if resp.status_code == 503:
             wait_for = 20
             try:
-                wait_for = min(int(resp.json().get(\"estimated_time\", 20)) + 2, 60)
+                wait_for = min(int(resp.json().get("estimated_time", 20)) + 2, 60)
             except Exception:
                 pass
-            print(f\"MusicGen is cold-loading on Hugging Face - waiting {wait_for}s and retrying once.\")
+            print(f"MusicGen is cold-loading on Hugging Face - waiting {wait_for}s and retrying once.")
             time.sleep(wait_for)
             resp = requests.post(
                 HF_MUSICGEN_URL,
-                headers={\"Authorization\": f\"Bearer {HF_TOKEN}\"},
-                json={\"inputs\": prompt},
+                headers={"Authorization": f"Bearer {HF_TOKEN}"},
+                json={"inputs": prompt},
                 timeout=120,
             )
         if resp.status_code >= 400:
-            print(f\"MusicGen fallback failed ({resp.status_code}): {resp.text[:300]}\")
+            print(f"MusicGen fallback failed ({resp.status_code}): {resp.text[:300]}")
             return None
-        content_type = resp.headers.get(\"content-type\", \"\")
-        if \"audio\" not in content_type:
-            print(f\"MusicGen fallback returned unexpected content-type '{content_type}', skipping.\")
+        content_type = resp.headers.get("content-type", "")
+        if "audio" not in content_type:
+            print(f"MusicGen fallback returned unexpected content-type '{content_type}', skipping.")
             return None
-        with open(out_path, \"wb\") as f:
+        with open(out_path, "wb") as f:
             f.write(resp.content)
-        print(f\"MusicGen fallback succeeded - background music generated via Hugging Face free tier.\")
+        print(f"MusicGen fallback succeeded - background music generated via Hugging Face free tier.")
         return out_path
     except Exception as e:
-        print(f\"MusicGen fallback raised an exception, continuing without background music: {e}\")
+        print(f"MusicGen fallback raised an exception, continuing without background music: {e}")
         return None
 
 
 def search_freesound_sfx(query, out_path):
     if not FREESOUND_API_KEY:
-        print(\"No FREESOUND_API_KEY set - skipping SFX for this cue.\")
+        print("No FREESOUND_API_KEY set - skipping SFX for this cue.")
         return None
     try:
         resp = requests.get(
-            \"https://freesound.org/apiv2/search/text/\",
+            "https://freesound.org/apiv2/search/text/",
             params={
-                \"query\": query,
-                \"token\": FREESOUND_API_KEY,
-                \"fields\": \"id,previews\",
-                \"filter\": \"duration:[0.1 TO 8]\",
-                \"sort\": \"score\",
-                \"page_size\": 1,
+                "query": query,
+                "token": FREESOUND_API_KEY,
+                "fields": "id,previews",
+                "filter": "duration:[0.1 TO 8]",
+                "sort": "score",
+                "page_size": 1,
             },
             timeout=30,
         )
         if resp.status_code >= 400:
-            print(f\"FREESOUND ERROR {resp.status_code}: {resp.text}\")
+            print(f"FREESOUND ERROR {resp.status_code}: {resp.text}")
             return None
-        results = resp.json().get(\"results\", [])
+        results = resp.json().get("results", [])
         if not results:
-            print(f\"No Freesound results for cue: {query}\")
+            print(f"No Freesound results for cue: {query}")
             return None
-        previews = results[0].get(\"previews\", {})
-        preview_url = previews.get(\"preview-hq-mp3\") or previews.get(\"preview-lq-mp3\")
+        previews = results[0].get("previews", {})
+        preview_url = previews.get("preview-hq-mp3") or previews.get("preview-lq-mp3")
         if not preview_url:
             return None
         download_file(preview_url, out_path)
         return out_path
     except Exception as e:
-        print(f\"Freesound lookup failed for cue '{query}', skipping this SFX: {e}\")
+        print(f"Freesound lookup failed for cue '{query}', skipping this SFX: {e}")
         return None
 
 
@@ -1149,19 +1142,19 @@ def apply_safety_limiter(audio_clip, ceiling=LIMITER_CEILING):
     try:
         samples = audio_clip.to_soundarray(fps=44100)
     except Exception as e:
-        print(f\"Safety limiter: could not analyze mixed audio ({e}) - skipping peak check, using mix as-is.\")
+        print(f"Safety limiter: could not analyze mixed audio ({e}) - skipping peak check, using mix as-is.")
         return audio_clip
     peak = float(np.max(np.abs(samples))) if samples.size else 0.0
 
     if peak <= 0:
-        print(\"Safety limiter: mixed audio is silent, nothing to scale.\")
+        print("Safety limiter: mixed audio is silent, nothing to scale.")
         return audio_clip
     if peak <= ceiling:
-        print(f\"Safety limiter: peak was {peak:.3f} (ceiling {ceiling}), no scaling needed.\")
+        print(f"Safety limiter: peak was {peak:.3f} (ceiling {ceiling}), no scaling needed.")
         return audio_clip
 
     scale = ceiling / peak
-    print(f\"Safety limiter: peak was {peak:.3f}, exceeds ceiling {ceiling} - scaling whole mix by {scale:.3f} to prevent clipping.\")
+    print(f"Safety limiter: peak was {peak:.3f}, exceeds ceiling {ceiling} - scaling whole mix by {scale:.3f} to prevent clipping.")
     return audio_clip.with_volume_scaled(scale)
 
 
@@ -1178,32 +1171,32 @@ def extract_original_clip_audio(video_clips, shot_durations, shot_starts, total_
             seg_audio = seg_audio.with_volume_scaled(ORIGINAL_CLIP_AUDIO_VOLUME).with_start(shot_starts[i])
             layers.append(seg_audio)
         except Exception as e:
-            print(f\"Could not extract original audio from shot {i}, skipping that layer: {e}\")
+            print(f"Could not extract original audio from shot {i}, skipping that layer: {e}")
     return layers
 
 
 def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration, original_clip_audio_layers=None):
     layers = [AudioFileClip(narration_path).with_volume_scaled(NARRATION_VOLUME)]
-    stats = {\"music_generated\": False, \"sfx_cues_total\": 0, \"sfx_applied_count\": 0}
+    stats = {"music_generated": False, "sfx_cues_total": 0, "sfx_applied_count": 0}
 
     if original_clip_audio_layers:
         layers.extend(original_clip_audio_layers)
 
     if music_mood:
-        music_path = \"/tmp/background_music.mp3\"
+        music_path = "/tmp/background_music.mp3"
         if generate_background_music(music_mood, total_duration, music_path):
             music_clip = AudioFileClip(music_path)
             music_clip = fit_audio_to_duration(music_clip, total_duration)
             music_clip = music_clip.with_volume_scaled(MUSIC_VOLUME)
             layers.append(music_clip)
-            stats[\"music_generated\"] = True
+            stats["music_generated"] = True
 
     for i, shot in enumerate(shot_list):
-        cue = (shot.get(\"sfx_cue\") or \"\").strip()
+        cue = (shot.get("sfx_cue") or "").strip()
         if not cue:
             continue
-        stats[\"sfx_cues_total\"] += 1
-        sfx_path = f\"/tmp/sfx_{i:03d}.mp3\"
+        stats["sfx_cues_total"] += 1
+        sfx_path = f"/tmp/sfx_{i:03d}.mp3"
         if search_freesound_sfx(cue, sfx_path):
             sfx_clip = AudioFileClip(sfx_path)
             max_len = shot_durations[i]
@@ -1211,14 +1204,14 @@ def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_
                 sfx_clip = sfx_clip.subclipped(0, max_len)
             sfx_clip = sfx_clip.with_volume_scaled(SFX_VOLUME).with_start(shot_starts[i])
             layers.append(sfx_clip)
-            stats[\"sfx_applied_count\"] += 1
+            stats["sfx_applied_count"] += 1
 
     mixed = CompositeAudioClip(layers)
     if mixed.duration and mixed.duration > total_duration:
         mixed = mixed.subclipped(0, total_duration)
-    print(f\"Audio mix stats: music_generated={stats['music_generated']}, \"
-          f\"sfx_applied={stats['sfx_applied_count']}/{stats['sfx_cues_total']} cues, \"
-          f\"original_clip_audio_layers={len(original_clip_audio_layers or [])}\")
+    print(f"Audio mix stats: music_generated={stats['music_generated']}, "
+          f"sfx_applied={stats['sfx_applied_count']}/{stats['sfx_cues_total']} cues, "
+          f"original_clip_audio_layers={len(original_clip_audio_layers or [])}")
     return apply_safety_limiter(mixed), stats
 
 
@@ -1229,16 +1222,16 @@ def _load_caption_font(size=CAPTION_FONT_SIZE):
                 return ImageFont.truetype(path, size)
             except Exception:
                 continue
-    print(\"Caption font not found at any known path - falling back to PIL's default font (captions will be smaller/plainer).\")
+    print("Caption font not found at any known path - falling back to PIL's default font (captions will be smaller/plainer).")
     return ImageFont.load_default()
 
 
 def _wrap_caption_text(text, font, max_width, draw):
     words = text.split()
     lines = []
-    current = \"\"
+    current = ""
     for word in words:
-        candidate = f\"{current} {word}\".strip()
+        candidate = f"{current} {word}".strip()
         bbox = draw.textbbox((0, 0), candidate, font=font)
         if bbox[2] - bbox[0] <= max_width or not current:
             current = candidate
@@ -1251,12 +1244,12 @@ def _wrap_caption_text(text, font, max_width, draw):
 
 
 def render_caption_image(text, video_width=WIDTH, video_height=HEIGHT):
-    text = (text or \"\").strip()
+    text = (text or "").strip()
     if not text:
         return None
 
     font = _load_caption_font()
-    img = Image.new(\"RGBA\", (video_width, video_height), (0, 0, 0, 0))
+    img = Image.new("RGBA", (video_width, video_height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
     max_text_width = int(video_width * CAPTION_MAX_WIDTH_RATIO)
@@ -1306,27 +1299,27 @@ def build_caption_clip(text, start, duration, video_width=WIDTH, video_height=HE
         clip = clip.with_start(start)
         return clip
     except Exception as e:
-        print(f\"Caption render failed for text {text[:60]!r}, skipping this caption: {e}\")
+        print(f"Caption render failed for text {text[:60]!r}, skipping this caption: {e}")
         return None
 
 
 def build_caption_clips(shot_list, shot_durations, shot_starts, video_width=WIDTH, video_height=HEIGHT):
     caption_clips = []
     for i, shot in enumerate(shot_list):
-        text = (shot.get(\"narration_excerpt\") or \"\").strip()
+        text = (shot.get("narration_excerpt") or "").strip()
         if not text:
             continue
         clip = build_caption_clip(text, shot_starts[i], shot_durations[i], video_width, video_height)
         if clip is not None:
             caption_clips.append(clip)
-    print(f\"Built {len(caption_clips)}/{len(shot_list)} caption overlays.\")
+    print(f"Built {len(caption_clips)}/{len(shot_list)} caption overlays.")
     return caption_clips
 
 
-def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot_list, shot_durations, output_path, setting_and_characters=\"\"):
+def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot_list, shot_durations, output_path, setting_and_characters=""):
     clips = []
     for i, url in enumerate(video_urls):
-        raw_path = f\"/tmp/final_shot_{i:03d}.mp4\"
+        raw_path = f"/tmp/final_shot_{i:03d}.mp4"
         download_file(url, raw_path)
 
         if i == len(video_urls) - 1:
@@ -1343,9 +1336,9 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
             if clip.duration < shot_durations[i]:
                 local_frame_path = _extract_last_frame_local(raw_path)
                 chain_anchor_url = _upload_local_image_for_anchor(
-                    script_id, f\"trail_{os.path.basename(raw_path)}\", local_frame_path
+                    script_id, f"trail_{os.path.basename(raw_path)}", local_frame_path
                 )
-                trail_out_path = raw_path.replace(\".mp4\", \"_trail.mp4\")
+                trail_out_path = raw_path.replace(".mp4", "_trail.mp4")
                 remaining = shot_durations[i] - clip.duration
                 try:
                     _generate_one_segment(
@@ -1353,12 +1346,12 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
                         setting_and_characters, anchor_image_url=chain_anchor_url,
                     )
                     trail_clip = VideoFileClip(trail_out_path).resized(new_size=(WIDTH, HEIGHT))
-                    combined = concatenate_videoclips([clip, trail_clip], method=\"compose\")
+                    combined = concatenate_videoclips([clip, trail_clip], method="compose")
                     if combined.duration < shot_durations[i]:
                         combined = fit_clip_to_duration(combined, shot_durations[i])
                     clip = combined
                 except Exception as e:
-                    print(f\"Trail chain-extension failed ({e}) - falling back to freeze-hold for the outro: {e}\")
+                    print(f"Trail chain-extension failed ({e}) - falling back to freeze-hold for the outro: {e}")
                     clip = fit_clip_to_duration(clip, shot_durations[i])
         else:
             clip = VideoFileClip(raw_path)
@@ -1381,7 +1374,7 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
         [AudioFadeIn(FADE_IN_SECONDS), AudioFadeOut(FADE_OUT_SECONDS)]
     )
 
-    final = concatenate_videoclips(clips, method=\"compose\")
+    final = concatenate_videoclips(clips, method="compose")
 
     # CAPTIONS DISABLED (2026-07-21): burned-in narration captions were showing
     # up over the video and Zia does not want them - video should be visual
@@ -1392,13 +1385,13 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
     final = final.with_effects([FadeIn(FADE_IN_SECONDS), FadeOut(FADE_OUT_SECONDS)])
     final = final.with_audio(final_audio)
     target_bitrate = compute_target_bitrate(total_duration)
-    print(f\"Target video bitrate: {target_bitrate} (duration {total_duration:.1f}s)\")
+    print(f"Target video bitrate: {target_bitrate} (duration {total_duration:.1f}s)")
     final.write_videofile(
         output_path,
         fps=FRAME_RATE,
-        codec=\"libx264\",
-        audio_codec=\"aac\",
-        audio_bitrate=\"128k\",
+        codec="libx264",
+        audio_codec="aac",
+        audio_bitrate="128k",
         bitrate=target_bitrate,
         threads=2,
         logger=None,
@@ -1407,36 +1400,36 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
 
 
 def upload_video(script_id, file_path):
-    file_name = f\"{script_id}.mp4\"
+    file_name = f"{script_id}.mp4"
     file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
-    print(f\"Final video size: {file_size_mb:.1f}MB\")
-    with open(file_path, \"rb\") as f:
+    print(f"Final video size: {file_size_mb:.1f}MB")
+    with open(file_path, "rb") as f:
         file_bytes = f.read()
 
     resp = requests.put(
-        f\"{SUPABASE_URL}/storage/v1/object/{VIDEO_BUCKET}/{file_name}\",
+        f"{SUPABASE_URL}/storage/v1/object/{VIDEO_BUCKET}/{file_name}",
         headers={
-            \"apikey\": SUPABASE_KEY,
-            \"Authorization\": f\"Bearer {SUPABASE_KEY}\",
-            \"Content-Type\": \"video/mp4\",
-            \"x-upsert\": \"true\",
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "video/mp4",
+            "x-upsert": "true",
         },
         data=file_bytes,
         timeout=300,
     )
     if resp.status_code >= 400:
-        print(f\"Upload failed - status {resp.status_code}: {resp.text}\")
+        print(f"Upload failed - status {resp.status_code}: {resp.text}")
     resp.raise_for_status()
-    return f\"{SUPABASE_URL}/storage/v1/object/public/{VIDEO_BUCKET}/{file_name}\"
+    return f"{SUPABASE_URL}/storage/v1/object/public/{VIDEO_BUCKET}/{file_name}"
 
 
 def mark_video_generated(script_id, video_url, audio_stats=None):
-    update = {\"status\": \"video_generated\", \"video_url\": video_url}
+    update = {"status": "video_generated", "video_url": video_url}
     if audio_stats is not None:
-        update[\"music_generated\"] = audio_stats.get(\"music_generated\", False)
-        update[\"sfx_applied_count\"] = audio_stats.get(\"sfx_applied_count\", 0)
+        update["music_generated"] = audio_stats.get("music_generated", False)
+        update["sfx_applied_count"] = audio_stats.get("sfx_applied_count", 0)
     resp = requests.patch(
-        f\"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}\",
+        f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
         headers=HEADERS,
         json=update,
         timeout=30,
@@ -1445,7 +1438,7 @@ def mark_video_generated(script_id, video_url, audio_stats=None):
 
 
 def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
-    \"\"\"
+    """
     Attempts up to shot_limit new shot generations on a single candidate
     script (plus final assembly if this call completes the last shot, or
     the script was already fully shot coming in).
@@ -1463,23 +1456,23 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
     assembly always runs when all shots are done, regardless of
     shot_limit, since assembly does not call Agnes and does not consume
     the per-run generation quota.
-    \"\"\"
-    script_id = script[\"id\"]
-    if not script.get(\"narration_url\"):
-        print(f\"Script {script_id} has no narration_url yet. Skipping.\")
+    """
+    script_id = script["id"]
+    if not script.get("narration_url"):
+        print(f"Script {script_id} has no narration_url yet. Skipping.")
         return 0
 
-    print(f\"Working on script {script_id}\")
+    print(f"Working on script {script_id}")
 
-    shot_list = script[\"shot_list\"]
+    shot_list = script["shot_list"]
     if isinstance(shot_list, str):
         shot_list = json.loads(shot_list)
     total_shots = len(shot_list)
-    music_mood = script.get(\"music_mood\") or \"\"
-    setting_and_characters = script.get(\"setting_and_characters\", \"\")
+    music_mood = script.get("music_mood") or ""
+    setting_and_characters = script.get("setting_and_characters", "")
 
-    video_urls = script.get(\"video_urls\") or []
-    next_index = script.get(\"video_next_index\") or 0
+    video_urls = script.get("video_urls") or []
+    next_index = script.get("video_next_index") or 0
 
     verified_urls = []
     for i, url in enumerate(video_urls):
@@ -1491,7 +1484,7 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
                 if head.status_code == 200:
                     verified = True
                     break
-                last_error = f\"status {head.status_code}\"
+                last_error = f"status {head.status_code}"
             except requests.RequestException as e:
                 last_error = str(e)
             if attempt < CLIP_VERIFY_RETRIES - 1:
@@ -1499,67 +1492,67 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
         if verified:
             verified_urls.append(url)
         else:
-            print(f\"Clip {i} failed verification after {CLIP_VERIFY_RETRIES} attempts ({last_error}), will regenerate: {url}\")
+            print(f"Clip {i} failed verification after {CLIP_VERIFY_RETRIES} attempts ({last_error}), will regenerate: {url}")
             break
 
     if len(verified_urls) != len(video_urls):
         video_urls = verified_urls
         next_index = len(verified_urls)
         save_progress(script_id, video_urls, next_index)
-        print(f\"Corrected progress after verification: {next_index}/{total_shots} shots actually confirmed done\")
+        print(f"Corrected progress after verification: {next_index}/{total_shots} shots actually confirmed done")
 
     shots_used = 0
 
     if next_index >= total_shots:
-        print(f\"All {total_shots} shots already generated, video_urls has {len(video_urls)} entries. Skipping to assembly check.\")
+        print(f"All {total_shots} shots already generated, video_urls has {len(video_urls)} entries. Skipping to assembly check.")
     elif shot_limit <= 0:
-        print(f\"No shot budget remaining this run for script {script_id} - will get a turn on the next scheduled run.\")
+        print(f"No shot budget remaining this run for script {script_id} - will get a turn on the next scheduled run.")
         return 0
     else:
-        audio_path = \"/tmp/narration_audio\"
-        audio_path += \".mp3\" if script[\"narration_url\"].endswith(\".mp3\") else \".wav\"
-        download_file(script[\"narration_url\"], audio_path)
+        audio_path = "/tmp/narration_audio"
+        audio_path += ".mp3" if script["narration_url"].endswith(".mp3") else ".wav"
+        download_file(script["narration_url"], audio_path)
         audio_clip = AudioFileClip(audio_path)
         shot_durations = get_shot_durations(script, shot_list, audio_clip)
 
         batch_end = min(next_index + shot_limit, total_shots)
-        print(f\"Resuming from shot {next_index + 1}/{total_shots} ({len(video_urls)} already done) - generating up to shot {batch_end} this run (budget this call: {shot_limit})\")
+        print(f"Resuming from shot {next_index + 1}/{total_shots} ({len(video_urls)} already done) - generating up to shot {batch_end} this run (budget this call: {shot_limit})")
 
         anchor_image_url = get_continuity_anchor(script, video_urls)
         if anchor_image_url:
-            print(f\"Using continuity anchor image for shot {next_index + 1}: {anchor_image_url}\")
+            print(f"Using continuity anchor image for shot {next_index + 1}: {anchor_image_url}")
         else:
-            print(f\"No continuity anchor available for shot {next_index + 1} - generating blind (text-to-video only) for this shot.\")
+            print(f"No continuity anchor available for shot {next_index + 1} - generating blind (text-to-video only) for this shot.")
 
         for i in range(next_index, batch_end):
             shot = shot_list[i]
-            raw_path = f\"/tmp/shot_{i:03d}.mp4\"
-            print(f\"Generating shot {i+1}/{total_shots} (~{shot_durations[i]:.1f}s)...\")
+            raw_path = f"/tmp/shot_{i:03d}.mp4"
+            print(f"Generating shot {i+1}/{total_shots} (~{shot_durations[i]:.1f}s)...")
             try:
                 generate_shot_clip(shot, shot_durations[i], raw_path, setting_and_characters, anchor_image_url=anchor_image_url, script_id=script_id)
             except ContentPolicyRejection as e:
                 mark_content_flagged(script_id, i, str(e))
-                print(f\"Rejected visual_description: {shot.get('visual_description', '')!r}\")
-                print(f\"FIX: reword shot_list[{i}].visual_description for script {script_id} in the \"
-                      f\"scripts table, then reset status to 'images_generated' to resume from exactly \"
-                      f\"this shot. Moving on to the next-oldest eligible candidate for now.\")
+                print(f"Rejected visual_description: {shot.get('visual_description', '')!r}")
+                print(f"FIX: reword shot_list[{i}].visual_description for script {script_id} in the "
+                      f"scripts table, then reset status to 'images_generated' to resume from exactly "
+                      f"this shot. Moving on to the next-oldest eligible candidate for now.")
                 return shots_used
             except AgnesOverloadedError as e:
-                print(f\"Agnes appears overloaded (upstream load saturated) on shot {i+1}/{total_shots} after all retries: {e}\")
+                print(f"Agnes appears overloaded (upstream load saturated) on shot {i+1}/{total_shots} after all retries: {e}")
                 if shots_used:
-                    print(f\"Progress already saved through shot {i}/{total_shots} ({len(video_urls)} clips done) \"
-                          f\"this run - stopping here instead of crashing; next scheduled run resumes from here.\")
+                    print(f"Progress already saved through shot {i}/{total_shots} ({len(video_urls)} clips done) "
+                          f"this run - stopping here instead of crashing; next scheduled run resumes from here.")
                 else:
-                    print(f\"Zero progress made on this script this run - moving on to the next-oldest \"
-                          f\"eligible candidate instead of ending the run. This script's own turn will \"
-                          f\"come back around once Agnes's load eases.\")
+                    print(f"Zero progress made on this script this run - moving on to the next-oldest "
+                          f"eligible candidate instead of ending the run. This script's own turn will "
+                          f"come back around once Agnes's load eases.")
                 return shots_used
 
             clip_url = upload_clip(script_id, i, raw_path)
             video_urls.append(clip_url)
             save_progress(script_id, video_urls, i + 1)
             shots_used += 1
-            print(f\"Saved progress: {i + 1}/{total_shots} shots done\")
+            print(f"Saved progress: {i + 1}/{total_shots} shots done")
 
             # Chain the NEXT shot's anchor to THIS shot's own last frame,
             # extracted from the clip we just generated, before it's removed.
@@ -1570,26 +1563,26 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
             time.sleep(4)
 
         if batch_end < total_shots:
-            print(f\"Shot budget for this candidate used up this run ({shots_used} shots). {total_shots - batch_end} shots remain - resuming on a future run.\")
+            print(f"Shot budget for this candidate used up this run ({shots_used} shots). {total_shots - batch_end} shots remain - resuming on a future run.")
             return shots_used
 
     if len(video_urls) >= total_shots:
-        print(\"All shots done. Assembling final video...\")
-        audio_path = \"/tmp/narration_audio_final\"
-        audio_path += \".mp3\" if script[\"narration_url\"].endswith(\".mp3\") else \".wav\"
-        download_file(script[\"narration_url\"], audio_path)
+        print("All shots done. Assembling final video...")
+        audio_path = "/tmp/narration_audio_final"
+        audio_path += ".mp3" if script["narration_url"].endswith(".mp3") else ".wav"
+        download_file(script["narration_url"], audio_path)
         audio_clip = AudioFileClip(audio_path)
         shot_durations = get_shot_durations(script, shot_list, audio_clip)
         shot_durations[-1] += TRAIL_SECONDS
 
-        output_path = \"/tmp/final_video.mp4\"
+        output_path = "/tmp/final_video.mp4"
         output_path, audio_stats = assemble_final_video(script_id, video_urls, audio_path, music_mood, shot_list, shot_durations, output_path, setting_and_characters=setting_and_characters)
 
         video_url = upload_video(script_id, output_path)
-        print(f\"Uploaded: {video_url}\")
+        print(f"Uploaded: {video_url}")
 
         mark_video_generated(script_id, video_url, audio_stats)
-        print(\"Done.\")
+        print("Done.")
 
     return shots_used
 
@@ -1597,7 +1590,7 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
 def main():
     candidates = get_ready_scripts(CANDIDATE_POOL_SIZE)
     if not candidates:
-        print(\"No scripts with images ready for video generation. Nothing to do.\")
+        print("No scripts with images ready for video generation. Nothing to do.")
         return
 
     remaining_budget = CLIP_BATCH_LIMIT
@@ -1605,25 +1598,23 @@ def main():
 
     for script in candidates:
         if remaining_budget <= 0:
-            print(f\"Per-run shot budget ({CLIP_BATCH_LIMIT}) fully used - stopping here to respect Agnes's \"
-                  f\"quota ceiling. Remaining candidates get their turn on the next scheduled run.\")
+            print(f"Per-run shot budget ({CLIP_BATCH_LIMIT}) fully used - stopping here to respect Agnes's "
+                  f"quota ceiling. Remaining candidates get their turn on the next scheduled run.")
             break
 
         shots_used = process_script(script, shot_limit=remaining_budget)
         if shots_used > 0:
             any_progress = True
             remaining_budget -= shots_used
-            print(f\"Script {script['id']} used {shots_used} shot(s) this run - {remaining_budget} left in this run's shared budget.\")
+            print(f"Script {script['id']} used {shots_used} shot(s) this run - {remaining_budget} left in this run's shared budget.")
         else:
-            print(f\"No progress on script {script['id']} this run (overloaded, content-flagged, or already \"
-                  f\"fully assembled) - trying the next candidate with the same remaining budget.\")
+            print(f"No progress on script {script['id']} this run (overloaded, content-flagged, or already "
+                  f"fully assembled) - trying the next candidate with the same remaining budget.")
 
     if not any_progress:
-        print(f\"No progress possible on any of the {len(candidates)} candidate scripts this run \"
-              f\"(all stalled or not ready) - next scheduled run will retry.\")
+        print(f"No progress possible on any of the {len(candidates)} candidate scripts this run "
+              f"(all stalled or not ready) - next scheduled run will retry.")
 
 
-if __name__ == \"__main__\":
+if __name__ == "__main__":
     main()
-"
-}
