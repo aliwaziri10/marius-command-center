@@ -515,7 +515,7 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
     lens_effect = shot.get("lens_effect") or "none"
     anchor = (setting_and_characters or "").strip()
 
-  if fallback_level == 0:
+    if fallback_level == 0:
         visual = shot.get("visual_description", "").strip()
         if any(kw in visual.lower() for kw in CROWD_OR_GROUP_KEYWORDS):
             anchor = _strip_named_characters_for_group_shot(anchor)
@@ -547,7 +547,7 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
             f"{shot_type} cinematic documentary shot",
         ]
 
-   if camera_movement != "static":
+    if camera_movement != "static":
         parts.append(f"camera {camera_movement}")
     if lens_effect != "none":
         parts.append(lens_effect.replace("_", " "))
