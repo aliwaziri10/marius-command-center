@@ -463,6 +463,36 @@ def _sanitize_anchor_for_fallback(anchor):
     ]
     return " ".join(kept).strip()
 
+CROWD_OR_GROUP_KEYWORDS = (
+    "two ", "three ", "four ", "five ", "several", "group of", "crowd",
+    "family", "villagers", "workers", "neighbors", "neighbours", "soldiers",
+    "colleagues", "team", "both", "twins", "pair of", "everyone", "people",
+    "others", "onlookers", "bystanders", "crew", "townspeople", "children",
+)
+
+DISTINCT_INDIVIDUALS_GUARD = (
+    "every person visible in this shot is a distinct, unique individual with "
+    "a different face, body, and clothing from every other person in the "
+    "frame - never repeat or clone one character's likeness onto more than "
+    "one person, even in a crowd, group, or background"
+)
+
+MOTION_CONTINUITY_GUARD = (
+    "motion continues smoothly and continuously in the same direction and "
+    "speed as the moment just before this - no reversing, no snapping "
+    "backward, no sudden stop-and-restart, no pausing mid-motion"
+)
+
+
+def _strip_named_characters_for_group_shot(anchor):
+    if not anchor:
+        return anchor
+    pieces = re.split(r'(?<=[.;])\s+', anchor)
+    kept = [
+        p for p in pieces
+        if "recurring character" not in p.lower() and "main character" not in p.lower()
+    ]
+    return " ".join(kept).strip()
 
 def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
     """
@@ -485,8 +515,10 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
     lens_effect = shot.get("lens_effect") or "none"
     anchor = (setting_and_characters or "").strip()
 
-    if fallback_level == 0:
+  if fallback_level == 0:
         visual = shot.get("visual_description", "").strip()
+        if any(kw in visual.lower() for kw in CROWD_OR_GROUP_KEYWORDS):
+            anchor = _strip_named_characters_for_group_shot(anchor)
         parts = []
         if anchor:
             parts.append(anchor)
@@ -494,6 +526,7 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
             parts.append("bright natural daylight, high-key lighting, well-exposed, vivid colors")
         parts.append(QUALITY_GUARD)
         parts.append(ANACHRONISM_GUARD)
+        parts.append(DISTINCT_INDIVIDUALS_GUARD)
         parts.append(visual)
         parts.append(f"{shot_type} shot")
     elif fallback_level == 1:
@@ -514,10 +547,12 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
             f"{shot_type} cinematic documentary shot",
         ]
 
-    if camera_movement != "static":
+   if camera_movement != "static":
         parts.append(f"camera {camera_movement}")
     if lens_effect != "none":
         parts.append(lens_effect.replace("_", " "))
+    if shot.get("_has_motion_anchor"):
+        parts.append(MOTION_CONTINUITY_GUARD)
 
     return ", ".join(p for p in parts if p)
 
@@ -770,6 +805,7 @@ def _generate_one_segment(shot, segment_duration, out_path, setting_and_characte
     num_frames = round_to_valid_frames(raw_frames)
     num_frames = max(MIN_FRAMES, min(MAX_FRAMES, num_frames))
 
+    shot["_has_motion_anchor"] = bool(anchor_image_url)
     prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=0)
     try:
         video_id = create_agnes_task(prompt, num_frames, image_url=anchor_image_url)
