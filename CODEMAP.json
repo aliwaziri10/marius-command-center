@@ -404,7 +404,7 @@
       "functions": [
         {
           "name": "retryable_request",
-          "line": 124,
+          "line": 112,
           "args": [
             "method",
             "url",
@@ -423,7 +423,7 @@
         },
         {
           "name": "get_next_pending_topic",
-          "line": 151,
+          "line": 139,
           "args": [],
           "calls": [
             "json",
@@ -433,7 +433,7 @@
         },
         {
           "name": "call_llm",
-          "line": 162,
+          "line": 150,
           "args": [
             "prompt"
           ],
@@ -452,7 +452,7 @@
         },
         {
           "name": "sanitize_json_control_chars",
-          "line": 213,
+          "line": 201,
           "args": [
             "text"
           ],
@@ -465,7 +465,7 @@
         },
         {
           "name": "extract_json",
-          "line": 248,
+          "line": 236,
           "args": [
             "raw_text"
           ],
@@ -484,7 +484,7 @@
         },
         {
           "name": "normalize_shot",
-          "line": 277,
+          "line": 265,
           "args": [
             "shot",
             "index"
@@ -497,7 +497,7 @@
         },
         {
           "name": "normalize_hook_text",
-          "line": 304,
+          "line": 292,
           "args": [
             "result"
           ],
@@ -512,7 +512,7 @@
         },
         {
           "name": "hook_text_matches_prompt_example",
-          "line": 320,
+          "line": 308,
           "args": [
             "hook_text"
           ],
@@ -526,7 +526,7 @@
         },
         {
           "name": "hook_text_too_long_to_glance",
-          "line": 327,
+          "line": 315,
           "args": [
             "hook_text"
           ],
@@ -538,7 +538,7 @@
         },
         {
           "name": "hook_text_matches_story",
-          "line": 332,
+          "line": 320,
           "args": [
             "hook_text",
             "narration_text"
@@ -554,7 +554,7 @@
         },
         {
           "name": "narration_has_engagement_cta",
-          "line": 346,
+          "line": 334,
           "args": [
             "narration_text"
           ],
@@ -566,7 +566,7 @@
         },
         {
           "name": "find_duplicate_shots",
-          "line": 354,
+          "line": 342,
           "args": [
             "normalized_shots"
           ],
@@ -580,7 +580,7 @@
         },
         {
           "name": "find_empty_shots",
-          "line": 366,
+          "line": 354,
           "args": [
             "normalized_shots"
           ],
@@ -592,7 +592,7 @@
         },
         {
           "name": "find_continuation_language_shots",
-          "line": 373,
+          "line": 361,
           "args": [
             "normalized_shots"
           ],
@@ -605,7 +605,7 @@
         },
         {
           "name": "find_missing_onscreen_text_shots",
-          "line": 384,
+          "line": 372,
           "args": [
             "normalized_shots"
           ],
@@ -619,7 +619,7 @@
         },
         {
           "name": "find_excessive_consecutive_subject",
-          "line": 393,
+          "line": 381,
           "args": [
             "normalized_shots"
           ],
@@ -631,7 +631,7 @@
         },
         {
           "name": "validate_and_normalize",
-          "line": 408,
+          "line": 396,
           "args": [
             "result"
           ],
@@ -660,7 +660,7 @@
         },
         {
           "name": "generate_script",
-          "line": 551,
+          "line": 539,
           "args": [
             "title",
             "angle"
@@ -671,7 +671,6 @@
             "call_llm",
             "extract_json",
             "print",
-            "range",
             "sleep",
             "validate_and_normalize"
           ],
@@ -679,7 +678,7 @@
         },
         {
           "name": "save_script",
-          "line": 865,
+          "line": 862,
           "args": [
             "topic_id",
             "narration_text",
@@ -696,7 +695,7 @@
         },
         {
           "name": "mark_topic_scripted",
-          "line": 884,
+          "line": 881,
           "args": [
             "topic_id"
           ],
@@ -707,7 +706,7 @@
         },
         {
           "name": "mark_topic_generation_failed",
-          "line": 894,
+          "line": 891,
           "args": [
             "topic_id",
             "reason"
@@ -721,7 +720,7 @@
         },
         {
           "name": "main",
-          "line": 908,
+          "line": 905,
           "args": [],
           "calls": [
             "generate_script",
@@ -736,7 +735,7 @@
         },
         {
           "name": "_simplify",
-          "line": 321,
+          "line": 309,
           "args": [
             "s"
           ],
