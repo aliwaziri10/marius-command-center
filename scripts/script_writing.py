@@ -33,6 +33,7 @@ MAX_RETRIES = 2
 MIN_SHOTS = 60
 MAX_SHOTS = 85
 MAX_GENERATION_ATTEMPTS = 3
+MAX_INFRA_ATTEMPTS = 4
 MAX_HOOK_TEXT_CHARS = 40
 MAX_HOOK_TEXT_WORDS = 5
 MIN_SETTING_CHARS = 40
@@ -71,13 +72,6 @@ MAX_CONSECUTIVE_ZOOM_SHOTS = 2
 
 MAX_CONSECUTIVE_SAME_SUBJECT = 3
 
-# Phrases that signal a shot is describing an action IN PROGRESS or asking
-# the video model to continue an action across a cut, rather than showing
-# an already-resolved, stable end state. This is a real, observed failure
-# mode: shots written this way either freeze/glitch mid-action or force the
-# next shot to "continue" motion the model can't actually carry across an
-# independent generation, and objects morph mid-motion (a cup becomes a
-# ball mid-air) when an action is described as spanning the whole shot.
 CONTINUATION_BANNED_PHRASES = (
     "continues to", "continues ", "then walks", "then runs", "then turns",
     "then opens", "then reaches", "then picks", "then lifts", "then carries",
@@ -91,10 +85,6 @@ CONTINUATION_BANNED_PHRASES = (
     "hands over the", "pours the", "opens the door and", "proceeds to",
 )
 
-# Keywords that mean a shot is deliberately showing readable text - if any
-# of these appear in visual_description, required_onscreen_text must be
-# filled in with the exact wording, so it can be validated/enforced
-# downstream instead of hoping the video model renders it correctly.
 ONSCREEN_TEXT_KEYWORDS = (
     "newspaper", "letter", "document", "sign", "headline", "inscription",
     "poster", "map", "book", "plaque", "telegram", "postcard", "banner",
@@ -110,14 +100,12 @@ RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class InfraFailure(RuntimeError):
-    """Raised when every generation attempt failed purely because Gemini
-    never returned a usable response (rate limits, network errors, or a
-    malformed response envelope on every single attempt) - meaning the
-    topic's actual content was never evaluated at all. This must NOT be
-    treated the same as a real content failure: the topic itself did
-    nothing wrong, so it must stay 'pending' for the next scheduled run
-    to retry once Gemini's quota/availability recovers, instead of being
-    permanently blacklisted as generation_failed."""
+    """Raised when Gemini never returned a usable response within the infra
+    retry budget - meaning the topic's actual content was never evaluated
+    at all. This must NOT be treated the same as a real content failure:
+    the topic itself did nothing wrong, so it must stay 'pending' for the
+    next scheduled run to retry once Gemini's quota/availability recovers,
+    instead of being permanently blacklisted as generation_failed."""
     pass
 
 
@@ -828,22 +816,31 @@ required_onscreen_text left empty will be rejected outright."""
 
     last_reason = None
     ever_reached_content = False
-    for attempt in range(MAX_GENERATION_ATTEMPTS):
+    content_attempt = 0
+    infra_attempt = 0
+
+    while content_attempt < MAX_GENERATION_ATTEMPTS:
         try:
             raw = call_llm(prompt)
         except RuntimeError as e:
+            infra_attempt += 1
             last_reason = f"Gemini call failed: {e}"
-            print(f"Attempt {attempt + 1}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
-            wait = (attempt + 1) * 20
-            print(f"Backing off {wait}s before next full attempt...")
+            print(f"Infra retry {infra_attempt}/{MAX_INFRA_ATTEMPTS} failed - {last_reason} "
+                  f"(does not count against the {MAX_GENERATION_ATTEMPTS} content attempts)")
+            if infra_attempt >= MAX_INFRA_ATTEMPTS:
+                break
+            wait = infra_attempt * 20
+            print(f"Backing off {wait}s before next infra retry...")
             time.sleep(wait)
             continue
+
         ever_reached_content = True
+        content_attempt += 1
         try:
             parsed = extract_json(raw)
         except (ValueError, json.JSONDecodeError) as e:
             last_reason = f"JSON parse failed: {e}"
-            print(f"Attempt {attempt + 1}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
+            print(f"Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
             continue
 
         is_valid, result = validate_and_normalize(parsed)
@@ -851,15 +848,15 @@ required_onscreen_text left empty will be rejected outright."""
             return result
 
         last_reason = result
-        print(f"Attempt {attempt + 1}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
+        print(f"Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
 
     if not ever_reached_content:
         raise InfraFailure(
-            f"Gemini never returned a usable response in {MAX_GENERATION_ATTEMPTS} "
-            f"attempts (pure API/rate-limit failure - topic content was never "
+            f"Gemini never returned a usable response after {infra_attempt} infra "
+            f"retries (pure API/rate-limit failure - topic content was never "
             f"actually evaluated). Last reason: {last_reason}"
         )
-    raise RuntimeError(f"Script generation failed after {MAX_GENERATION_ATTEMPTS} attempts. Last reason: {last_reason}")
+    raise RuntimeError(f"Script generation failed after {content_attempt} content attempts. Last reason: {last_reason}")
 
 
 def save_script(topic_id, narration_text, shot_list, music_mood, hook_text, setting_and_characters):
