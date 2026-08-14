@@ -144,15 +144,22 @@ def retryable_request(method, url, max_retries=MAX_RETRIES, **kwargs):
     raise RuntimeError(f"Supabase call still failing after {max_retries} attempts: {last_error.status_code if last_error else 'unknown'} {last_error.text if last_error else ''}")
 
 
-def get_next_pending_topic():
+def get_pending_topics(limit=5):
+    """HEAD-OF-LINE FIX (2026-08-14): previously fetched only the single
+    oldest pending topic. If that topic hit InfraFailure, main() returned
+    cleanly (exit 0, no GitHub issue) and left it 'pending' for the next
+    run to retry - which then hit the exact same topic again. Confirmed
+    live: 'The Manzanar Teacher Who Taught in Secret' (created 2026-07-17)
+    sat retried on every 12h run for over a week while 240+ newer pending
+    topics never got a turn. Mirrors the same fix already proven in
+    video_generation.py's get_ready_scripts()."""
     resp = retryable_request(
         "GET",
-        f"{SUPABASE_URL}/rest/v1/topics?status=eq.pending&order=created_at.asc&limit=1",
+        f"{SUPABASE_URL}/rest/v1/topics?status=eq.pending&order=created_at.asc&limit={limit}",
         headers=HEADERS,
         timeout=30,
     )
-    rows = resp.json()
-    return rows[0] if rows else None
+    return resp.json()
 
 
 def call_llm(prompt):
@@ -989,32 +996,38 @@ def mark_topic_generation_failed(topic_id, reason):
 
 
 def main():
-    topic = get_next_pending_topic()
-    if not topic:
+    topics = get_pending_topics(limit=5)
+    if not topics:
         print("No pending topics found. Nothing to do.")
         return
 
-    print(f"Writing script for: {topic['title']}")
-    try:
-        result = generate_script(topic["title"], topic["angle"])
-    except InfraFailure as e:
-        print(f"Gemini infra failure, not the topic's fault - leaving topic {topic['id']} as "
-              f"pending so the next scheduled run retries it: {e}")
-        return
-    except RuntimeError as e:
-        mark_topic_generation_failed(topic["id"], str(e))
+    for topic in topics:
+        print(f"Writing script for: {topic['title']}")
+        try:
+            result = generate_script(topic["title"], topic["angle"])
+        except InfraFailure as e:
+            print(f"Gemini infra failure on topic {topic['id']} ({topic['title']}) - not the "
+                  f"topic's fault, leaving it pending and trying the next-oldest candidate "
+                  f"this run instead of exiting: {e}")
+            continue
+        except RuntimeError as e:
+            mark_topic_generation_failed(topic["id"], str(e))
+            continue
+
+        save_script(
+            topic["id"],
+            result["narration_text"],
+            result["shot_list"],
+            result["music_mood"],
+            result["hook_text"],
+            result["setting_and_characters"],
+        )
+        mark_topic_scripted(topic["id"])
+        print("Done.")
         return
 
-    save_script(
-        topic["id"],
-        result["narration_text"],
-        result["shot_list"],
-        result["music_mood"],
-        result["hook_text"],
-        result["setting_and_characters"],
-    )
-    mark_topic_scripted(topic["id"])
-    print("Done.")
+    print("No candidate in this batch produced a script this run (all hit infra failures or "
+          "were marked generation_failed) - next scheduled run will re-fetch and retry.")
 
 
 if __name__ == "__main__":
