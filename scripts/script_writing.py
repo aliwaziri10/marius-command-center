@@ -71,6 +71,7 @@ MAX_ZOOM_SHOT_RATIO = 0.32
 MAX_CONSECUTIVE_ZOOM_SHOTS = 2
 
 MAX_CONSECUTIVE_SAME_SUBJECT = 3
+MAX_SUBJECT_SHOT_RATIO = 0.45
 
 CONTINUATION_BANNED_PHRASES = (
     "continues to", "continues ", "then walks", "then runs", "then turns",
@@ -83,6 +84,13 @@ CONTINUATION_BANNED_PHRASES = (
     "turning to", "turns to face", "reaching for", "reaches for",
     "picks up and carries", "lifts and carries", "carries the",
     "hands over the", "pours the", "opens the door and", "proceeds to",
+)
+
+LOITERING_BANNED_PHRASES = (
+    "standing around", "standing there", "standing nearby", "standing idly",
+    "just standing", "simply standing", "standing quietly with no",
+    "waiting there", "waiting around", "sitting there doing nothing",
+    "looking around aimlessly", "with nothing in particular",
 )
 
 ONSCREEN_TEXT_KEYWORDS = (
@@ -369,6 +377,17 @@ def find_continuation_language_shots(normalized_shots):
     return hits
 
 
+def find_loitering_shots(normalized_shots):
+    hits = []
+    for i, s in enumerate(normalized_shots):
+        desc = (s["visual_description"] or "").lower()
+        for phrase in LOITERING_BANNED_PHRASES:
+            if phrase in desc:
+                hits.append((i, phrase))
+                break
+    return hits
+
+
 def find_missing_onscreen_text_shots(normalized_shots):
     hits = []
     for i, s in enumerate(normalized_shots):
@@ -376,6 +395,19 @@ def find_missing_onscreen_text_shots(normalized_shots):
         if any(kw in desc for kw in ONSCREEN_TEXT_KEYWORDS) and not s["required_onscreen_text"]:
             hits.append(i)
     return hits
+
+
+def find_dominant_subject(normalized_shots):
+    subject_counts = Counter(
+        s["primary_subject"].lower() for s in normalized_shots if s["primary_subject"]
+    )
+    if not subject_counts:
+        return None
+    subject, count = subject_counts.most_common(1)[0]
+    ratio = count / len(normalized_shots)
+    if ratio > MAX_SUBJECT_SHOT_RATIO:
+        return subject, count, ratio
+    return None
 
 
 def find_excessive_consecutive_subject(normalized_shots):
@@ -495,6 +527,19 @@ def validate_and_normalize(result):
             f"actually generated."
         )
 
+    loitering_hits = find_loitering_shots(normalized_shots)
+    if loitering_hits:
+        worst_i, worst_phrase = loitering_hits[0]
+        return False, (
+            f"{len(loitering_hits)} shot(s) describe a character just standing/"
+            f"waiting/sitting with no active task (first at shot {worst_i}, phrase "
+            f"{worst_phrase!r}) - every shot with a person in frame must anchor on "
+            f"a specific ongoing task or intent, already mid-task (e.g. 'already "
+            f"kneeling, mending a fishing net' not 'standing near the shore'). "
+            f"A character present in frame with nothing to do reads as aimless "
+            f"loitering on screen, not a purposeful, stable moment."
+        )
+
     missing_text_hits = find_missing_onscreen_text_shots(normalized_shots)
     if missing_text_hits:
         return False, (
@@ -513,6 +558,19 @@ def validate_and_normalize(result):
             f"ending at shot {idx} (max {MAX_CONSECUTIVE_SAME_SUBJECT}) - cut away to "
             f"a different subject, angle, or B-roll before returning to this "
             f"character, instead of holding on the same face shot after shot."
+        )
+
+    dominant_subject = find_dominant_subject(normalized_shots)
+    if dominant_subject:
+        subject, count, ratio = dominant_subject
+        return False, (
+            f"'{subject}' is the primary_subject of {count}/{len(normalized_shots)} shots "
+            f"({ratio:.0%}), over the {MAX_SUBJECT_SHOT_RATIO:.0%} episode-wide ceiling - "
+            f"even with cutaways breaking up consecutive runs, this character is in nearly "
+            f"every scene, which doesn't read as a real documentary. Replace enough of "
+            f"their shots with pure B-roll (landscapes, objects, documents, crowds, other "
+            f"people mentioned in the story) so they're a strong presence, not the subject "
+            f"of almost every single shot."
         )
 
     result["shot_list"] = normalized_shots
@@ -676,6 +734,23 @@ describing what's happening RIGHT NOW in the shot - instead describe the
 subject already in position: "standing beside the open door," "already
 seated at the table," "holding the letter, already unfolded."
 
+PURPOSEFUL STILLNESS, NOT LOITERING (HARD RULE): "already in position" does
+NOT mean "just standing/sitting there with nothing to do." Every shot with a
+person in frame must anchor them in a specific, concrete, already-in-progress
+task or intent - not a static end-state with no purpose. A character who is
+merely present in frame reads on screen as aimless loitering, which is just
+as bad as unresolved motion. Instead of "already standing near the field,"
+write "already kneeling in the field, both hands gripping the plow mid-
+furrow." Instead of "already seated at the table," write "already seated at
+the table, eyes fixed on the letter laid open in front of her." Every shot
+must answer: what is this person doing, and why, at this exact frozen
+moment - not just where are they positioned. Purely contemplative or
+grief-stricken stillness is fine (e.g. "already kneeling at the grave,
+head bowed, one hand resting on the headstone") as long as it is specific
+and emotionally motivated, never generic idling. Never use phrasing like
+"standing around," "standing there," "waiting there," "sitting there doing
+nothing," or "looking around" with no stated task or focus.
+
 OBJECT INTEGRITY: every object named in a shot must remain that same
 object for the whole shot - never describe an action mid-transformation.
 This is what causes a cup to visibly become a different object mid-air.
@@ -693,6 +768,17 @@ continuation of the earlier shot, but keep their fixed physical
 description (age, hair, facial hair, clothing, any distinguishing feature)
 IDENTICAL to what's stated in "setting_and_characters" every single time -
 never let the described appearance drift between shots.
+
+EPISODE-WIDE SCREEN TIME BUDGET (separate from the consecutive-shot rule
+above): breaking up consecutive runs is NOT enough on its own - a
+character can still dominate almost every shot in the episode as long as
+each run is short. At most {int(MAX_SUBJECT_SHOT_RATIO * 100)}% of ALL
+shots in the episode may have the same primary_subject. This is a hard
+ceiling across the whole shot list, not just back-to-back shots. A real
+documentary spends real time on setting, objects, other people mentioned
+in the story, and pure B-roll - it does not center one face in nearly
+every single frame. Budget generously for shots with primary_subject set
+to "" (pure B-roll) or to a different named person/group from the story.
 
 LEGIBLE ON-SCREEN TEXT: if a shot deliberately shows readable text (a
 newspaper headline, a letter, a sign, a document, an inscription), you
