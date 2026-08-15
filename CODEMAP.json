@@ -405,7 +405,7 @@
       "functions": [
         {
           "name": "retryable_request",
-          "line": 165,
+          "line": 195,
           "args": [
             "method",
             "url",
@@ -424,7 +424,7 @@
         },
         {
           "name": "get_pending_topics",
-          "line": 192,
+          "line": 222,
           "args": [
             "limit"
           ],
@@ -436,7 +436,7 @@
         },
         {
           "name": "call_llm",
-          "line": 210,
+          "line": 240,
           "args": [
             "prompt"
           ],
@@ -455,7 +455,7 @@
         },
         {
           "name": "sanitize_json_control_chars",
-          "line": 266,
+          "line": 296,
           "args": [
             "text"
           ],
@@ -468,7 +468,7 @@
         },
         {
           "name": "extract_json",
-          "line": 301,
+          "line": 331,
           "args": [
             "raw_text"
           ],
@@ -487,7 +487,7 @@
         },
         {
           "name": "narration_has_engagement_cta",
-          "line": 330,
+          "line": 360,
           "args": [
             "narration_text"
           ],
@@ -499,7 +499,7 @@
         },
         {
           "name": "build_narration_prompt",
-          "line": 341,
+          "line": 371,
           "args": [
             "title",
             "angle"
@@ -509,7 +509,7 @@
         },
         {
           "name": "build_narration_continuation_prompt",
-          "line": 412,
+          "line": 442,
           "args": [
             "title",
             "angle",
@@ -521,7 +521,7 @@
         },
         {
           "name": "generate_narration",
-          "line": 443,
+          "line": 473,
           "args": [
             "title",
             "angle"
@@ -545,8 +545,25 @@
           "docstring": "Stage 1: produce a narration that already clears the word-count and"
         },
         {
+          "name": "split_narration_into_chunks",
+          "line": 567,
+          "args": [
+            "narration_text",
+            "num_chunks"
+          ],
+          "calls": [
+            "append",
+            "join",
+            "len",
+            "split",
+            "strip",
+            "sum"
+          ],
+          "docstring": "Splits narration into num_chunks pieces, breaking only at sentence"
+        },
+        {
           "name": "normalize_shot",
-          "line": 537,
+          "line": 597,
           "args": [
             "shot",
             "index"
@@ -559,7 +576,7 @@
         },
         {
           "name": "normalize_hook_text",
-          "line": 564,
+          "line": 624,
           "args": [
             "result"
           ],
@@ -574,7 +591,7 @@
         },
         {
           "name": "hook_text_matches_prompt_example",
-          "line": 580,
+          "line": 640,
           "args": [
             "hook_text"
           ],
@@ -588,7 +605,7 @@
         },
         {
           "name": "hook_text_too_long_to_glance",
-          "line": 587,
+          "line": 647,
           "args": [
             "hook_text"
           ],
@@ -600,7 +617,7 @@
         },
         {
           "name": "hook_text_matches_story",
-          "line": 592,
+          "line": 652,
           "args": [
             "hook_text",
             "narration_text"
@@ -616,7 +633,7 @@
         },
         {
           "name": "find_duplicate_shots",
-          "line": 606,
+          "line": 666,
           "args": [
             "normalized_shots"
           ],
@@ -630,7 +647,7 @@
         },
         {
           "name": "find_empty_shots",
-          "line": 618,
+          "line": 678,
           "args": [
             "normalized_shots"
           ],
@@ -642,7 +659,7 @@
         },
         {
           "name": "find_continuation_language_shots",
-          "line": 625,
+          "line": 685,
           "args": [
             "normalized_shots"
           ],
@@ -655,7 +672,7 @@
         },
         {
           "name": "find_loitering_shots",
-          "line": 636,
+          "line": 696,
           "args": [
             "normalized_shots"
           ],
@@ -668,7 +685,7 @@
         },
         {
           "name": "find_missing_onscreen_text_shots",
-          "line": 647,
+          "line": 707,
           "args": [
             "normalized_shots"
           ],
@@ -682,7 +699,7 @@
         },
         {
           "name": "find_dominant_subject",
-          "line": 656,
+          "line": 716,
           "args": [
             "normalized_shots"
           ],
@@ -696,7 +713,7 @@
         },
         {
           "name": "find_excessive_consecutive_subject",
-          "line": 669,
+          "line": 729,
           "args": [
             "normalized_shots"
           ],
@@ -708,7 +725,7 @@
         },
         {
           "name": "validate_and_normalize_shot_response",
-          "line": 684,
+          "line": 744,
           "args": [
             "result",
             "narration_text"
@@ -738,21 +755,30 @@
           "docstring": "Validates everything EXCEPT narration_text/CTA, since those were"
         },
         {
-          "name": "build_shot_breakdown_prompt",
-          "line": 835,
+          "name": "build_shot_breakdown_chunk_prompt",
+          "line": 1004,
           "args": [
             "title",
             "angle",
-            "narration_text"
+            "chunk_text",
+            "chunk_index",
+            "num_chunks",
+            "min_shots_chunk",
+            "max_shots_chunk",
+            "setting_and_characters",
+            "prior_last_subject",
+            "prior_last_movement"
           ],
           "calls": [
-            "int"
+            "append",
+            "format",
+            "join"
           ],
-          "docstring": ""
+          "docstring": "Builds the prompt for ONE narration chunk's shot breakdown. The"
         },
         {
           "name": "generate_shot_breakdown",
-          "line": 1039,
+          "line": 1159,
           "args": [
             "title",
             "angle",
@@ -761,18 +787,25 @@
           "calls": [
             "InfraFailure",
             "RuntimeError",
-            "build_shot_breakdown_prompt",
+            "build_shot_breakdown_chunk_prompt",
             "call_llm",
+            "enumerate",
+            "extend",
             "extract_json",
+            "get",
+            "isinstance",
+            "len",
             "print",
             "sleep",
+            "split_narration_into_chunks",
+            "strip",
             "validate_and_normalize_shot_response"
           ],
-          "docstring": ""
+          "docstring": "CHUNKED (2026-08-15): splits narration into NUM_SHOT_CHUNKS pieces and"
         },
         {
           "name": "generate_script",
-          "line": 1095,
+          "line": 1283,
           "args": [
             "title",
             "angle"
@@ -785,7 +818,7 @@
         },
         {
           "name": "save_script",
-          "line": 1105,
+          "line": 1293,
           "args": [
             "topic_id",
             "narration_text",
@@ -802,7 +835,7 @@
         },
         {
           "name": "mark_topic_scripted",
-          "line": 1124,
+          "line": 1312,
           "args": [
             "topic_id"
           ],
@@ -813,7 +846,7 @@
         },
         {
           "name": "mark_topic_generation_failed",
-          "line": 1134,
+          "line": 1322,
           "args": [
             "topic_id",
             "reason"
@@ -827,7 +860,7 @@
         },
         {
           "name": "main",
-          "line": 1148,
+          "line": 1336,
           "args": [],
           "calls": [
             "generate_script",
@@ -842,7 +875,7 @@
         },
         {
           "name": "_simplify",
-          "line": 581,
+          "line": 641,
           "args": [
             "s"
           ],
