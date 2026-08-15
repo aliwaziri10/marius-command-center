@@ -266,6 +266,23 @@ lighting/quality/anachronism guards). Only if that ultra-generic prompt is
 STILL rejected does the shot actually fail and the script get flagged -
 which should now be rare to the point of near-zero, since tier 2 carries
 no story-specific content whatsoever for Agnes to react to.
+
+VISUAL-STYLE MODERNIZATION (2026-08-15): QUALITY_GUARD previously pushed a
+"shot on film, natural film grain" look - this fought sepia/washed-out
+grading (good) but the grain/film framing itself still read as classic
+analog rather than modern digital cinema, and every fallback tier's
+"{shot_type} cinematic documentary shot" phrasing nudged Agnes toward a
+dated, observational documentary aesthetic on top of that. Story content
+(setting_and_characters, ANACHRONISM_GUARD) stays historically accurate as
+before - only the camera/color-grade language changed. QUALITY_GUARD now
+describes a modern high-end digital cinema look (crisp clarity, shallow
+depth of field, professional color grading, cinematic lighting) instead of
+film grain, while still explicitly guarding against a flat/synthetic AI
+look so dropping the grain cue doesn't let AI artifacts show through more.
+Every fallback-tier "cinematic documentary shot" phrase was replaced with
+"modern high-production cinematic shot" so the visual-style language no
+longer nudges toward a documentary look; the fallback tiers' actual story
+content (or lack of it, in tier 2) is unchanged.
 """
 
 import os
@@ -426,9 +443,18 @@ ANACHRONISM_GUARD = (
     "no modern furniture, no electrical wiring or outlets, no plastic objects"
 )
 
+# VISUAL-STYLE MODERNIZATION (2026-08-15): previously "shot on film, natural
+# film grain" - which fought sepia/washed-out grading but still read as
+# classic analog rather than modern digital cinema. Now describes a
+# modern high-end digital cinema look instead (crisp clarity, shallow
+# depth of field, professional color grading, cinematic lighting), while
+# still explicitly guarding against a flat/synthetic AI look so dropping
+# the grain cue doesn't let AI artifacts show through more.
 QUALITY_GUARD = (
-    "shot on film, natural film grain, vivid saturated color, no sepia tone, "
-    "no heavy desaturation, no muted documentary color grading, no artificial CGI look, no plastic skin"
+    "modern high-end digital cinema, crisp sharp clarity, professional color grading, "
+    "shallow depth of field, cinematic lighting, vivid saturated color, no sepia tone, "
+    "no heavy desaturation, no muted documentary color grading, no grainy vintage film look, "
+    "no artificial CGI look, no flat synthetic AI look, no plastic skin"
 )
 
 
@@ -537,14 +563,14 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
         parts.append("bright natural daylight, high-key lighting, well-exposed")
         parts.append(QUALITY_GUARD)
         parts.append(ANACHRONISM_GUARD)
-        parts.append(f"{shot_type} cinematic documentary shot")
+        parts.append(f"{shot_type} modern high-production cinematic shot")
     else:
         parts = [
             "generic historical documentary reenactment scene, unspecified period figures",
             "bright natural daylight, high-key lighting, well-exposed",
             QUALITY_GUARD,
             ANACHRONISM_GUARD,
-            f"{shot_type} cinematic documentary shot",
+            f"{shot_type} modern high-production cinematic shot",
         ]
 
     if camera_movement != "static":
