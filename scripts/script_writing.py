@@ -51,9 +51,31 @@ takes the now-confirmed-length narration and builds setting_and_characters,
 hook_text, music_mood, and the shot_list from it. This also means a narration
 that already passed validation is never thrown away just because the shot
 list failed a check - only the shot-list stage retries in that case.
+
+CHUNKED SHOT BREAKDOWN (2026-08-15): even after splitting narration from
+shot-breakdown above, the shot-breakdown call ALONE was still structurally
+too big for Groq's free tier - it embeds the full ~2,400-token narration
+plus ~1,500-2,000 tokens of shot-writing rules as input, then asks for a
+60-85 shot structured JSON array (150-250 output tokens per shot), landing
+at 15,000-22,000 tokens in a single request - 25-85% over Groq's entire
+12,000 TPM ceiling before generation even starts. No amount of retry/backoff
+timing fixes this, because the very first attempt in a fresh 60-second
+window is already too big to fit. Fix: generate_shot_breakdown() now splits
+the narration into NUM_SHOT_CHUNKS roughly-equal, sentence-aligned pieces
+and makes one small Groq call per chunk (each individually well under
+12,000 TPM), spaced SHOT_CHUNK_CALL_DELAY_SECONDS apart so they land in
+separate rate-limit windows instead of stacking. The first chunk's call
+also produces the episode-wide setting_and_characters/hook_text/music_mood
+anchor; later chunks are given that same anchor text to keep every shot
+visually consistent. All chunk shot_lists are stitched together and
+renumbered, then run through the exact same validate_and_normalize_shot_
+response() checks (duplicates, zoom ratio, consecutive-subject, onscreen
+text, etc.) as before - only how the request reaches Groq changed, not the
+quality bar a shot list has to clear.
 """
 
 import os
+import re
 import json
 import time
 import requests
@@ -85,6 +107,14 @@ CONTENT_RETRY_WAIT_SECONDS = 25
 NARRATION_MAX_ATTEMPTS = 3
 NARRATION_MAX_CONTINUATIONS = 3
 NARRATION_TARGET_WORDS = 1800
+
+# CHUNKED SHOT BREAKDOWN (2026-08-15): see module docstring. Splitting one
+# 60-85 shot request (15,000-22,000 tokens) into 3 smaller requests keeps
+# each call comfortably under Groq's 12,000 TPM free-tier ceiling.
+NUM_SHOT_CHUNKS = 3
+CHUNK_MIN_SHOTS = MIN_SHOTS // NUM_SHOT_CHUNKS
+CHUNK_MAX_SHOTS = -(-MAX_SHOTS // NUM_SHOT_CHUNKS)  # ceil division
+SHOT_CHUNK_CALL_DELAY_SECONDS = 20
 
 GROQ_MODEL = "llama-3.3-70b-versatile"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -531,8 +561,38 @@ def generate_narration(title, angle):
 
 
 # ---------------------------------------------------------------------------
-# STAGE 2: SHOT BREAKDOWN (from a confirmed-length narration)
+# STAGE 2: SHOT BREAKDOWN (from a confirmed-length narration, in chunks)
 # ---------------------------------------------------------------------------
+
+def split_narration_into_chunks(narration_text, num_chunks):
+    """Splits narration into num_chunks pieces, breaking only at sentence
+    boundaries (never mid-sentence) and balancing word count across pieces
+    as evenly as possible. Each chunk becomes its own, much smaller, Groq
+    shot-breakdown call."""
+    sentences = re.split(r"(?<=[.!?])\s+", narration_text.strip())
+    sentences = [s for s in sentences if s.strip()]
+
+    if len(sentences) <= num_chunks:
+        return [s.strip() for s in sentences] or [narration_text.strip()]
+
+    total_words = sum(len(s.split()) for s in sentences)
+    target_words = total_words / num_chunks
+
+    chunks = []
+    current = []
+    current_words = 0
+    for sentence in sentences:
+        current.append(sentence)
+        current_words += len(sentence.split())
+        if current_words >= target_words and len(chunks) < num_chunks - 1:
+            chunks.append(" ".join(current).strip())
+            current = []
+            current_words = 0
+    if current:
+        chunks.append(" ".join(current).strip())
+
+    return chunks
+
 
 def normalize_shot(shot, index):
     shot_type = shot.get("shot_type")
@@ -683,7 +743,10 @@ def find_excessive_consecutive_subject(normalized_shots):
 
 def validate_and_normalize_shot_response(result, narration_text):
     """Validates everything EXCEPT narration_text/CTA, since those were
-    already confirmed during the narration stage before this is ever called."""
+    already confirmed during the narration stage before this is ever called.
+    Runs on the FULL stitched shot list (all chunks combined), so every
+    episode-wide check here (total shot count, zoom ratio, subject
+    dominance, etc.) still applies exactly as before chunking was added."""
     setting_and_characters = (result.get("setting_and_characters") or "").strip()
     if len(setting_and_characters) < MIN_SETTING_CHARS:
         return False, (
@@ -832,80 +895,25 @@ def validate_and_normalize_shot_response(result, narration_text):
     return True, result
 
 
-def build_shot_breakdown_prompt(title, angle, narration_text):
-    return f"""You are the visual director and sound designer for "Erased," a
-YouTube documentary channel. The narration script below has ALREADY been
-written and finalized for this episode - do not rewrite, shorten, or alter
-it in any way. Your job is to build the setting/character anchor, a
-thumbnail hook line, the music mood, and a full shot-by-shot breakdown of
-this exact narration.
-
-Episode topic: {title}
-Angle: {angle}
-
-FINALIZED NARRATION (do not change this text):
----
-{narration_text}
----
-
-SETTING AND CHARACTERS - write this as a fixed visual anchor for the whole
-episode. This is the single most important field for keeping the episode
-visually consistent, so treat it as non-negotiable:
-- State the real-world location, country/region, era, and the actual
-  ethnicity/culture of the people in this specific story. Be explicit and
-  concrete (e.g. "rural Gambia, West Africa, 1981 - Gambian people, dark
-  skin, traditional and period-appropriate West African dress" NOT vague
-  phrasing that a video model could misread as a different region).
-- For every recurring named or clearly-identifiable person in the story
-  (e.g. "the mother," "the young soldier," "the porter"), give one fixed,
-  concrete physical description (approximate age, build, hair, distinctive
-  clothing) that must be repeated consistently - this person must look the
-  same in every shot they appear in, not reinterpreted shot to shot.
-  If the story has no individually-tracked recurring character (e.g. it
-  follows a crowd or an unnamed narrator's perspective), say so explicitly
-  instead of inventing one.
-This full anchor will be attached to every single shot's image/video
-generation prompt later in the pipeline, so write it as a standalone
-paragraph that makes sense with no other context - 2-5 sentences.
-
-THUMBNAIL HOOK TEXT - a short, punchy line of thumbnail cover text that
-would make someone scrolling YouTube stop and click. This is NOT a
-narration sentence - it should read like a headline: concrete, high-stakes,
-and built around the single most shocking number, name, or fact in THIS
-SPECIFIC STORY.
-
-THE 2-SECOND RULE: a thumbnail gets about 2 seconds of a scrolling viewer's
-attention, and most viewers see it shrunk down on a phone screen. The hook
-text must be absorbable in that window - which means SHORT:
-{MAX_HOOK_TEXT_WORDS} words maximum, ideally 3-4, under {MAX_HOOK_TEXT_CHARS}
-characters. Use short punchy fragments separated by periods, not one
-flowing sentence.
-
-The example below shows the STYLE only. Do not reuse or adapt it - write an
-entirely new line using facts that actually appear in the narration above.
-   Style example only, from an unrelated story - never copy this line
-   itself: "312 DIARIES. ONE BOMB. GONE IN SECONDS."
-
-CINEMATIC DIRECTOR - shot list requirements:
-Break the narration above into EXACTLY between {MIN_SHOTS} and {MAX_SHOTS}
-shots - this is a hard requirement, not a suggestion. This is a dense,
-sub-sentence level breakdown - a single narration sentence should often
-span 2-3 separate shots, not one. Do not write sparse, paragraph-level
-shots. Every "narration_excerpt" must be an exact, verbatim substring taken
-from the finalized narration above, in order, covering it start to finish.
+SHOT_RULES_BLOCK = f"""CINEMATIC DIRECTOR - shot list requirements:
+This is a dense, sub-sentence level breakdown - a single narration sentence
+should often span 2-3 separate shots, not one. Do not write sparse,
+paragraph-level shots. Every "narration_excerpt" must be an exact, verbatim
+substring taken from the NARRATION SEGMENT below, in order, covering it
+start to finish.
 
 EVERY SHOT MUST BE DISTINCT - THIS IS ALSO A HARD REQUIREMENT: every shot
 must have its own real visual_description and narration_excerpt drawn from
-a different part of the narration. NEVER repeat an earlier shot (same
-visual_description and narration_excerpt) later in the list just to reach
-the shot count - a script that repeats any shot more than twice will be
-rejected and regenerated.
+a different part of the narration segment. NEVER repeat an earlier shot
+(same visual_description and narration_excerpt) later in the list just to
+reach the shot count - a script that repeats any shot more than twice will
+be rejected and regenerated.
 
 Every shot's "visual_description" must stay consistent with the
-"setting_and_characters" anchor above - same location/era/ethnicity, and
-any recurring person described there must match their fixed appearance in
-every shot they appear in. Do not introduce a different ethnicity, region,
-or unplanned recurring character partway through.
+"setting_and_characters" anchor given below - same location/era/ethnicity,
+and any recurring person described there must match their fixed appearance
+in every shot they appear in. Do not introduce a different ethnicity,
+region, or unplanned recurring character partway through.
 
 DOCUMENTARY SHOT INDEPENDENCE (HARD RULE): write the shot list as a
 documentary editor, not a movie storyboard. Every shot must be a complete,
@@ -945,11 +953,6 @@ the camera angle, framing, and body orientation, but keep their fixed
 physical description IDENTICAL to what's stated in "setting_and_characters"
 every single time.
 
-EPISODE-WIDE SCREEN TIME BUDGET: at most {int(MAX_SUBJECT_SHOT_RATIO * 100)}%
-of ALL shots in the episode may have the same primary_subject. Budget
-generously for shots with primary_subject set to "" (pure B-roll) or to a
-different named person/group from the story.
-
 LEGIBLE ON-SCREEN TEXT: if a shot deliberately shows readable text (a
 newspaper headline, a letter, a sign, a document, an inscription), you must
 state the exact required wording in "required_onscreen_text", and describe
@@ -985,34 +988,158 @@ ZOOM DISCIPLINE:
   crash_zoom, zoom_in, snap_zoom) or an extreme_close_up shot_type. Never
   use two zoom-in-family movements back to back.
 - At least 1 in 4 shots must be "wide" or "establishing" shot_type, spread
-  through the episode.
+  through this segment.
 - For the remaining shots, favor movements that add energy WITHOUT
   tightening the frame: pan_left, pan_right, tilt_up, tilt_down, tracking,
   dolly_in, dolly_out, whip_pan, orbit, drone_rise, drone_descend,
   parallax, handheld_shake, dutch_angle, speed_ramp, pull_out, zoom_out.
 
 SOUND DESIGNER:
-- At the top level, include "music_mood": a single descriptive prompt for
-  an AI music generator describing the background score for the WHOLE
-  episode - scored like a thriller movie, building tension progressively,
-  peaking at the biggest reveal, then resolving.
 - For each shot, include "sfx_cue" for both loud dramatic moments and
   quieter ambient/atmospheric sound. Aim for at least half of all shots to
   carry some sfx_cue, leaving "" only where truly no distinct sound would
-  be audible.
+  be audible."""
+
+
+def build_shot_breakdown_chunk_prompt(
+    title, angle, chunk_text, chunk_index, num_chunks,
+    min_shots_chunk, max_shots_chunk,
+    setting_and_characters=None, prior_last_subject=None, prior_last_movement=None,
+):
+    """Builds the prompt for ONE narration chunk's shot breakdown. The
+    first chunk (chunk_index == 0) also produces the episode-wide
+    setting_and_characters/hook_text/music_mood anchor; later chunks are
+    handed that same anchor text back so every shot stays visually
+    consistent, and are given a short note on the previous chunk's last
+    shot so cutaway discipline carries across the chunk boundary."""
+    segment_label = f"segment {chunk_index + 1} of {num_chunks}"
+
+    if chunk_index == 0:
+        anchor_block = f"""SETTING AND CHARACTERS - write this as a fixed visual anchor for the WHOLE
+episode (not just this segment). This is the single most important field for
+keeping the episode visually consistent across all {num_chunks} segments, so
+treat it as non-negotiable:
+- State the real-world location, country/region, era, and the actual
+  ethnicity/culture of the people in this specific story. Be explicit and
+  concrete (e.g. "rural Gambia, West Africa, 1981 - Gambian people, dark
+  skin, traditional and period-appropriate West African dress" NOT vague
+  phrasing that a video model could misread as a different region).
+- For every recurring named or clearly-identifiable person in the story
+  (e.g. "the mother," "the young soldier," "the porter"), give one fixed,
+  concrete physical description (approximate age, build, hair, distinctive
+  clothing) that must be repeated consistently - this person must look the
+  same in every shot they appear in, not reinterpreted shot to shot.
+  If the story has no individually-tracked recurring character (e.g. it
+  follows a crowd or an unnamed narrator's perspective), say so explicitly
+  instead of inventing one.
+This full anchor will be attached to every single shot's image/video
+generation prompt later in the pipeline (across all {num_chunks} segments),
+so write it as a standalone paragraph that makes sense with no other
+context - 2-5 sentences.
+
+THUMBNAIL HOOK TEXT - a short, punchy line of thumbnail cover text that
+would make someone scrolling YouTube stop and click. This is NOT a
+narration sentence - it should read like a headline: concrete, high-stakes,
+and built around the single most shocking number, name, or fact in THIS
+SPECIFIC STORY (you may draw on the full episode topic/angle above, not
+just this first segment).
+
+THE 2-SECOND RULE: a thumbnail gets about 2 seconds of a scrolling viewer's
+attention, and most viewers see it shrunk down on a phone screen. The hook
+text must be absorbable in that window - which means SHORT:
+{MAX_HOOK_TEXT_WORDS} words maximum, ideally 3-4, under {MAX_HOOK_TEXT_CHARS}
+characters. Use short punchy fragments separated by periods, not one
+flowing sentence.
+
+The example below shows the STYLE only. Do not reuse or adapt it - write an
+entirely new line using facts that actually appear in the story.
+   Style example only, from an unrelated story - never copy this line
+   itself: "312 DIARIES. ONE BOMB. GONE IN SECONDS."
+
+MUSIC MOOD - include "music_mood": a single descriptive prompt for an AI
+music generator describing the background score for the WHOLE episode -
+scored like a thriller movie, building tension progressively, peaking at
+the biggest reveal, then resolving.
+
+"""
+        json_extra_fields = """  "setting_and_characters": "2-5 sentence fixed anchor for the WHOLE episode.",
+  "hook_text": "Short punchy thumbnail cover line, max {max_words} words and under {max_chars} characters.",
+  "music_mood": "Background score prompt for the whole episode, describing its build-up arc.",
+""".format(max_words=MAX_HOOK_TEXT_WORDS, max_chars=MAX_HOOK_TEXT_CHARS)
+        continuity_note = ""
+    else:
+        anchor_block = f"""SETTING AND CHARACTERS - this is ALREADY FIXED for the whole episode. Every
+shot you write below must stay strictly consistent with it (same location,
+era, ethnicity, and exact fixed physical description for any recurring
+character named in it):
+
+---
+{setting_and_characters}
+---
+
+Do NOT invent a new setting_and_characters, hook_text, or music_mood in
+this response - this segment only returns a shot_list.
+
+"""
+        json_extra_fields = ""
+        continuity_bits = []
+        if prior_last_subject:
+            continuity_bits.append(
+                f'the previous segment\'s last shot had primary_subject "{prior_last_subject}" - '
+                f"avoid opening this segment with more consecutive shots of that same subject; "
+                f"cut to something else first if this segment's narration allows it"
+            )
+        if prior_last_movement:
+            continuity_bits.append(
+                f'the previous segment\'s last shot used camera_movement "{prior_last_movement}" - '
+                f"don't repeat that exact movement as this segment's first shot"
+            )
+        continuity_note = (
+            "CONTINUITY WITH THE PREVIOUS SEGMENT: " + "; also ".join(continuity_bits) + ".\n\n"
+            if continuity_bits else ""
+        )
+
+    return f"""You are the visual director and sound designer for "Erased," a
+YouTube documentary channel. The narration script for this episode has
+ALREADY been written and finalized - do not rewrite, shorten, or alter it.
+Your job right now is ONLY to build the shot-by-shot breakdown for
+{segment_label} of this episode's narration (given below as NARRATION
+SEGMENT). This segment will later be stitched together with the other
+{num_chunks - 1} segment(s) into one continuous shot list, so treat the
+NARRATION SEGMENT below as a slice of a longer script, not a complete story
+by itself.
+
+Episode topic: {title}
+Angle: {angle}
+
+{anchor_block}NARRATION SEGMENT ({segment_label}, do not change this text):
+---
+{chunk_text}
+---
+
+{continuity_note}Break the NARRATION SEGMENT above into EXACTLY between
+{min_shots_chunk} and {max_shots_chunk} shots covering this segment only,
+start to finish - this is a hard requirement, not a suggestion.
+
+{SHOT_RULES_BLOCK}
+
+FINAL CHECK before you output: for every shot whose visual_description
+mentions a newspaper, letter, sign, document, headline, inscription,
+poster, map, book, plaque, telegram, postcard, banner, ledger, diary,
+certificate, or gravestone/tombstone - you MUST fill in
+required_onscreen_text with the exact wording, or rewrite that shot so no
+readable text is the focus. A shot with one of those words present and
+required_onscreen_text left empty will be rejected outright.
 
 Return ONLY valid JSON, no other text, no markdown fences, in this exact
 format:
 
 {{
-  "setting_and_characters": "2-5 sentence fixed anchor.",
-  "hook_text": "Short punchy thumbnail cover line, max {MAX_HOOK_TEXT_WORDS} words and under {MAX_HOOK_TEXT_CHARS} characters.",
-  "music_mood": "Background score prompt for the whole episode, describing its build-up arc.",
-  "shot_list": [
+{json_extra_fields}  "shot_list": [
     {{
       "shot_number": 1,
-      "visual_description": "Detailed description for AI image/video generation, consistent with setting_and_characters above",
-      "narration_excerpt": "The exact, verbatim portion of the finalized narration this shot covers",
+      "visual_description": "Detailed description for AI image/video generation, consistent with setting_and_characters",
+      "narration_excerpt": "The exact, verbatim portion of THIS SEGMENT's narration this shot covers",
       "shot_type": "wide",
       "camera_movement": "push_in",
       "camera_reason": "Why this movement fits this beat",
@@ -1024,20 +1151,20 @@ format:
   ]
 }}
 
-Include between {MIN_SHOTS} and {MAX_SHOTS} shots covering the full
-narration above - every shot must be distinct, never repeat an earlier shot.
-
-FINAL CHECK before you output: for every shot whose visual_description
-mentions a newspaper, letter, sign, document, headline, inscription,
-poster, map, book, plaque, telegram, postcard, banner, ledger, diary,
-certificate, or gravestone/tombstone - you MUST fill in
-required_onscreen_text with the exact wording, or rewrite that shot so no
-readable text is the focus. A shot with one of those words present and
-required_onscreen_text left empty will be rejected outright."""
+Include between {min_shots_chunk} and {max_shots_chunk} shots covering this
+segment's narration above - every shot must be distinct, never repeat an
+earlier shot."""
 
 
 def generate_shot_breakdown(title, angle, narration_text):
-    prompt = build_shot_breakdown_prompt(title, angle, narration_text)
+    """CHUNKED (2026-08-15): splits narration into NUM_SHOT_CHUNKS pieces and
+    makes one small Groq call per piece (spaced SHOT_CHUNK_CALL_DELAY_SECONDS
+    apart), instead of one huge call that structurally cannot fit under
+    Groq's free-tier 12,000 TPM ceiling. All chunk shot_lists are stitched
+    and renumbered, then validated with the exact same episode-wide rules
+    as before chunking (validate_and_normalize_shot_response is unchanged)."""
+    chunks = split_narration_into_chunks(narration_text, NUM_SHOT_CHUNKS)
+    num_chunks = len(chunks)
 
     last_reason = None
     ever_reached_content = False
@@ -1045,13 +1172,66 @@ def generate_shot_breakdown(title, angle, narration_text):
     infra_attempt = 0
 
     while content_attempt < MAX_GENERATION_ATTEMPTS:
-        try:
-            raw = call_llm(prompt)
-        except RuntimeError as e:
-            infra_attempt += 1
-            last_reason = f"Groq call failed: {e}"
-            print(f"[shots] Infra retry {infra_attempt}/{MAX_INFRA_ATTEMPTS} failed - {last_reason} "
-                  f"(does not count against the {MAX_GENERATION_ATTEMPTS} content attempts)")
+        setting_and_characters = None
+        hook_text = None
+        music_mood = None
+        stitched_shots = []
+        infra_failed_this_round = False
+        content_failure_reason = None
+
+        for idx, chunk_text in enumerate(chunks):
+            if idx > 0:
+                print(f"[shots] Waiting {SHOT_CHUNK_CALL_DELAY_SECONDS}s before segment "
+                      f"{idx + 1}/{num_chunks} call (keeps each Groq call in its own TPM window)...")
+                time.sleep(SHOT_CHUNK_CALL_DELAY_SECONDS)
+
+            prior_last_subject = stitched_shots[-1].get("primary_subject") if stitched_shots else None
+            prior_last_movement = stitched_shots[-1].get("camera_movement") if stitched_shots else None
+
+            prompt = build_shot_breakdown_chunk_prompt(
+                title, angle, chunk_text, idx, num_chunks,
+                CHUNK_MIN_SHOTS, CHUNK_MAX_SHOTS,
+                setting_and_characters=setting_and_characters,
+                prior_last_subject=prior_last_subject,
+                prior_last_movement=prior_last_movement,
+            )
+
+            try:
+                raw = call_llm(prompt)
+            except RuntimeError as e:
+                infra_attempt += 1
+                last_reason = f"Groq call failed on segment {idx + 1}/{num_chunks}: {e}"
+                print(f"[shots] Infra retry {infra_attempt}/{MAX_INFRA_ATTEMPTS} failed - {last_reason} "
+                      f"(does not count against the {MAX_GENERATION_ATTEMPTS} content attempts)")
+                infra_failed_this_round = True
+                break
+
+            ever_reached_content = True
+            try:
+                parsed = extract_json(raw)
+            except (ValueError, json.JSONDecodeError) as e:
+                content_failure_reason = f"JSON parse failed on segment {idx + 1}/{num_chunks}: {e}"
+                break
+
+            if idx == 0:
+                setting_and_characters = (parsed.get("setting_and_characters") or "").strip()
+                hook_text = (parsed.get("hook_text") or "").strip()
+                music_mood = (parsed.get("music_mood") or "").strip()
+
+            chunk_shot_list = parsed.get("shot_list")
+            if not isinstance(chunk_shot_list, list) or len(chunk_shot_list) == 0:
+                content_failure_reason = f"segment {idx + 1}/{num_chunks} returned missing/empty shot_list"
+                break
+            if len(chunk_shot_list) < CHUNK_MIN_SHOTS or len(chunk_shot_list) > CHUNK_MAX_SHOTS:
+                content_failure_reason = (
+                    f"segment {idx + 1}/{num_chunks} shot count {len(chunk_shot_list)} outside "
+                    f"{CHUNK_MIN_SHOTS}-{CHUNK_MAX_SHOTS} range"
+                )
+                break
+
+            stitched_shots.extend(chunk_shot_list)
+
+        if infra_failed_this_round:
             if infra_attempt >= MAX_INFRA_ATTEMPTS:
                 break
             wait = infra_attempt * 20
@@ -1059,12 +1239,10 @@ def generate_shot_breakdown(title, angle, narration_text):
             time.sleep(wait)
             continue
 
-        ever_reached_content = True
         content_attempt += 1
-        try:
-            parsed = extract_json(raw)
-        except (ValueError, json.JSONDecodeError) as e:
-            last_reason = f"JSON parse failed: {e}"
+
+        if content_failure_reason:
+            last_reason = content_failure_reason
             print(f"[shots] Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
             if content_attempt < MAX_GENERATION_ATTEMPTS:
                 print(f"Waiting {CONTENT_RETRY_WAIT_SECONDS}s before next content attempt "
@@ -1072,11 +1250,21 @@ def generate_shot_breakdown(title, angle, narration_text):
                 time.sleep(CONTENT_RETRY_WAIT_SECONDS)
             continue
 
-        is_valid, result = validate_and_normalize_shot_response(parsed, narration_text)
-        if is_valid:
-            return result
+        for i, shot in enumerate(stitched_shots):
+            shot["shot_number"] = i + 1
 
-        last_reason = result
+        result = {
+            "setting_and_characters": setting_and_characters,
+            "hook_text": hook_text,
+            "music_mood": music_mood,
+            "shot_list": stitched_shots,
+        }
+
+        is_valid, validated = validate_and_normalize_shot_response(result, narration_text)
+        if is_valid:
+            return validated
+
+        last_reason = validated
         print(f"[shots] Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
         if content_attempt < MAX_GENERATION_ATTEMPTS:
             print(f"Waiting {CONTENT_RETRY_WAIT_SECONDS}s before next content attempt "
