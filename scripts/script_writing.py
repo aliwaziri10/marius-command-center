@@ -11,6 +11,19 @@ falls through to OpenRouter just re-hits the same rate-limit wall. Removed
 OpenRouter entirely. Gemini (same free key/approach TDP's
 generate_script.py already uses successfully) is now the ONLY provider.
 Requires the GEMINI_API_KEY secret in this repo (already added).
+
+CONTENT-RETRY BACKOFF FIX (2026-08-15): previously, a content/validation
+failure (bad word count, duplicate shots, etc.) retried immediately with
+ZERO wait - only infra failures (network/429 errors inside call_llm) had
+backoff. With 5 topics x up to 3 content attempts each, this could burst
+10-15+ Gemini calls within the first minute of a run, blowing through
+free-tier Gemini's ~10-15 RPM ceiling almost immediately - after which
+every subsequent call in that run also 429'd, since the per-minute window
+doesn't clear for 60s. Confirmed via GitHub issue history: the last real
+"Script Writing workflow failed" issue was Aug 9, but zero scripts saved
+since - because when all 5 topics hit InfraFailure, main() exits cleanly
+(code 0), so the failure never surfaces as a GitHub issue. Added a real
+sleep between content attempts below to stop the self-inflicted burst.
 """
 
 import os
@@ -40,6 +53,7 @@ MIN_SETTING_CHARS = 40
 MAX_SETTING_CHARS = 900
 MIN_NARRATION_WORDS = 1500
 MAX_SHOT_REPEAT_COUNT = 2
+CONTENT_RETRY_WAIT_SECONDS = 25
 
 GEMINI_MODEL = "gemini-3.5-flash"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_KEY}"
@@ -934,6 +948,10 @@ required_onscreen_text left empty will be rejected outright."""
         except (ValueError, json.JSONDecodeError) as e:
             last_reason = f"JSON parse failed: {e}"
             print(f"Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
+            if content_attempt < MAX_GENERATION_ATTEMPTS:
+                print(f"Waiting {CONTENT_RETRY_WAIT_SECONDS}s before next content attempt "
+                      f"(prevents bursting past Gemini's free-tier RPM ceiling)...")
+                time.sleep(CONTENT_RETRY_WAIT_SECONDS)
             continue
 
         is_valid, result = validate_and_normalize(parsed)
@@ -942,6 +960,10 @@ required_onscreen_text left empty will be rejected outright."""
 
         last_reason = result
         print(f"Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
+        if content_attempt < MAX_GENERATION_ATTEMPTS:
+            print(f"Waiting {CONTENT_RETRY_WAIT_SECONDS}s before next content attempt "
+                  f"(prevents bursting past Gemini's free-tier RPM ceiling)...")
+            time.sleep(CONTENT_RETRY_WAIT_SECONDS)
 
     if not ever_reached_content:
         raise InfraFailure(
