@@ -24,6 +24,17 @@ doesn't clear for 60s. Confirmed via GitHub issue history: the last real
 since - because when all 5 topics hit InfraFailure, main() exits cleanly
 (code 0), so the failure never surfaces as a GitHub issue. Added a real
 sleep between content attempts below to stop the self-inflicted burst.
+
+PROVIDER SWITCH (2026-08-15): Gemini removed, Groq is now the ONLY provider.
+Gemini's free-tier RPM ceiling (~10-15 RPM) kept getting blown through by
+this script's own retry bursts even with the 25s backoff fix above. Groq's
+free tier (30 RPM, 12,000 TPM, 1,000 requests/day on llama-3.3-70b-versatile)
+gives a materially higher per-minute ceiling, and its 128K context window
+comfortably fits this script's large prompt + long narration + 60-85 shot
+JSON output - unlike Cerebras, whose free tier is capped at 8,192 tokens
+total (input+output combined) and would fail on nearly every real request
+here. Requires the GROQ_API_KEY secret in this repo (get one free, no
+credit card, at console.groq.com).
 """
 
 import os
@@ -34,7 +45,7 @@ from collections import Counter
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
-GEMINI_KEY = os.environ["GEMINI_API_KEY"]
+GROQ_KEY = os.environ["GROQ_API_KEY"]
 
 HEADERS = {
     "apikey": SUPABASE_KEY,
@@ -55,8 +66,8 @@ MIN_NARRATION_WORDS = 1500
 MAX_SHOT_REPEAT_COUNT = 2
 CONTENT_RETRY_WAIT_SECONDS = 25
 
-GEMINI_MODEL = "gemini-3.5-flash"
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_KEY}"
+GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 
@@ -122,11 +133,11 @@ RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class InfraFailure(RuntimeError):
-    """Raised when Gemini never returned a usable response within the infra
+    """Raised when Groq never returned a usable response within the infra
     retry budget - meaning the topic's actual content was never evaluated
     at all. This must NOT be treated the same as a real content failure:
     the topic itself did nothing wrong, so it must stay 'pending' for the
-    next scheduled run to retry once Gemini's quota/availability recovers,
+    next scheduled run to retry once Groq's quota/availability recovers,
     instead of being permanently blacklisted as generation_failed."""
     pass
 
@@ -177,31 +188,36 @@ def get_pending_topics(limit=5):
 
 
 def call_llm(prompt):
-    """PROVIDER SWITCH (2026-08-06): Gemini only - OpenRouter removed
-    entirely per Zia, since keeping an already-unreliable fallback just
-    means occasional runs still hit the same rate-limit wall."""
+    """PROVIDER SWITCH (2026-08-15): Groq only, using llama-3.3-70b-versatile.
+    OpenAI-compatible chat completions endpoint - 30 RPM / 12,000 TPM /
+    1,000 requests per day free tier, no credit card, 128K context window
+    (comfortably fits this script's large prompt + long JSON output)."""
     body = json.dumps({
-        "contents": [{"parts": [{"text": prompt}]}],
+        "model": GROQ_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
     }).encode()
     last_error = None
     for attempt in range(MAX_RETRIES):
         try:
             resp = requests.post(
-                GEMINI_URL,
+                GROQ_URL,
                 data=body,
-                headers={"Content-Type": "application/json"},
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {GROQ_KEY}",
+                },
                 timeout=120,
             )
         except RETRYABLE_NETWORK_EXCEPTIONS as e:
             wait = (attempt + 1) * 15
-            print(f"Gemini network error ({e.__class__.__name__}: {e}), waiting {wait}s before retry...")
+            print(f"Groq network error ({e.__class__.__name__}: {e}), waiting {wait}s before retry...")
             last_error = e
             time.sleep(wait)
             continue
 
         if resp.status_code == 429:
             wait = (attempt + 1) * 15
-            print(f"Gemini rate limited, waiting {wait}s before retry...")
+            print(f"Groq rate limited, waiting {wait}s before retry...")
             last_error = resp
             time.sleep(wait)
             continue
@@ -210,21 +226,21 @@ def call_llm(prompt):
             resp.raise_for_status()
         except requests.exceptions.HTTPError as e:
             wait = (attempt + 1) * 15
-            print(f"Gemini HTTP error {resp.status_code} ({e}): {resp.text[:300]}, waiting {wait}s before retry...")
+            print(f"Groq HTTP error {resp.status_code} ({e}): {resp.text[:300]}, waiting {wait}s before retry...")
             last_error = resp
             time.sleep(wait)
             continue
 
         try:
-            return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+            return resp.json()["choices"][0]["message"]["content"]
         except (requests.exceptions.JSONDecodeError, KeyError, IndexError) as e:
             wait = (attempt + 1) * 15
-            print(f"Gemini response envelope malformed/unparseable ({e}), waiting {wait}s before retry...")
+            print(f"Groq response envelope malformed/unparseable ({e}), waiting {wait}s before retry...")
             last_error = e
             time.sleep(wait)
             continue
 
-    raise RuntimeError(f"Gemini still failing after {MAX_RETRIES} attempts: {last_error}")
+    raise RuntimeError(f"Groq still failing after {MAX_RETRIES} attempts: {last_error}")
 
 
 def sanitize_json_control_chars(text):
@@ -931,7 +947,7 @@ required_onscreen_text left empty will be rejected outright."""
             raw = call_llm(prompt)
         except RuntimeError as e:
             infra_attempt += 1
-            last_reason = f"Gemini call failed: {e}"
+            last_reason = f"Groq call failed: {e}"
             print(f"Infra retry {infra_attempt}/{MAX_INFRA_ATTEMPTS} failed - {last_reason} "
                   f"(does not count against the {MAX_GENERATION_ATTEMPTS} content attempts)")
             if infra_attempt >= MAX_INFRA_ATTEMPTS:
@@ -950,7 +966,7 @@ required_onscreen_text left empty will be rejected outright."""
             print(f"Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
             if content_attempt < MAX_GENERATION_ATTEMPTS:
                 print(f"Waiting {CONTENT_RETRY_WAIT_SECONDS}s before next content attempt "
-                      f"(prevents bursting past Gemini's free-tier RPM ceiling)...")
+                      f"(prevents bursting past Groq's free-tier RPM ceiling)...")
                 time.sleep(CONTENT_RETRY_WAIT_SECONDS)
             continue
 
@@ -962,12 +978,12 @@ required_onscreen_text left empty will be rejected outright."""
         print(f"Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
         if content_attempt < MAX_GENERATION_ATTEMPTS:
             print(f"Waiting {CONTENT_RETRY_WAIT_SECONDS}s before next content attempt "
-                  f"(prevents bursting past Gemini's free-tier RPM ceiling)...")
+                  f"(prevents bursting past Groq's free-tier RPM ceiling)...")
             time.sleep(CONTENT_RETRY_WAIT_SECONDS)
 
     if not ever_reached_content:
         raise InfraFailure(
-            f"Gemini never returned a usable response after {infra_attempt} infra "
+            f"Groq never returned a usable response after {infra_attempt} infra "
             f"retries (pure API/rate-limit failure - topic content was never "
             f"actually evaluated). Last reason: {last_reason}"
         )
@@ -1028,7 +1044,7 @@ def main():
         try:
             result = generate_script(topic["title"], topic["angle"])
         except InfraFailure as e:
-            print(f"Gemini infra failure on topic {topic['id']} ({topic['title']}) - not the "
+            print(f"Groq infra failure on topic {topic['id']} ({topic['title']}) - not the "
                   f"topic's fault, leaving it pending and trying the next-oldest candidate "
                   f"this run instead of exiting: {e}")
             continue
