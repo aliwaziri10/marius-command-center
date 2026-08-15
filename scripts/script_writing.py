@@ -118,6 +118,21 @@ SHOT_CHUNK_CALL_DELAY_SECONDS = 20
 
 GROQ_MODEL = "llama-3.3-70b-versatile"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+# TRUNCATED-JSON FIX (2026-08-15 evening): no max_tokens was ever set on the
+# Groq request, so a large shot-breakdown segment (~29 shots of structured
+# JSON) could get silently cut off mid-object by Groq's own default output
+# cap - producing exactly the "Expecting ',' delimiter" parse errors seen on
+# live runs. Setting this explicitly, well above what any single call here
+# needs, removes that as a failure mode entirely. response_format forces
+# Groq's native JSON mode so output is never wrapped in markdown fences or
+# truncated by a stray non-JSON preamble.
+GROQ_MAX_TOKENS = 8000
+GROQ_RESPONSE_FORMAT = {"type": "json_object"}
+# BURST-RISK FIX (2026-08-15 evening): every other retry path in this file
+# waits between Groq calls except the narration continuation loop, which
+# fired back-to-back with zero delay. Closing that gap so this script never
+# self-inflicts a burst against Groq's 30 RPM ceiling.
+CONTINUATION_CALL_DELAY_SECONDS = 10
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 
@@ -245,6 +260,8 @@ def call_llm(prompt):
     body = json.dumps({
         "model": GROQ_MODEL,
         "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": GROQ_MAX_TOKENS,
+        "response_format": GROQ_RESPONSE_FORMAT,
     }).encode()
     last_error = None
     for attempt in range(MAX_RETRIES):
@@ -267,7 +284,19 @@ def call_llm(prompt):
 
         if resp.status_code == 429:
             wait = (attempt + 1) * 15
-            print(f"Groq rate limited, waiting {wait}s before retry...")
+            # DIAGNOSTIC FIX (2026-08-15 evening): previously logged nothing
+            # but "rate limited" - impossible to tell RPM vs TPM vs RPD from
+            # that alone. Groq returns the real remaining budget on every
+            # response; log it so the next failure is diagnosable from the
+            # Actions log instead of guessed at.
+            print(
+                f"Groq rate limited (429) - "
+                f"remaining requests: {resp.headers.get('x-ratelimit-remaining-requests', '?')} "
+                f"(resets in {resp.headers.get('x-ratelimit-reset-requests', '?')}), "
+                f"remaining tokens: {resp.headers.get('x-ratelimit-remaining-tokens', '?')} "
+                f"(resets in {resp.headers.get('x-ratelimit-reset-tokens', '?')}). "
+                f"Waiting {wait}s before retry..."
+            )
             last_error = resp
             time.sleep(wait)
             continue
@@ -523,6 +552,7 @@ def generate_narration(title, angle):
             words_so_far = len(narration.split())
             print(f"[narration] Draft is {words_so_far} words, below {MIN_NARRATION_WORDS} - "
                   f"continuation round {continuation_rounds}/{NARRATION_MAX_CONTINUATIONS}")
+            time.sleep(CONTINUATION_CALL_DELAY_SECONDS)
             try:
                 raw_cont = call_llm(build_narration_continuation_prompt(title, angle, narration, words_so_far))
                 parsed_cont = extract_json(raw_cont)
