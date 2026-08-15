@@ -72,6 +72,33 @@ renumbered, then run through the exact same validate_and_normalize_shot_
 response() checks (duplicates, zoom ratio, consecutive-subject, onscreen
 text, etc.) as before - only how the request reaches Groq changed, not the
 quality bar a shot list has to clear.
+
+SUSPECTED-DAILY-QUOTA-EXHAUSTION EARLY ABORT (2026-08-15, later): a live run
+showed every single Groq call 429ing from the very first topic onward, but
+the logged x-ratelimit-remaining-requests (999-1000) and remaining-tokens
+(12000, freshly reset) both looked essentially full/healthy - impossible if
+per-minute RPM/TPM were the real constraint. Root cause: per Groq's own
+documented header semantics, x-ratelimit-*-requests actually refers to RPD
+(requests per DAY), not RPM, and Groq ALSO enforces a separate TPD
+(tokens-per-day) cap that is NEVER exposed in any response header at all
+(confirmed via Groq docs/community sources - commonly ~100K tokens/day for
+llama-3.3-70b-versatile on free tier). This pipeline switched to the
+chunked two-stage approach (multiple large calls per script) the SAME DAY,
+on top of several earlier same-day test/fix cycles already hitting Groq -
+very likely already exhausting the invisible daily token budget, which
+only resets at UTC midnight regardless of any backoff/retry tuning here.
+Previously, call_llm()'s 429 diagnostic logging only surfaced the
+per-minute/RPD headers, which actively look healthy/misleading in exactly
+this scenario, and main() would burn ~10-15 minutes per run blindly
+retrying 5 topics x 4 infra attempts each, all doomed until the daily
+reset. Fix: detect the "high remaining requests+tokens but still 429"
+signature as SuspectedDailyQuotaExhausted and abort the ENTIRE run
+immediately with a clear diagnostic, instead of retrying uselessly. This
+does not fix the underlying cause (nothing can succeed again until Groq's
+daily reset) - if this keeps recurring, the real fix is reducing total
+tokens/script (fewer/smaller chunked shot-breakdown calls), since a paid
+Groq tier is not allowed under the standing no-spend-until-$5,000-revenue
+rule.
 """
 
 import os
@@ -133,6 +160,14 @@ GROQ_RESPONSE_FORMAT = {"type": "json_object"}
 # fired back-to-back with zero delay. Closing that gap so this script never
 # self-inflicts a burst against Groq's 30 RPM ceiling.
 CONTINUATION_CALL_DELAY_SECONDS = 10
+
+# SUSPECTED-DAILY-QUOTA-EXHAUSTION FIX (2026-08-15, later): see module
+# docstring. If a 429 comes back with BOTH remaining-requests and
+# remaining-tokens still above these fractions of their reported limits,
+# the per-minute/RPD headers are lying about being the real constraint -
+# treat it as the invisible daily token (TPD) cap instead, which only
+# clears at UTC midnight no matter how this script backs off.
+SUSPECTED_DAILY_QUOTA_REMAINING_RATIO = 0.5
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 
@@ -205,6 +240,30 @@ class InfraFailure(RuntimeError):
     next scheduled run to retry once Groq's quota/availability recovers,
     instead of being permanently blacklisted as generation_failed."""
     pass
+
+
+class SuspectedDailyQuotaExhausted(RuntimeError):
+    """Raised (2026-08-15, later fix) when a 429 comes back with
+    remaining-requests and remaining-tokens headers BOTH still showing
+    plenty of headroom - meaning the visible per-minute/RPD limits are not
+    the real constraint. Groq also enforces an undocumented, header-invisible
+    TPD (tokens-per-day) cap that only resets at UTC midnight. Unlike
+    InfraFailure, this should NOT be retried within the same run - every
+    further call will hit the exact same wall, so the whole run should abort
+    immediately instead of burning ~10-15 minutes on doomed retries across
+    every remaining topic."""
+    pass
+
+
+def _parse_ratio(remaining_str, limit_str):
+    try:
+        remaining = float(remaining_str)
+        limit = float(limit_str)
+        if limit <= 0:
+            return None
+        return remaining / limit
+    except (TypeError, ValueError):
+        return None
 
 
 def retryable_request(method, url, max_retries=MAX_RETRIES, **kwargs):
@@ -284,6 +343,10 @@ def call_llm(prompt):
 
         if resp.status_code == 429:
             wait = (attempt + 1) * 15
+            remaining_requests = resp.headers.get('x-ratelimit-remaining-requests', '?')
+            limit_requests = resp.headers.get('x-ratelimit-limit-requests', '?')
+            remaining_tokens = resp.headers.get('x-ratelimit-remaining-tokens', '?')
+            limit_tokens = resp.headers.get('x-ratelimit-limit-tokens', '?')
             # DIAGNOSTIC FIX (2026-08-15 evening): previously logged nothing
             # but "rate limited" - impossible to tell RPM vs TPM vs RPD from
             # that alone. Groq returns the real remaining budget on every
@@ -291,12 +354,35 @@ def call_llm(prompt):
             # Actions log instead of guessed at.
             print(
                 f"Groq rate limited (429) - "
-                f"remaining requests: {resp.headers.get('x-ratelimit-remaining-requests', '?')} "
+                f"remaining requests: {remaining_requests} "
                 f"(resets in {resp.headers.get('x-ratelimit-reset-requests', '?')}), "
-                f"remaining tokens: {resp.headers.get('x-ratelimit-remaining-tokens', '?')} "
+                f"remaining tokens: {remaining_tokens} "
                 f"(resets in {resp.headers.get('x-ratelimit-reset-tokens', '?')}). "
                 f"Waiting {wait}s before retry..."
             )
+
+            # SUSPECTED-DAILY-QUOTA-EXHAUSTION FIX (2026-08-15, later): see
+            # module docstring and class docstring above. If the headers
+            # Groq itself just sent us show plenty of headroom on BOTH
+            # remaining-requests and remaining-tokens, this 429 cannot be
+            # explained by the visible per-minute/RPD limits - it's almost
+            # certainly the invisible daily token (TPD) cap, which will not
+            # clear until UTC midnight no matter how long we wait/retry
+            # here. Abort immediately instead of wasting the local backoff.
+            req_ratio = _parse_ratio(remaining_requests, limit_requests)
+            tok_ratio = _parse_ratio(remaining_tokens, limit_tokens)
+            if (
+                req_ratio is not None and req_ratio > SUSPECTED_DAILY_QUOTA_REMAINING_RATIO
+                and tok_ratio is not None and tok_ratio > SUSPECTED_DAILY_QUOTA_REMAINING_RATIO
+            ):
+                raise SuspectedDailyQuotaExhausted(
+                    f"Got 429 but remaining-requests ({remaining_requests}/{limit_requests}) and "
+                    f"remaining-tokens ({remaining_tokens}/{limit_tokens}) both still show plenty of "
+                    f"headroom - this is very likely Groq's undocumented daily token (TPD) cap, not "
+                    f"real-time RPM/TPM throttling. TPD only resets at UTC midnight; no retry/backoff "
+                    f"here can fix this today."
+                )
+
             last_error = resp
             time.sleep(wait)
             continue
@@ -514,6 +600,11 @@ def generate_narration(title, angle):
     while content_attempt < NARRATION_MAX_ATTEMPTS:
         try:
             raw = call_llm(build_narration_prompt(title, angle))
+        except SuspectedDailyQuotaExhausted:
+            # FIX (2026-08-15, later): must NOT be swallowed by the generic
+            # RuntimeError/infra-retry handling below - propagate straight
+            # up so main() can abort the whole run instead of retrying.
+            raise
         except RuntimeError as e:
             infra_attempt += 1
             last_reason = f"Groq call failed: {e}"
@@ -557,6 +648,8 @@ def generate_narration(title, angle):
                 raw_cont = call_llm(build_narration_continuation_prompt(title, angle, narration, words_so_far))
                 parsed_cont = extract_json(raw_cont)
                 cont_text = (parsed_cont.get("continuation_text") or "").strip()
+            except SuspectedDailyQuotaExhausted:
+                raise
             except (RuntimeError, ValueError, json.JSONDecodeError) as e:
                 print(f"[narration] Continuation round {continuation_rounds} failed ({e}), stopping continuation "
                       f"for this draft")
@@ -1228,6 +1321,10 @@ def generate_shot_breakdown(title, angle, narration_text):
 
             try:
                 raw = call_llm(prompt)
+            except SuspectedDailyQuotaExhausted:
+                # FIX (2026-08-15, later): propagate straight up, do not
+                # treat as an ordinary per-chunk infra retry.
+                raise
             except RuntimeError as e:
                 infra_attempt += 1
                 last_reason = f"Groq call failed on segment {idx + 1}/{num_chunks}: {e}"
@@ -1373,6 +1470,19 @@ def main():
         print(f"Writing script for: {topic['title']}")
         try:
             result = generate_script(topic["title"], topic["angle"])
+        except SuspectedDailyQuotaExhausted as e:
+            # FIX (2026-08-15, later): see module docstring. Every remaining
+            # topic in this batch would hit the exact same wall - stop the
+            # whole run immediately instead of burning ~10-15 more minutes
+            # on doomed retries. Topic stays 'pending', same as InfraFailure,
+            # since this is not the topic's fault either.
+            print(
+                f"ABORTING RUN - suspected Groq daily token quota (TPD) exhaustion on topic "
+                f"{topic['id']} ({topic['title']}): {e}"
+            )
+            print("This will not clear until Groq's daily reset (UTC midnight) - not retrying "
+                  "further topics this run. Next scheduled run will retry from the top.")
+            return
         except InfraFailure as e:
             print(f"Groq infra failure on topic {topic['id']} ({topic['title']}) - not the "
                   f"topic's fault, leaving it pending and trying the next-oldest candidate "
