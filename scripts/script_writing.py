@@ -35,6 +35,22 @@ JSON output - unlike Cerebras, whose free tier is capped at 8,192 tokens
 total (input+output combined) and would fail on nearly every real request
 here. Requires the GROQ_API_KEY secret in this repo (get one free, no
 credit card, at console.groq.com).
+
+TWO-STAGE GENERATION (2026-08-15): live data showed a consistent pattern -
+narration_text landing at 200-550 words against the 1500-word floor, on the
+SAME call that also had to produce a full 60-85 shot structured JSON
+breakdown. Root cause: asking one model call to write 1700+ words of prose
+AND decompose it into a large structured shot list spends the model's
+effective output budget on the shot list, cutting the narration short. Split
+into two calls: (1) generate_narration() writes ONLY the narration, and if
+it comes back short, does a CONTINUATION call (feeds back what was written
+and asks the model to continue seamlessly to the target length) instead of
+discarding and starting over - continuation is far more reliable for
+hitting a hard word floor than a fresh retry. (2) generate_shot_breakdown()
+takes the now-confirmed-length narration and builds setting_and_characters,
+hook_text, music_mood, and the shot_list from it. This also means a narration
+that already passed validation is never thrown away just because the shot
+list failed a check - only the shot-list stage retries in that case.
 """
 
 import os
@@ -65,6 +81,10 @@ MAX_SETTING_CHARS = 900
 MIN_NARRATION_WORDS = 1500
 MAX_SHOT_REPEAT_COUNT = 2
 CONTENT_RETRY_WAIT_SECONDS = 25
+
+NARRATION_MAX_ATTEMPTS = 3
+NARRATION_MAX_CONTINUATIONS = 3
+NARRATION_TARGET_WORDS = 1800
 
 GROQ_MODEL = "llama-3.3-70b-versatile"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -307,6 +327,213 @@ def extract_json(raw_text):
         return json.loads(sanitize_json_control_chars(candidate))
 
 
+def narration_has_engagement_cta(narration_text):
+    if not narration_text:
+        return False
+    window = narration_text[-CTA_SEARCH_WINDOW_CHARS:].lower()
+    return any(keyword in window for keyword in CTA_KEYWORDS)
+
+
+# ---------------------------------------------------------------------------
+# STAGE 1: NARRATION ONLY
+# ---------------------------------------------------------------------------
+
+def build_narration_prompt(title, angle):
+    return f"""You are the head writer for "Erased," a YouTube documentary
+channel telling real, historically documented true stories of ordinary people
+caught in extraordinary historical moments, whose names history left out.
+
+Episode topic: {title}
+Angle: {angle}
+
+Your ONLY job in this response is to write the full narration script. Do not
+write anything else - no shot list, no JSON metadata, nothing but the
+narration itself, wrapped in the JSON format specified at the bottom.
+
+OPENING HOOK - this is the most important part of the script. The first 8
+seconds of narration determine whether the viewer stays or leaves, so follow
+this exact structure for the opening lines:
+
+1. STAKE (first 1-2 sentences): State the single most dramatic, concrete fact
+   of the story immediately. Do NOT say "today we'll look at" or "this is the
+   story of" or introduce the channel/topic first. Lead with the fact itself,
+   as if the viewer already knows what's at risk. Use a real, specific number,
+   name, or consequence from the story - not a vague tease.
+   Bad: "Today we're going to talk about a forgotten hero of history."
+   Good: "140,000 men dug the trenches of the Western Front - and history
+   erased every one of their names."
+
+2. VISUAL LOCK (next 1 sentence): A concrete, specific image or moment that
+   proves the stake is real - not generic scene-setting.
+
+3. CURIOSITY GAP (next 1-2 sentences): Pose the specific question the rest of
+   the episode answers, so the viewer needs to keep watching to find out.
+
+Only after these opening beats should the script settle into the normal
+narrative arc. No channel intro, no "welcome back," no restating the title -
+go straight into the stake.
+
+LENGTH IS A HARD REQUIREMENT: write a complete 10-12 minute narration script
+of AT LEAST {MIN_NARRATION_WORDS} words - target {NARRATION_TARGET_WORDS}
+words. This is not a suggestion or a rough guide - a narration under
+{MIN_NARRATION_WORDS} words will be rejected outright and you will be asked
+to continue writing from where you stopped. Do not stop early. Do not
+summarize the rest of the story to wrap up quickly. Build a full narrative
+arc: setup and stakes, rising complications, the core dramatic turn, the
+emotional climax, and a reflective closing line - give each of these real
+space, not a sentence or two each. If you don't know enough documented detail
+about this specific story to reach the target, expand on the real historical
+context, setting, sensory detail, and the emotional experience of the people
+involved - do not pad with repetition or filler, and do not write a short
+script assuming it will be extended later.
+
+CALL TO ACTION - THIS IS REQUIRED, NOT OPTIONAL: immediately after the
+emotional climax of the story and before the final reflective closing line,
+you MUST write one natural, in-voice sentence encouraging the viewer to
+like, subscribe, and share their own thoughts in the comments so more of
+these erased stories get told. Every single script must include this - a
+script with no call to action will be rejected and regenerated. It must
+NOT be a generic "smash that like button" line - write it in the tone and
+voice of this specific episode, using imagery or phrasing that echoes the
+story just told, and vary the wording from episode to episode. It is part
+of the narration itself, not a separate field. Use natural language that
+clearly asks the viewer to like/share/subscribe and to respond in the
+comments (for example, weaving in words like "comment," "share," or
+"subscribe" naturally) so the ask is unambiguous, not just implied.
+
+Return ONLY valid JSON, no other text, no markdown fences, in this exact
+format:
+
+{{
+  "narration_text": "The full narration script as one string, written to be read aloud, at least {MIN_NARRATION_WORDS} words."
+}}"""
+
+
+def build_narration_continuation_prompt(title, angle, so_far, words_so_far):
+    return f"""You are continuing a narration script for "Erased," a YouTube
+documentary channel, that you started writing but stopped too early.
+
+Episode topic: {title}
+Angle: {angle}
+
+Here is everything you have written so far ({words_so_far} words - the
+target is at least {MIN_NARRATION_WORDS}, ideally {NARRATION_TARGET_WORDS}):
+
+---
+{so_far}
+---
+
+Continue writing EXACTLY where this leaves off. Do not repeat or rephrase
+anything already written above. Do not restart the story or re-introduce it.
+Pick up mid-narrative and keep building: more rising complications, sensory
+and historical detail, the dramatic turn, the emotional climax, and (if not
+already present above) end with the required call-to-action sentence
+(naturally asking the viewer to like/subscribe/comment, in the voice of this
+story) followed by a reflective closing line. Write enough new material to
+bring the total well past {MIN_NARRATION_WORDS} words.
+
+Return ONLY valid JSON, no other text, no markdown fences, in this exact
+format:
+
+{{
+  "continuation_text": "Only the NEW text that continues on from where the narration above left off - do not repeat any of the text already given to you."
+}}"""
+
+
+def generate_narration(title, angle):
+    """Stage 1: produce a narration that already clears the word-count and
+    CTA bar before the (expensive, easy-to-fail) shot-list stage ever runs.
+    A short first draft is extended via continuation calls rather than
+    thrown away - continuation is far more reliable than a fresh retry for
+    hitting a hard word floor, since the model is extending known-good text
+    instead of trying to nail the whole length in one shot."""
+    infra_attempt = 0
+    content_attempt = 0
+    last_reason = None
+    ever_reached_content = False
+
+    while content_attempt < NARRATION_MAX_ATTEMPTS:
+        try:
+            raw = call_llm(build_narration_prompt(title, angle))
+        except RuntimeError as e:
+            infra_attempt += 1
+            last_reason = f"Groq call failed: {e}"
+            print(f"[narration] Infra retry {infra_attempt}/{MAX_INFRA_ATTEMPTS} failed - {last_reason}")
+            if infra_attempt >= MAX_INFRA_ATTEMPTS:
+                break
+            time.sleep(infra_attempt * 20)
+            continue
+
+        ever_reached_content = True
+        content_attempt += 1
+        try:
+            parsed = extract_json(raw)
+            narration = (parsed.get("narration_text") or "").strip()
+        except (ValueError, json.JSONDecodeError) as e:
+            last_reason = f"JSON parse failed: {e}"
+            print(f"[narration] Attempt {content_attempt}/{NARRATION_MAX_ATTEMPTS} failed - {last_reason}")
+            if content_attempt < NARRATION_MAX_ATTEMPTS:
+                time.sleep(CONTENT_RETRY_WAIT_SECONDS)
+            continue
+
+        if not narration:
+            last_reason = "narration_text missing/empty"
+            print(f"[narration] Attempt {content_attempt}/{NARRATION_MAX_ATTEMPTS} failed - {last_reason}")
+            if content_attempt < NARRATION_MAX_ATTEMPTS:
+                time.sleep(CONTENT_RETRY_WAIT_SECONDS)
+            continue
+
+        # Continuation loop: extend a short draft instead of discarding it.
+        continuation_rounds = 0
+        while (
+            len(narration.split()) < MIN_NARRATION_WORDS
+            and continuation_rounds < NARRATION_MAX_CONTINUATIONS
+        ):
+            continuation_rounds += 1
+            words_so_far = len(narration.split())
+            print(f"[narration] Draft is {words_so_far} words, below {MIN_NARRATION_WORDS} - "
+                  f"continuation round {continuation_rounds}/{NARRATION_MAX_CONTINUATIONS}")
+            try:
+                raw_cont = call_llm(build_narration_continuation_prompt(title, angle, narration, words_so_far))
+                parsed_cont = extract_json(raw_cont)
+                cont_text = (parsed_cont.get("continuation_text") or "").strip()
+            except (RuntimeError, ValueError, json.JSONDecodeError) as e:
+                print(f"[narration] Continuation round {continuation_rounds} failed ({e}), stopping continuation "
+                      f"for this draft")
+                break
+            if cont_text:
+                narration = narration.rstrip() + "\n\n" + cont_text.strip()
+
+        word_count = len(narration.split())
+        if word_count < MIN_NARRATION_WORDS:
+            last_reason = f"narration still only {word_count} words after {continuation_rounds} continuation round(s)"
+            print(f"[narration] Attempt {content_attempt}/{NARRATION_MAX_ATTEMPTS} failed - {last_reason}")
+            if content_attempt < NARRATION_MAX_ATTEMPTS:
+                time.sleep(CONTENT_RETRY_WAIT_SECONDS)
+            continue
+
+        if not narration_has_engagement_cta(narration):
+            last_reason = "narration is missing the required like/subscribe/comment call-to-action near the end"
+            print(f"[narration] Attempt {content_attempt}/{NARRATION_MAX_ATTEMPTS} failed - {last_reason}")
+            if content_attempt < NARRATION_MAX_ATTEMPTS:
+                time.sleep(CONTENT_RETRY_WAIT_SECONDS)
+            continue
+
+        print(f"[narration] Confirmed at {word_count} words.")
+        return narration
+
+    if not ever_reached_content:
+        raise InfraFailure(
+            f"Groq never returned a usable response after {infra_attempt} infra retries during "
+            f"narration stage. Last reason: {last_reason}"
+        )
+    raise RuntimeError(f"Narration generation failed after {content_attempt} content attempts. Last reason: {last_reason}")
+
+
+# ---------------------------------------------------------------------------
+# STAGE 2: SHOT BREAKDOWN (from a confirmed-length narration)
+# ---------------------------------------------------------------------------
+
 def normalize_shot(shot, index):
     shot_type = shot.get("shot_type")
     if shot_type not in VALID_SHOT_TYPES:
@@ -374,14 +601,6 @@ def hook_text_matches_story(hook_text, narration_text):
         return True
 
     return any(w in narration_lower for w in meaningful_words)
-
-
-def narration_has_engagement_cta(narration_text):
-    if not narration_text:
-        return False
-
-    window = narration_text[-CTA_SEARCH_WINDOW_CHARS:].lower()
-    return any(keyword in window for keyword in CTA_KEYWORDS)
 
 
 def find_duplicate_shots(normalized_shots):
@@ -462,21 +681,9 @@ def find_excessive_consecutive_subject(normalized_shots):
     return None
 
 
-def validate_and_normalize(result):
-    if "narration_text" not in result or not result["narration_text"].strip():
-        return False, "missing narration_text"
-
-    narration_word_count = len(result["narration_text"].split())
-    if narration_word_count < MIN_NARRATION_WORDS:
-        return False, (
-            f"narration_text is only {narration_word_count} words - need at least "
-            f"{MIN_NARRATION_WORDS} (aim for 1700-2000 for a 10-12 minute episode - "
-            f"never write close to the floor). "
-            f"A short narration doesn't have enough real story content to fill "
-            f"{MIN_SHOTS}+ distinct shots and forces padding the shot list with "
-            f"repeated shots instead of real coverage."
-        )
-
+def validate_and_normalize_shot_response(result, narration_text):
+    """Validates everything EXCEPT narration_text/CTA, since those were
+    already confirmed during the narration stage before this is ever called."""
     setting_and_characters = (result.get("setting_and_characters") or "").strip()
     if len(setting_and_characters) < MIN_SETTING_CHARS:
         return False, (
@@ -486,13 +693,6 @@ def validate_and_normalize(result):
             f"recurring character's appearance"
         )
     result["setting_and_characters"] = setting_and_characters[:MAX_SETTING_CHARS]
-
-    if not narration_has_engagement_cta(result["narration_text"]):
-        return False, (
-            "narration_text is missing an in-voice engagement call-to-action "
-            "(like/subscribe/comment) near the end - must weave one in right "
-            "after the emotional climax, before the closing line"
-        )
 
     shot_list = result.get("shot_list")
     if not isinstance(shot_list, list) or len(shot_list) == 0:
@@ -625,24 +825,32 @@ def validate_and_normalize(result):
     if hook_text_too_long_to_glance(result["hook_text"]):
         return False, f"hook_text is {len(result['hook_text'].split())} words - too long to read in a 2-second glance (max {MAX_HOOK_TEXT_WORDS})"
 
-    if not hook_text_matches_story(result["hook_text"], result["narration_text"]):
+    if not hook_text_matches_story(result["hook_text"], narration_text):
         return False, f"hook_text {result['hook_text']!r} doesn't appear related to this story's narration"
 
+    result["narration_text"] = narration_text
     return True, result
 
 
-def generate_script(title, angle):
-    prompt = f"""You are the head writer for "Erased," a YouTube documentary
-channel telling real, historically documented true stories of ordinary people
-caught in extraordinary historical moments, whose names history left out.
+def build_shot_breakdown_prompt(title, angle, narration_text):
+    return f"""You are the visual director and sound designer for "Erased," a
+YouTube documentary channel. The narration script below has ALREADY been
+written and finalized for this episode - do not rewrite, shorten, or alter
+it in any way. Your job is to build the setting/character anchor, a
+thumbnail hook line, the music mood, and a full shot-by-shot breakdown of
+this exact narration.
 
 Episode topic: {title}
 Angle: {angle}
 
-SETTING AND CHARACTERS - write this FIRST, before anything else, as a fixed
-visual anchor for the whole episode. This is the single most important
-field for keeping the episode visually consistent, so treat it as
-non-negotiable:
+FINALIZED NARRATION (do not change this text):
+---
+{narration_text}
+---
+
+SETTING AND CHARACTERS - write this as a fixed visual anchor for the whole
+episode. This is the single most important field for keeping the episode
+visually consistent, so treat it as non-negotiable:
 - State the real-world location, country/region, era, and the actual
   ethnicity/culture of the people in this specific story. Be explicit and
   concrete (e.g. "rural Gambia, West Africa, 1981 - Gambian people, dark
@@ -660,96 +868,38 @@ This full anchor will be attached to every single shot's image/video
 generation prompt later in the pipeline, so write it as a standalone
 paragraph that makes sense with no other context - 2-5 sentences.
 
-OPENING HOOK - this is the most important part of the script. The first 8
-seconds of narration determine whether the viewer stays or leaves, so follow
-this exact structure for the opening lines:
-
-1. STAKE (first 1-2 sentences): State the single most dramatic, concrete fact
-   of the story immediately. Do NOT say "today we'll look at" or "this is the
-   story of" or introduce the channel/topic first. Lead with the fact itself,
-   as if the viewer already knows what's at risk. Use a real, specific number,
-   name, or consequence from the story - not a vague tease.
-   Bad: "Today we're going to talk about a forgotten hero of history."
-   Good: "140,000 men dug the trenches of the Western Front - and history
-   erased every one of their names."
-
-2. VISUAL LOCK (next 1 sentence): A concrete, specific image or moment that
-   proves the stake is real - not generic scene-setting.
-
-3. CURIOSITY GAP (next 1-2 sentences): Pose the specific question the rest of
-   the episode answers, so the viewer needs to keep watching to find out.
-
-Only after these opening beats should the script settle into the normal
-narrative arc. No channel intro, no "welcome back," no restating the title -
-go straight into the stake.
-
-Write a complete 10-12 minute narration script of AT LEAST {MIN_NARRATION_WORDS}
-words - aim for 1700-2000 words, not the bare minimum, since narration close
-to the floor keeps failing validation and wasting generation attempts. Use
-the opening structure above, build a clear narrative arc through the rest
-of the story, and end with a reflective closing line. This length is a hard
-requirement, not a suggestion - a short narration doesn't have enough real
-content to fill the shot list below without repeating shots, and will be
-rejected. If you don't know enough real detail about this specific story
-to reach {MIN_NARRATION_WORDS} words, expand on documented historical context, setting, and
-the emotional experience of the people involved - do not pad with repetition
-or filler, and do not submit a short script expecting it to be padded later.
-
-CALL TO ACTION - THIS IS REQUIRED, NOT OPTIONAL: immediately after the
-emotional climax of the story and before the final reflective closing line,
-you MUST write one natural, in-voice sentence encouraging the viewer to
-like, subscribe, and share their own thoughts in the comments so more of
-these erased stories get told. Every single script must include this - a
-script with no call to action will be rejected and regenerated. It must
-NOT be a generic "smash that like button" line - write it in the tone and
-voice of this specific episode, using imagery or phrasing that echoes the
-story just told, and vary the wording from episode to episode. It is part
-of the narration_text itself, not a separate field. Use natural language
-that clearly asks the viewer to like/share/subscribe and to respond in the
-comments (for example, weaving in words like "comment," "share," or
-"subscribe" naturally) so the ask is unambiguous, not just implied.
-
-THUMBNAIL HOOK TEXT - separate from the narration, also write a short,
-punchy line of thumbnail cover text that would make someone scrolling
-YouTube stop and click. This is NOT a narration sentence - it should read
-like a headline: concrete, high-stakes, and built around the single most
-shocking number, name, or fact in THIS SPECIFIC STORY (the one named in
-"Episode topic" above) - never a different story.
+THUMBNAIL HOOK TEXT - a short, punchy line of thumbnail cover text that
+would make someone scrolling YouTube stop and click. This is NOT a
+narration sentence - it should read like a headline: concrete, high-stakes,
+and built around the single most shocking number, name, or fact in THIS
+SPECIFIC STORY.
 
 THE 2-SECOND RULE: a thumbnail gets about 2 seconds of a scrolling viewer's
-attention before they move on, and most viewers see it shrunk down on a
-phone screen. The hook text must be absorbable in that window - which
-means SHORT: {MAX_HOOK_TEXT_WORDS} words maximum, ideally 3-4, under
-{MAX_HOOK_TEXT_CHARS} characters. This is not a summary of the story - the
-video title already gives that context. This is the single emotional
-spike: one number, one name, or one consequence. Use short punchy
-fragments separated by periods, not one flowing sentence - fragments let
-the eye grab each piece independently instead of having to read
-start-to-finish.
+attention, and most viewers see it shrunk down on a phone screen. The hook
+text must be absorbable in that window - which means SHORT:
+{MAX_HOOK_TEXT_WORDS} words maximum, ideally 3-4, under {MAX_HOOK_TEXT_CHARS}
+characters. Use short punchy fragments separated by periods, not one
+flowing sentence.
 
-The example below shows the STYLE only - a short fragment built from a real
-number/name/consequence. It is NOT about this episode's topic. Do not reuse
-it, copy it, or adapt it - write an entirely new line using facts that
-actually appear in the narration you write for THIS episode.
-   Bad (too long/sentence-like): "When a bomb hit the pub, 312 diaries were
-   buried under the rubble."
+The example below shows the STYLE only. Do not reuse or adapt it - write an
+entirely new line using facts that actually appear in the narration above.
    Style example only, from an unrelated story - never copy this line
    itself: "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 
 CINEMATIC DIRECTOR - shot list requirements:
-Break the episode into EXACTLY between {MIN_SHOTS} and {MAX_SHOTS} shots -
-this is a hard requirement, not a suggestion. This is a dense, sub-sentence
-level breakdown - a single narration sentence should often span 2-3 separate
-shots, not one. Do not write sparse, paragraph-level shots.
+Break the narration above into EXACTLY between {MIN_SHOTS} and {MAX_SHOTS}
+shots - this is a hard requirement, not a suggestion. This is a dense,
+sub-sentence level breakdown - a single narration sentence should often
+span 2-3 separate shots, not one. Do not write sparse, paragraph-level
+shots. Every "narration_excerpt" must be an exact, verbatim substring taken
+from the finalized narration above, in order, covering it start to finish.
 
 EVERY SHOT MUST BE DISTINCT - THIS IS ALSO A HARD REQUIREMENT: every shot
 must have its own real visual_description and narration_excerpt drawn from
-a different part of the narration you wrote. NEVER repeat an earlier shot
-(same visual_description and narration_excerpt) later in the list just to
-reach the shot count - a script that repeats any shot more than twice will
-be rejected and regenerated. If your narration doesn't naturally break into
-{MAX_SHOTS} distinct shots, write a longer narration and break it more
-finely instead of looping earlier shots.
+a different part of the narration. NEVER repeat an earlier shot (same
+visual_description and narration_excerpt) later in the list just to reach
+the shot count - a script that repeats any shot more than twice will be
+rejected and regenerated.
 
 Every shot's "visual_description" must stay consistent with the
 "setting_and_characters" anchor above - same location/era/ethnicity, and
@@ -774,23 +924,15 @@ seated at the table," "holding the letter, already unfolded."
 PURPOSEFUL STILLNESS, NOT LOITERING (HARD RULE): "already in position" does
 NOT mean "just standing/sitting there with nothing to do." Every shot with a
 person in frame must anchor them in a specific, concrete, already-in-progress
-task or intent - not a static end-state with no purpose. A character who is
-merely present in frame reads on screen as aimless loitering, which is just
-as bad as unresolved motion. Instead of "already standing near the field,"
-write "already kneeling in the field, both hands gripping the plow mid-
-furrow." Instead of "already seated at the table," write "already seated at
-the table, eyes fixed on the letter laid open in front of her." Every shot
-must answer: what is this person doing, and why, at this exact frozen
-moment - not just where are they positioned. Purely contemplative or
-grief-stricken stillness is fine (e.g. "already kneeling at the grave,
-head bowed, one hand resting on the headstone") as long as it is specific
-and emotionally motivated, never generic idling. Never use phrasing like
+task or intent - not a static end-state with no purpose. Instead of "already
+standing near the field," write "already kneeling in the field, both hands
+gripping the plow mid-furrow." Every shot must answer: what is this person
+doing, and why, at this exact frozen moment. Never use phrasing like
 "standing around," "standing there," "waiting there," "sitting there doing
 nothing," or "looking around" with no stated task or focus.
 
 OBJECT INTEGRITY: every object named in a shot must remain that same
 object for the whole shot - never describe an action mid-transformation.
-This is what causes a cup to visibly become a different object mid-air.
 Favor "already holding," "already placed," "already resting on" phrasing
 over active verbs like "lifts," "pours," "hands over," which invite the
 video model to try to render (and lose track of) motion it can't sustain.
@@ -798,36 +940,21 @@ video model to try to render (and lose track of) motion it can't sustain.
 CUTAWAY DISCIPLINE: the same character must not appear as the
 primary_subject of more than 3 consecutive shots. Frequently cut to B-roll
 - landscapes, buildings, documents, objects, hands, tools, crowds, weather,
-architecture - so the camera doesn't stay locked on one face shot after
-shot. Whenever the same character reappears after a cutaway, change the
-camera angle, framing, and body orientation so it doesn't look like a
-continuation of the earlier shot, but keep their fixed physical
-description (age, hair, facial hair, clothing, any distinguishing feature)
-IDENTICAL to what's stated in "setting_and_characters" every single time -
-never let the described appearance drift between shots.
+architecture. Whenever the same character reappears after a cutaway, change
+the camera angle, framing, and body orientation, but keep their fixed
+physical description IDENTICAL to what's stated in "setting_and_characters"
+every single time.
 
-EPISODE-WIDE SCREEN TIME BUDGET (separate from the consecutive-shot rule
-above): breaking up consecutive runs is NOT enough on its own - a
-character can still dominate almost every shot in the episode as long as
-each run is short. At most {int(MAX_SUBJECT_SHOT_RATIO * 100)}% of ALL
-shots in the episode may have the same primary_subject. This is a hard
-ceiling across the whole shot list, not just back-to-back shots. A real
-documentary spends real time on setting, objects, other people mentioned
-in the story, and pure B-roll - it does not center one face in nearly
-every single frame. Budget generously for shots with primary_subject set
-to "" (pure B-roll) or to a different named person/group from the story.
+EPISODE-WIDE SCREEN TIME BUDGET: at most {int(MAX_SUBJECT_SHOT_RATIO * 100)}%
+of ALL shots in the episode may have the same primary_subject. Budget
+generously for shots with primary_subject set to "" (pure B-roll) or to a
+different named person/group from the story.
 
 LEGIBLE ON-SCREEN TEXT: if a shot deliberately shows readable text (a
-newspaper headline, a letter, a sign, a document, an inscription), you
-must state the exact required wording in "required_onscreen_text" so it
-can be verified/overlaid correctly, and describe it explicitly in
-visual_description (e.g. "a period newspaper clearly displays the
-headline 'THE BATTLE OF LONDON'"). If no specific wording is required by
-the story, do NOT make readable text the focus of the shot at all - AI
-video generation cannot reliably render legible text, so prefer angling,
-partial obscuring (a hand over part of the page), or shallow focus for any
-document/sign that doesn't need to be read, rather than a clean flat shot
-of text the model will likely garble.
+newspaper headline, a letter, a sign, a document, an inscription), you must
+state the exact required wording in "required_onscreen_text", and describe
+it explicitly in visual_description. If no specific wording is required,
+do NOT make readable text the focus of the shot at all.
 
 For each shot, provide:
 - "shot_type": one of "wide", "medium", "close_up", "extreme_close_up",
@@ -840,82 +967,52 @@ For each shot, provide:
 - "camera_reason": one short sentence on why this movement was chosen for
   this specific narration beat
 - "lens_effect": one of "shallow_depth_of_field", "lens_flare", "film_grain",
-  "none" - use sparingly and only where it heightens the moment (e.g.
-  shallow_depth_of_field on an emotional close-up, lens_flare on a
-  triumphant reveal). Most shots should be "none".
+  "none" - use sparingly. Most shots should be "none".
 - "primary_subject": a short consistent tag for the main character/subject
-  of this shot (e.g. "the soldier", "the mother"), matching how they're
-  named in setting_and_characters. Use "" (empty string) for pure B-roll
-  shots with no named recurring character in frame (landscapes, objects,
-  documents, crowds).
+  of this shot, matching how they're named in setting_and_characters. Use
+  "" for pure B-roll shots.
 - "required_onscreen_text": if this shot deliberately shows readable text,
   the exact wording that must appear, correctly spelled. Otherwise "".
 
 PACING RHYTHM (Gen Z attention span - keep it moving):
-- Default to quick shots (roughly 2-4 seconds of narration each). Avoid long
-  static stretches.
-- Only use a held/static shot deliberately, right before a big reveal or
-  emotional gut-punch, to let it land. These held shots should be rare -
-  most of the episode should feel fast-cut.
+- Default to quick shots (roughly 2-4 seconds of narration each).
+- Only use a held/static shot deliberately, right before a big reveal.
 - Vary shot_type, camera_movement, and lens_effect constantly - never repeat
   the same camera_movement more than twice in a row.
 
-ZOOM DISCIPLINE (avoid an all-close-up, all-zoomed-in episode): push_in,
-crash_zoom, zoom_in, snap_zoom, and extreme_close_up all tighten the frame.
-Used too often, back-to-back, the whole episode feels claustrophobic and
-zoomed-in with no sense of place - this has been a real problem, so treat
-this as a hard budget, not a suggestion:
+ZOOM DISCIPLINE:
 - At most 1 in 4 shots may use a zoom-in-family movement (push_in,
   crash_zoom, zoom_in, snap_zoom) or an extreme_close_up shot_type. Never
   use two zoom-in-family movements back to back.
 - At least 1 in 4 shots must be "wide" or "establishing" shot_type, spread
-  through the episode (not clustered only at the start), so the viewer
-  keeps a sense of location and space between tight moments.
+  through the episode.
 - For the remaining shots, favor movements that add energy WITHOUT
   tightening the frame: pan_left, pan_right, tilt_up, tilt_down, tracking,
   dolly_in, dolly_out, whip_pan, orbit, drone_rise, drone_descend,
   parallax, handheld_shake, dutch_angle, speed_ramp, pull_out, zoom_out.
-  These give the same fast-cut, premium-AI-video energy without the
-  claustrophobic zoomed-in feel.
 
-SOUND DESIGNER - audio requirements:
-- At the top level, include "music_mood": a single descriptive prompt (for
-  an AI music generator) describing the background score for the WHOLE
-  episode. Score it like a THRILLER MOVIE, not a somber museum documentary:
-  it should build tension progressively through the episode - start
-  restrained and low-key, add layers/intensity as the story escalates, and
-  peak into a dramatic, percussive climax at the episode's biggest reveal
-  or emotional gut-punch, before resolving. Describe the specific arc
-  explicitly in the prompt. Favor modern, high-energy scoring over
-  classical/orchestral-documentary tropes - think trailer music and
-  true-crime thriller scoring, not elevator-music strings.
-- For each shot, include "sfx_cue": a short sound-effect prompt for
-  BOTH loud dramatic moments (explosions, gunfire, crashes, sudden
-  reveals, door slams, crowd roars) AND quieter ambient/atmospheric
-  sound that grounds a scene in physical reality (footsteps on a
-  specific surface, wind, rain, fire crackling, a door creaking, distant
-  voices/crowd murmur, birds, waves, rustling paper/fabric, a clock
-  ticking). Many true stories are quiet, not explosive - if every shot's
-  sfx_cue is left empty because nothing "loud" happens, the finished
-  video plays with no sound design at all, which is worse than a subtle
-  ambient cue. Aim for at least half of all shots to carry SOME sfx_cue
-  (loud or ambient), and only leave "sfx_cue" as an empty string for
-  shots where truly no distinct sound would be audible (e.g. a static
-  wide shot of an empty landscape with only score playing).
+SOUND DESIGNER:
+- At the top level, include "music_mood": a single descriptive prompt for
+  an AI music generator describing the background score for the WHOLE
+  episode - scored like a thriller movie, building tension progressively,
+  peaking at the biggest reveal, then resolving.
+- For each shot, include "sfx_cue" for both loud dramatic moments and
+  quieter ambient/atmospheric sound. Aim for at least half of all shots to
+  carry some sfx_cue, leaving "" only where truly no distinct sound would
+  be audible.
 
 Return ONLY valid JSON, no other text, no markdown fences, in this exact
 format:
 
 {{
-  "setting_and_characters": "2-5 sentence fixed anchor: real-world location/era/ethnicity of this story, plus a fixed physical description of every recurring named/identifiable character.",
-  "narration_text": "The full narration script as one string, written to be read aloud.",
-  "hook_text": "Short punchy thumbnail cover line, max {MAX_HOOK_TEXT_WORDS} words and under {MAX_HOOK_TEXT_CHARS} characters, readable in a 2-second glance, written specifically for THIS episode's topic - never the style example above.",
+  "setting_and_characters": "2-5 sentence fixed anchor.",
+  "hook_text": "Short punchy thumbnail cover line, max {MAX_HOOK_TEXT_WORDS} words and under {MAX_HOOK_TEXT_CHARS} characters.",
   "music_mood": "Background score prompt for the whole episode, describing its build-up arc.",
   "shot_list": [
     {{
       "shot_number": 1,
       "visual_description": "Detailed description for AI image/video generation, consistent with setting_and_characters above",
-      "narration_excerpt": "The exact portion of narration this shot covers",
+      "narration_excerpt": "The exact, verbatim portion of the finalized narration this shot covers",
       "shot_type": "wide",
       "camera_movement": "push_in",
       "camera_reason": "Why this movement fits this beat",
@@ -927,7 +1024,8 @@ format:
   ]
 }}
 
-Include between {MIN_SHOTS} and {MAX_SHOTS} shots covering the full narration - every shot must be distinct, never repeat an earlier shot.
+Include between {MIN_SHOTS} and {MAX_SHOTS} shots covering the full
+narration above - every shot must be distinct, never repeat an earlier shot.
 
 FINAL CHECK before you output: for every shot whose visual_description
 mentions a newspaper, letter, sign, document, headline, inscription,
@@ -936,6 +1034,10 @@ certificate, or gravestone/tombstone - you MUST fill in
 required_onscreen_text with the exact wording, or rewrite that shot so no
 readable text is the focus. A shot with one of those words present and
 required_onscreen_text left empty will be rejected outright."""
+
+
+def generate_shot_breakdown(title, angle, narration_text):
+    prompt = build_shot_breakdown_prompt(title, angle, narration_text)
 
     last_reason = None
     ever_reached_content = False
@@ -948,7 +1050,7 @@ required_onscreen_text left empty will be rejected outright."""
         except RuntimeError as e:
             infra_attempt += 1
             last_reason = f"Groq call failed: {e}"
-            print(f"Infra retry {infra_attempt}/{MAX_INFRA_ATTEMPTS} failed - {last_reason} "
+            print(f"[shots] Infra retry {infra_attempt}/{MAX_INFRA_ATTEMPTS} failed - {last_reason} "
                   f"(does not count against the {MAX_GENERATION_ATTEMPTS} content attempts)")
             if infra_attempt >= MAX_INFRA_ATTEMPTS:
                 break
@@ -963,19 +1065,19 @@ required_onscreen_text left empty will be rejected outright."""
             parsed = extract_json(raw)
         except (ValueError, json.JSONDecodeError) as e:
             last_reason = f"JSON parse failed: {e}"
-            print(f"Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
+            print(f"[shots] Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
             if content_attempt < MAX_GENERATION_ATTEMPTS:
                 print(f"Waiting {CONTENT_RETRY_WAIT_SECONDS}s before next content attempt "
                       f"(prevents bursting past Groq's free-tier RPM ceiling)...")
                 time.sleep(CONTENT_RETRY_WAIT_SECONDS)
             continue
 
-        is_valid, result = validate_and_normalize(parsed)
+        is_valid, result = validate_and_normalize_shot_response(parsed, narration_text)
         if is_valid:
             return result
 
         last_reason = result
-        print(f"Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
+        print(f"[shots] Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
         if content_attempt < MAX_GENERATION_ATTEMPTS:
             print(f"Waiting {CONTENT_RETRY_WAIT_SECONDS}s before next content attempt "
                   f"(prevents bursting past Groq's free-tier RPM ceiling)...")
@@ -984,10 +1086,20 @@ required_onscreen_text left empty will be rejected outright."""
     if not ever_reached_content:
         raise InfraFailure(
             f"Groq never returned a usable response after {infra_attempt} infra "
-            f"retries (pure API/rate-limit failure - topic content was never "
-            f"actually evaluated). Last reason: {last_reason}"
+            f"retries during shot-breakdown stage (narration was already confirmed "
+            f"good). Last reason: {last_reason}"
         )
-    raise RuntimeError(f"Script generation failed after {content_attempt} content attempts. Last reason: {last_reason}")
+    raise RuntimeError(f"Shot breakdown failed after {content_attempt} content attempts. Last reason: {last_reason}")
+
+
+def generate_script(title, angle):
+    """Orchestrates the two stages. If the narration stage hits InfraFailure,
+    that propagates up untouched (topic stays pending). If the shot-breakdown
+    stage fails after narration already succeeded, that's still surfaced as
+    a real failure - but note the narration itself was proven fine, so a
+    generation_failed topic reset for this reason should retry fast."""
+    narration_text = generate_narration(title, angle)
+    return generate_shot_breakdown(title, angle, narration_text)
 
 
 def save_script(topic_id, narration_text, shot_list, music_mood, hook_text, setting_and_characters):
