@@ -133,6 +133,38 @@ buffer) rather than a fixed guessed backoff, so retries land after the
 window has actually cleared instead of guessing short. Also raised
 MAX_RETRIES 2->4 so call_llm has enough attempts to survive a real
 per-minute window without exhausting its retry budget first.
+
+MILLISECOND RESET FORMAT + INVERTED FAIL-SAFE FIX (2026-08-17, even later):
+a live run aborted with SuspectedDailyQuotaExhausted despite the 429
+showing a FULLY replenished quota - remaining-requests 1000/1000 and
+remaining-tokens 12000/12000 - with Groq reporting reset windows of "1ms"
+for both. That is about as far from a real daily cap as a 429 can look, yet
+the run aborted anyway. Root cause, two compounding bugs: (1)
+_parse_reset_seconds() only recognized the "Ns" and "NmN.Ns" formats; a
+bare-millisecond value like "1ms" matches neither (no digits precede the
+"s" once "1m" is consumed), so it silently returned None instead of
+~0.001s. (2) looks_like_long_window then treated a None reset as "unknown,
+so assume it COULD be a long/daily window" (the old `is None or >
+threshold` check passes when None) - the exact opposite of a safe default,
+since an unparseable reset should never by itself justify aborting the
+whole run. Combined, an ordinary (if unusual) instantaneous-reset 429 got
+misread as conclusive daily-quota evidence. Fix: (a) _parse_reset_seconds()
+now also parses bare "Nms" values; (b) looks_like_long_window now requires
+a reset value to be POSITIVELY KNOWN and above the threshold on both
+signals (`is not None and > threshold`) - an unparseable or missing reset
+no longer counts as "long" by default, so SuspectedDailyQuotaExhausted only
+fires on real, measured evidence. Also stopped folding
+reset_requests_seconds into the ordinary per-minute wait calculation: per
+the SUSPECTED-DAILY-QUOTA-EXHAUSTION docstring above, x-ratelimit-*-requests
+is an RPD-ish counter, not the real per-minute constraint, so waiting for
+its (often much longer) reset window before every retry - as the previous
+wait = max(..., reset_requests_seconds + 3, ...) did - was inflating
+ordinary TPM-only backoffs (e.g. an actual ~45s token-window reset) into
+260+s waits for no reason, multiplying total run time for no benefit. The
+wait now only folds in reset_requests_seconds when remaining-requests
+actually looks close to exhausted (see REQUESTS_NEAR_LIMIT_RATIO below),
+not on every single retry regardless of whether requests were ever the
+real bottleneck.
 """
 
 import os
@@ -216,6 +248,13 @@ SUSPECTED_DAILY_QUOTA_REMAINING_RATIO = 0.5
 # window can never report) is allowed to trigger the daily-exhaustion abort.
 SUSPECTED_DAILY_QUOTA_MIN_RESET_SECONDS = 120
 
+# WASTEFUL-WAIT FIX (2026-08-17, even later): see module docstring. Only
+# fold x-ratelimit-reset-requests into the ordinary per-minute retry wait
+# when remaining-requests are actually below this fraction of their limit -
+# otherwise that (often much longer, RPD-ish) reset window isn't the real
+# bottleneck, and waiting for it just wastes time on every single retry.
+REQUESTS_NEAR_LIMIT_RATIO = 0.1
+
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 
 CTA_KEYWORDS = (
@@ -290,10 +329,11 @@ class InfraFailure(RuntimeError):
 
 
 class SuspectedDailyQuotaExhausted(RuntimeError):
-    """Raised (2026-08-15, later fix; tightened 2026-08-17, later) when a
-    429 comes back with remaining-requests and remaining-tokens headers
-    BOTH still showing plenty of headroom AND the reset window itself is
-    long (not a per-minute TPM/RPM window - see
+    """Raised (2026-08-15, later fix; tightened 2026-08-17, later and
+    2026-08-17, even later) when a 429 comes back with remaining-requests
+    and remaining-tokens headers BOTH still showing plenty of headroom AND
+    the reset window itself is POSITIVELY KNOWN to be long (not a
+    per-minute TPM/RPM window, and not simply unparseable - see
     SUSPECTED_DAILY_QUOTA_MIN_RESET_SECONDS) - meaning the visible
     per-minute limits are not the real constraint. Groq also enforces an
     undocumented, header-invisible TPD (tokens-per-day) cap that only
@@ -317,14 +357,27 @@ def _parse_ratio(remaining_str, limit_str):
 
 
 def _parse_reset_seconds(reset_str):
-    """FALSE-POSITIVE DAILY-QUOTA ABORT FIX (2026-08-17, later): see module
-    docstring. Parses Groq's x-ratelimit-reset-* header format, which looks
-    like "33.159s" or "2m52.8s" (optional minutes, always seconds). Returns
-    None if the header is missing or doesn't match, so callers can treat an
-    unparseable reset as "unknown" rather than silently zero."""
+    """FALSE-POSITIVE DAILY-QUOTA ABORT FIX (2026-08-17, later; extended
+    2026-08-17, even later): see module docstring. Parses Groq's
+    x-ratelimit-reset-* header format. Handles both the "33.159s" /
+    "2m52.8s" form (optional minutes, always seconds) AND the bare
+    millisecond form ("1ms", "500ms") seen when a window is about to roll
+    over - the seconds-only pattern alone silently fails to match "1ms"
+    (no digits precede the "s" once an optional "1m" is consumed), which
+    previously returned None and got misread downstream as "unknown,
+    assume it could be a long window." Returns None only when the header
+    is truly missing or in a genuinely unrecognized format, so callers can
+    treat that as honestly unknown rather than silently zero OR silently
+    long."""
     if not reset_str:
         return None
-    match = re.match(r"^(?:(\d+)m)?([\d.]+)s$", reset_str.strip())
+    s = reset_str.strip()
+
+    ms_match = re.match(r"^([\d.]+)ms$", s)
+    if ms_match:
+        return float(ms_match.group(1)) / 1000.0
+
+    match = re.match(r"^(?:(\d+)m)?([\d.]+)s$", s)
     if not match:
         return None
     minutes = float(match.group(1)) if match.group(1) else 0.0
@@ -433,19 +486,24 @@ def call_llm(prompt):
             )
 
             # SUSPECTED-DAILY-QUOTA-EXHAUSTION FIX (2026-08-15, later;
-            # tightened 2026-08-17, later): see module docstring and class
-            # docstring above. A live run showed the ratio check ALONE is
-            # not enough - a routine per-minute TPM window (reset in
-            # 18-33s) satisfies "plenty of headroom on both" just as easily
-            # as a genuine daily cap. Only treat this as suspected daily
-            # exhaustion when BOTH the ratios look healthy AND the reset
-            # window itself is long (i.e. NOT a per-minute window, which
-            # can never report a reset beyond ~60s).
+            # tightened 2026-08-17, later and 2026-08-17, even later): see
+            # module docstring and class docstring above. A live run showed
+            # the ratio check ALONE is not enough - a routine per-minute TPM
+            # window (reset in 18-33s) satisfies "plenty of headroom on
+            # both" just as easily as a genuine daily cap. A second live run
+            # then showed the reset-window check itself could be fooled the
+            # other way: an unparseable reset value (e.g. Groq's bare
+            # millisecond form "1ms") must count as POSITIVELY KNOWN and
+            # long on both signals, not "unknown, so maybe long" - an
+            # unmeasured reset should never by itself justify aborting the
+            # whole run.
             req_ratio = _parse_ratio(remaining_requests, limit_requests)
             tok_ratio = _parse_ratio(remaining_tokens, limit_tokens)
             looks_like_long_window = (
-                (reset_requests_seconds is None or reset_requests_seconds > SUSPECTED_DAILY_QUOTA_MIN_RESET_SECONDS)
-                and (reset_tokens_seconds is None or reset_tokens_seconds > SUSPECTED_DAILY_QUOTA_MIN_RESET_SECONDS)
+                reset_requests_seconds is not None
+                and reset_requests_seconds > SUSPECTED_DAILY_QUOTA_MIN_RESET_SECONDS
+                and reset_tokens_seconds is not None
+                and reset_tokens_seconds > SUSPECTED_DAILY_QUOTA_MIN_RESET_SECONDS
             )
             if (
                 req_ratio is not None and req_ratio > SUSPECTED_DAILY_QUOTA_REMAINING_RATIO
@@ -456,16 +514,29 @@ def call_llm(prompt):
                     f"Got 429 but remaining-requests ({remaining_requests}/{limit_requests}) and "
                     f"remaining-tokens ({remaining_tokens}/{limit_tokens}) both still show plenty of "
                     f"headroom, AND the reset window (requests: {reset_requests_str}, tokens: "
-                    f"{reset_tokens_str}) is too long to be an ordinary per-minute limit - this is "
-                    f"very likely Groq's undocumented daily token (TPD) cap, not real-time RPM/TPM "
-                    f"throttling. TPD only resets at UTC midnight; no retry/backoff here can fix "
-                    f"this today."
+                    f"{reset_tokens_str}) is measured and too long to be an ordinary per-minute limit "
+                    f"- this is very likely Groq's undocumented daily token (TPD) cap, not real-time "
+                    f"RPM/TPM throttling. TPD only resets at UTC midnight; no retry/backoff here can "
+                    f"fix this today."
                 )
 
             # Ordinary per-minute rate limit: wait out the ACTUAL reported
             # reset window (plus a small buffer) rather than a fixed guess,
             # so the retry lands after the window has genuinely cleared.
-            wait = max((attempt + 1) * 15, (reset_tokens_seconds or 0) + 3, (reset_requests_seconds or 0) + 3)
+            # WASTEFUL-WAIT FIX (2026-08-17, even later): see module
+            # docstring. reset_requests_seconds reflects Groq's RPD-ish
+            # requests counter, not the real per-minute bottleneck - folding
+            # it into every wait via max(...) was inflating ordinary
+            # TPM-only backoffs (e.g. an actual ~45s token-window reset)
+            # into 260+s waits for no reason, multiplying total run time.
+            # Only factor it in when remaining-requests actually looks
+            # close to exhausted; otherwise the token reset is the real
+            # signal worth waiting on.
+            requests_actually_low = req_ratio is not None and req_ratio < REQUESTS_NEAR_LIMIT_RATIO
+            wait_candidates = [(attempt + 1) * 15, (reset_tokens_seconds or 0) + 3]
+            if requests_actually_low:
+                wait_candidates.append((reset_requests_seconds or 0) + 3)
+            wait = max(wait_candidates)
             print(f"Waiting {wait:.1f}s before retry...")
             last_error = resp
             time.sleep(wait)
