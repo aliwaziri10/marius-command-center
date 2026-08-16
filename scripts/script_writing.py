@@ -109,6 +109,30 @@ too. Lowered NARRATION_TARGET_WORDS 1800->1600 (still comfortably above the
 1500-word floor) and NARRATION_MAX_CONTINUATIONS 3->2 (each continuation
 round is a full extra Groq call). Both reduce worst-case tokens spent
 before a script completes, without changing the acceptance bar.
+
+FALSE-POSITIVE DAILY-QUOTA ABORT FIX (2026-08-17, later): a live manual run
+proved the Aug 15 SuspectedDailyQuotaExhausted heuristic above is WRONG in
+the common case. Actual log: two 429s, with x-ratelimit-reset-tokens of
+"33.159s" and "18.1s" - both clearly PER-MINUTE TPM windows, not a daily
+cap (a real daily/TPD reset would report hours, not seconds). The old check
+only looked at remaining/limit ratios (>50% remaining on both requests and
+tokens) and never looked at how soon the window actually resets, so it
+misclassified an ordinary short-lived TPM rate limit - one that a normal
+~30s backoff would have cleared - as a full-run-aborting daily exhaustion.
+This was actively making things worse: two narration continuation calls in
+quick succession (695->1080 words) legitimately used up the per-minute
+token budget, hit 429, and the run aborted immediately instead of just
+waiting out the ~30s window it was already about to clear on its own.
+Fix: parse x-ratelimit-reset-tokens/-requests (Groq's "Ns" / "NmN.Ns"
+format) via _parse_reset_seconds(). Only raise SuspectedDailyQuotaExhausted
+when the reset window itself is long (> SUSPECTED_DAILY_QUOTA_MIN_RESET_
+SECONDS, i.e. genuinely NOT a per-minute window) in addition to the
+existing high-remaining-ratio signature. Otherwise, this is an ordinary
+TPM/RPM rate limit: wait out the actual reported reset time (plus a small
+buffer) rather than a fixed guessed backoff, so retries land after the
+window has actually cleared instead of guessing short. Also raised
+MAX_RETRIES 2->4 so call_llm has enough attempts to survive a real
+per-minute window without exhausting its retry budget first.
 """
 
 import os
@@ -128,7 +152,11 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-MAX_RETRIES = 2
+# FALSE-POSITIVE DAILY-QUOTA ABORT FIX (2026-08-17, later): see module
+# docstring. Bumped from 2 so call_llm can actually survive a real
+# per-minute TPM window (now that we wait out the real reset time instead
+# of a fixed guessed backoff) without running out of attempts first.
+MAX_RETRIES = 4
 MIN_SHOTS = 25
 MAX_SHOTS = 35
 MAX_GENERATION_ATTEMPTS = 3
@@ -178,6 +206,15 @@ CONTINUATION_CALL_DELAY_SECONDS = 10
 # treat it as the invisible daily token (TPD) cap instead, which only
 # clears at UTC midnight no matter how this script backs off.
 SUSPECTED_DAILY_QUOTA_REMAINING_RATIO = 0.5
+
+# FALSE-POSITIVE DAILY-QUOTA ABORT FIX (2026-08-17, later): see module
+# docstring. A live run proved the ratio check ALONE isn't enough - a
+# routine TPM window (reset in ~18-33s) satisfied the "plenty of headroom"
+# ratio condition just as easily as a real daily cap would. A reset window
+# shorter than this is treated as an ordinary per-minute limit no matter
+# how the ratios look; only a longer reset window (which a per-minute
+# window can never report) is allowed to trigger the daily-exhaustion abort.
+SUSPECTED_DAILY_QUOTA_MIN_RESET_SECONDS = 120
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 
@@ -253,15 +290,18 @@ class InfraFailure(RuntimeError):
 
 
 class SuspectedDailyQuotaExhausted(RuntimeError):
-    """Raised (2026-08-15, later fix) when a 429 comes back with
-    remaining-requests and remaining-tokens headers BOTH still showing
-    plenty of headroom - meaning the visible per-minute/RPD limits are not
-    the real constraint. Groq also enforces an undocumented, header-invisible
-    TPD (tokens-per-day) cap that only resets at UTC midnight. Unlike
-    InfraFailure, this should NOT be retried within the same run - every
-    further call will hit the exact same wall, so the whole run should abort
-    immediately instead of burning ~10-15 minutes on doomed retries across
-    every remaining topic."""
+    """Raised (2026-08-15, later fix; tightened 2026-08-17, later) when a
+    429 comes back with remaining-requests and remaining-tokens headers
+    BOTH still showing plenty of headroom AND the reset window itself is
+    long (not a per-minute TPM/RPM window - see
+    SUSPECTED_DAILY_QUOTA_MIN_RESET_SECONDS) - meaning the visible
+    per-minute limits are not the real constraint. Groq also enforces an
+    undocumented, header-invisible TPD (tokens-per-day) cap that only
+    resets at UTC midnight. Unlike InfraFailure, this should NOT be
+    retried within the same run - every further call will hit the exact
+    same wall, so the whole run should abort immediately instead of
+    burning ~10-15 minutes on doomed retries across every remaining
+    topic."""
     pass
 
 
@@ -274,6 +314,22 @@ def _parse_ratio(remaining_str, limit_str):
         return remaining / limit
     except (TypeError, ValueError):
         return None
+
+
+def _parse_reset_seconds(reset_str):
+    """FALSE-POSITIVE DAILY-QUOTA ABORT FIX (2026-08-17, later): see module
+    docstring. Parses Groq's x-ratelimit-reset-* header format, which looks
+    like "33.159s" or "2m52.8s" (optional minutes, always seconds). Returns
+    None if the header is missing or doesn't match, so callers can treat an
+    unparseable reset as "unknown" rather than silently zero."""
+    if not reset_str:
+        return None
+    match = re.match(r"^(?:(\d+)m)?([\d.]+)s$", reset_str.strip())
+    if not match:
+        return None
+    minutes = float(match.group(1)) if match.group(1) else 0.0
+    seconds = float(match.group(2))
+    return minutes * 60 + seconds
 
 
 def retryable_request(method, url, max_retries=MAX_RETRIES, **kwargs):
@@ -352,11 +408,19 @@ def call_llm(prompt):
             continue
 
         if resp.status_code == 429:
-            wait = (attempt + 1) * 15
             remaining_requests = resp.headers.get('x-ratelimit-remaining-requests', '?')
             limit_requests = resp.headers.get('x-ratelimit-limit-requests', '?')
             remaining_tokens = resp.headers.get('x-ratelimit-remaining-tokens', '?')
             limit_tokens = resp.headers.get('x-ratelimit-limit-tokens', '?')
+            reset_requests_str = resp.headers.get('x-ratelimit-reset-requests', '?')
+            reset_tokens_str = resp.headers.get('x-ratelimit-reset-tokens', '?')
+
+            # FALSE-POSITIVE DAILY-QUOTA ABORT FIX (2026-08-17, later): parse
+            # the actual reset windows so the wait below matches reality
+            # instead of a fixed guessed backoff.
+            reset_requests_seconds = _parse_reset_seconds(reset_requests_str)
+            reset_tokens_seconds = _parse_reset_seconds(reset_tokens_str)
+
             # DIAGNOSTIC FIX (2026-08-15 evening): previously logged nothing
             # but "rate limited" - impossible to tell RPM vs TPM vs RPD from
             # that alone. Groq returns the real remaining budget on every
@@ -364,35 +428,45 @@ def call_llm(prompt):
             # Actions log instead of guessed at.
             print(
                 f"Groq rate limited (429) - "
-                f"remaining requests: {remaining_requests} "
-                f"(resets in {resp.headers.get('x-ratelimit-reset-requests', '?')}), "
-                f"remaining tokens: {remaining_tokens} "
-                f"(resets in {resp.headers.get('x-ratelimit-reset-tokens', '?')}). "
-                f"Waiting {wait}s before retry..."
+                f"remaining requests: {remaining_requests} (resets in {reset_requests_str}), "
+                f"remaining tokens: {remaining_tokens} (resets in {reset_tokens_str})."
             )
 
-            # SUSPECTED-DAILY-QUOTA-EXHAUSTION FIX (2026-08-15, later): see
-            # module docstring and class docstring above. If the headers
-            # Groq itself just sent us show plenty of headroom on BOTH
-            # remaining-requests and remaining-tokens, this 429 cannot be
-            # explained by the visible per-minute/RPD limits - it's almost
-            # certainly the invisible daily token (TPD) cap, which will not
-            # clear until UTC midnight no matter how long we wait/retry
-            # here. Abort immediately instead of wasting the local backoff.
+            # SUSPECTED-DAILY-QUOTA-EXHAUSTION FIX (2026-08-15, later;
+            # tightened 2026-08-17, later): see module docstring and class
+            # docstring above. A live run showed the ratio check ALONE is
+            # not enough - a routine per-minute TPM window (reset in
+            # 18-33s) satisfies "plenty of headroom on both" just as easily
+            # as a genuine daily cap. Only treat this as suspected daily
+            # exhaustion when BOTH the ratios look healthy AND the reset
+            # window itself is long (i.e. NOT a per-minute window, which
+            # can never report a reset beyond ~60s).
             req_ratio = _parse_ratio(remaining_requests, limit_requests)
             tok_ratio = _parse_ratio(remaining_tokens, limit_tokens)
+            looks_like_long_window = (
+                (reset_requests_seconds is None or reset_requests_seconds > SUSPECTED_DAILY_QUOTA_MIN_RESET_SECONDS)
+                and (reset_tokens_seconds is None or reset_tokens_seconds > SUSPECTED_DAILY_QUOTA_MIN_RESET_SECONDS)
+            )
             if (
                 req_ratio is not None and req_ratio > SUSPECTED_DAILY_QUOTA_REMAINING_RATIO
                 and tok_ratio is not None and tok_ratio > SUSPECTED_DAILY_QUOTA_REMAINING_RATIO
+                and looks_like_long_window
             ):
                 raise SuspectedDailyQuotaExhausted(
                     f"Got 429 but remaining-requests ({remaining_requests}/{limit_requests}) and "
                     f"remaining-tokens ({remaining_tokens}/{limit_tokens}) both still show plenty of "
-                    f"headroom - this is very likely Groq's undocumented daily token (TPD) cap, not "
-                    f"real-time RPM/TPM throttling. TPD only resets at UTC midnight; no retry/backoff "
-                    f"here can fix this today."
+                    f"headroom, AND the reset window (requests: {reset_requests_str}, tokens: "
+                    f"{reset_tokens_str}) is too long to be an ordinary per-minute limit - this is "
+                    f"very likely Groq's undocumented daily token (TPD) cap, not real-time RPM/TPM "
+                    f"throttling. TPD only resets at UTC midnight; no retry/backoff here can fix "
+                    f"this today."
                 )
 
+            # Ordinary per-minute rate limit: wait out the ACTUAL reported
+            # reset window (plus a small buffer) rather than a fixed guess,
+            # so the retry lands after the window has genuinely cleared.
+            wait = max((attempt + 1) * 15, (reset_tokens_seconds or 0) + 3, (reset_requests_seconds or 0) + 3)
+            print(f"Waiting {wait:.1f}s before retry...")
             last_error = resp
             time.sleep(wait)
             continue
