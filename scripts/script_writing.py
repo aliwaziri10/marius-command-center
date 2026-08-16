@@ -99,6 +99,16 @@ daily reset) - if this keeps recurring, the real fix is reducing total
 tokens/script (fewer/smaller chunked shot-breakdown calls), since a paid
 Groq tier is not allowed under the standing no-spend-until-$5,000-revenue
 rule.
+
+TOKEN-BUDGET TRIM (2026-08-17): the Aug 16 fix already cut shots per script
+(MIN_SHOTS 60->25, MAX_SHOTS 85->35, NUM_SHOT_CHUNKS 3->2), but zero new
+scripts had landed since Aug 6 as of this edit - still consistent with the
+invisible Groq TPD cap above being hit before a script completes. This is
+the next lever flagged in the handoff doc: trim narration's own token cost
+too. Lowered NARRATION_TARGET_WORDS 1800->1600 (still comfortably above the
+1500-word floor) and NARRATION_MAX_CONTINUATIONS 3->2 (each continuation
+round is a full extra Groq call). Both reduce worst-case tokens spent
+before a script completes, without changing the acceptance bar.
 """
 
 import os
@@ -132,8 +142,8 @@ MAX_SHOT_REPEAT_COUNT = 2
 CONTENT_RETRY_WAIT_SECONDS = 25
 
 NARRATION_MAX_ATTEMPTS = 3
-NARRATION_MAX_CONTINUATIONS = 3
-NARRATION_TARGET_WORDS = 1800
+NARRATION_MAX_CONTINUATIONS = 2
+NARRATION_TARGET_WORDS = 1600
 
 # CHUNKED SHOT BREAKDOWN (2026-08-15): see module docstring. Splitting one
 # 60-85 shot request (15,000-22,000 tokens) into 3 smaller requests keeps
@@ -1510,4 +1520,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
