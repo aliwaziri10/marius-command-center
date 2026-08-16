@@ -119,8 +119,8 @@ HEADERS = {
 }
 
 MAX_RETRIES = 2
-MIN_SHOTS = 60
-MAX_SHOTS = 85
+MIN_SHOTS = 25
+MAX_SHOTS = 35
 MAX_GENERATION_ATTEMPTS = 3
 MAX_INFRA_ATTEMPTS = 4
 MAX_HOOK_TEXT_CHARS = 40
@@ -138,7 +138,7 @@ NARRATION_TARGET_WORDS = 1800
 # CHUNKED SHOT BREAKDOWN (2026-08-15): see module docstring. Splitting one
 # 60-85 shot request (15,000-22,000 tokens) into 3 smaller requests keeps
 # each call comfortably under Groq's 12,000 TPM free-tier ceiling.
-NUM_SHOT_CHUNKS = 3
+NUM_SHOT_CHUNKS = 2
 CHUNK_MIN_SHOTS = MIN_SHOTS // NUM_SHOT_CHUNKS
 CHUNK_MAX_SHOTS = -(-MAX_SHOTS // NUM_SHOT_CHUNKS)  # ceil division
 SHOT_CHUNK_CALL_DELAY_SECONDS = 20
@@ -1510,3 +1510,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
