@@ -181,6 +181,21 @@ wait now only folds in reset_requests_seconds when remaining-requests
 actually looks close to exhausted (see REQUESTS_NEAR_LIMIT_RATIO below),
 not on every single retry regardless of whether requests were ever the
 real bottleneck.
+
+TRUNCATED-JSON + REPETITIVE-REACTION FIX (2026-08-18): live data on the
+generation_failed backlog showed two systemic issues never addressed by
+the provider-switch history above. (1) call_llm()'s generationConfig never
+set maxOutputTokens, leaving it on Gemini's default ceiling - long
+shot-breakdown responses (a 12-17 shot chunk's worth of structured JSON)
+could hit that default mid-object and come back truncated, which then
+failed extract_json/json.loads with errors like "Expecting property name
+enclosed in double quotes" - the exact signature seen on 3 stuck topics.
+Added an explicit maxOutputTokens so a large chunk response has headroom
+to finish before any cap kicks in. (2) Zia flagged that characters in the
+finished videos gasp constantly as a reaction beat - almost every episode
+reaches for it by default. Added explicit guidance to both the narration
+prompt and the shot-description rules to vary emotional/physical reactions
+instead of defaulting to gasping every time tension rises.
 """
 
 import os
@@ -227,6 +242,12 @@ NUM_SHOT_CHUNKS = 2
 CHUNK_MIN_SHOTS = MIN_SHOTS // NUM_SHOT_CHUNKS
 CHUNK_MAX_SHOTS = -(-MAX_SHOTS // NUM_SHOT_CHUNKS)  # ceil division
 SHOT_CHUNK_CALL_DELAY_SECONDS = 20
+
+# TRUNCATED-JSON FIX (2026-08-18): see module docstring. A chunk's shot_list
+# JSON response can run long; without an explicit ceiling this was left on
+# Gemini's default maxOutputTokens, which could truncate mid-object on a
+# large chunk and produce invalid JSON.
+GEMINI_MAX_OUTPUT_TOKENS = 8192
 
 GEMINI_KEY = os.environ["GEMINI_API_KEY"]
 GEMINI_MODEL = "gemini-3.5-flash-lite"
@@ -383,7 +404,10 @@ def call_llm(prompt):
     JSON output so it's never wrapped in markdown fences."""
     body = json.dumps({
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"response_mime_type": "application/json"},
+        "generationConfig": {
+            "response_mime_type": "application/json",
+            "maxOutputTokens": GEMINI_MAX_OUTPUT_TOKENS,
+        },
     }).encode()
     last_error = None
     for attempt in range(MAX_RETRIES):
@@ -581,6 +605,16 @@ about this specific story to reach the target, expand on the real historical
 context, setting, sensory detail, and the emotional experience of the people
 involved - do not pad with repetition or filler, and do not write a short
 script assuming it will be extended later.
+
+VARY EMOTIONAL BEATS - DO NOT DEFAULT TO GASPING: when describing a
+character's reaction to shock, fear, or surprise, do not reach for "gasped"
+or "gasping" as the default reaction verb. Real people react to tension in
+many different physical and emotional ways - a held breath, a stiffened
+posture, a dropped object, silence, a whispered word, trembling hands, a
+racing pulse, frozen stillness, a sharp intake through the nose, clenched
+fists. Choose the reaction that fits this specific moment and this specific
+person, and vary it across the script - the same reaction beat should not
+repeat more than once or twice in a single episode.
 
 CALL TO ACTION - THIS IS REQUIRED, NOT OPTIONAL: immediately after the
 emotional climax of the story and before the final reflective closing line,
@@ -1088,6 +1122,16 @@ and any recurring person described there must match their fixed appearance
 in every shot they appear in. Do not introduce a different ethnicity,
 region, or unplanned recurring character partway through.
 
+VARY PHYSICAL REACTIONS - DO NOT DEFAULT TO GASPING: when a shot's
+visual_description shows a character reacting to shock, danger, or a
+sudden turn in the story, do not default to "gasps" / "gasping" / "a sharp
+gasp" as the go-to reaction. Draw from a wide range of physical reactions
+instead - a held breath, a stiffened body, a hand frozen mid-motion, wide
+unmoving eyes, a dropped object, trembling hands, a clenched jaw, a
+sudden stillness - and pick whichever fits this specific character and
+moment. Across a full shot list, no single reaction beat (gasping
+included) should repeat more than once or twice.
+
 DOCUMENTARY SHOT INDEPENDENCE (HARD RULE): write the shot list as a
 documentary editor, not a movie storyboard. Every shot must be a complete,
 independent visual composition that starts from an already-stable moment
@@ -1126,11 +1170,18 @@ the camera angle, framing, and body orientation, but keep their fixed
 physical description IDENTICAL to what's stated in "setting_and_characters"
 every single time.
 
-LEGIBLE ON-SCREEN TEXT: if a shot deliberately shows readable text (a
-newspaper headline, a letter, a sign, a document, an inscription), you must
-state the exact required wording in "required_onscreen_text", and describe
-it explicitly in visual_description. If no specific wording is required,
-do NOT make readable text the focus of the shot at all.
+LEGIBLE ON-SCREEN TEXT (HARD RULE - THIS IS THE #1 CAUSE OF REJECTED SHOT
+LISTS): if a shot's visual_description mentions ANY of the following words -
+newspaper, letter, document, sign, headline, inscription, poster, map,
+book, plaque, telegram, postcard, banner, ledger, diary, certificate,
+gravestone, tombstone - you MUST either (a) fill "required_onscreen_text"
+with the exact wording that must appear on it, correctly spelled, or (b)
+rewrite the visual_description so that object is present but not the
+readable focus of the shot (e.g. a closed book on a shelf, a letter held
+face-down). A shot that names one of these objects with
+required_onscreen_text left empty is an automatic rejection of the entire
+shot list - check every single shot against this list before finishing
+your response.
 
 For each shot, provide:
 - "shot_type": one of "wide", "medium", "close_up", "extreme_close_up",
@@ -1319,7 +1370,7 @@ format:
       "lens_effect": "none",
       "sfx_cue": "",
       "primary_subject": "",
-      "required_onscreen_text": ""
+      "required_onscreen_text": "REQUIRED if visual_description names a newspaper/letter/sign/document/etc - the exact wording, otherwise leave as empty string"
     }}
   ]
 }}
