@@ -1,0 +1,70 @@
+name: Health Check
+
+on:
+  schedule:
+  - cron: "0 */2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  health_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run health check
+        id: health_check
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set +e
+          python scripts/health_check.py > health_check_output.txt 2>&1
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          cat health_check_output.txt
+
+      - name: Extract issue body
+        if: steps.health_check.outputs.exit_code != '0'
+        id: extract_body
+        run: |
+          awk '/---ISSUE_BODY_START---/{flag=1;next}/---ISSUE_BODY_END---/{flag=0}flag' health_check_output.txt > issue_body.txt
+          echo "Extracted body:"
+          cat issue_body.txt
+
+      - name: Open or update alert issue
+        if: steps.health_check.outputs.exit_code != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXISTING=$(gh issue list --repo "${{ github.repository }}" --search "\"[Marius Health Check] Active alert\" in:title" --state open --json number --jq '.[0].number')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --repo "${{ github.repository }}" --body-file issue_body.txt
+            gh issue comment "$EXISTING" --repo "${{ github.repository }}" --body "(updated $(date -u +%Y-%m-%dT%H:%M:%SZ), run ${{ github.run_id }})"
+          else
+            gh issue create --repo "${{ github.repository }}" \
+              --title "[Marius Health Check] Active alert - $(date -u +%Y-%m-%d)" \
+              --body-file issue_body.txt
+          fi
+
+      - name: Close alert issue if healthy
+        if: steps.health_check.outputs.exit_code == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXISTING=$(gh issue list --repo "${{ github.repository }}" --search "\"[Marius Health Check] Active alert\" in:title" --state open --json number --jq '.[0].number')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --repo "${{ github.repository }}" --body "Resolved - health check is clean as of $(date -u +%Y-%m-%dT%H:%M:%SZ) (run ${{ github.run_id }})."
+            gh issue close "$EXISTING" --repo "${{ github.repository }}"
+          fi
