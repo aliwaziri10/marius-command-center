@@ -134,6 +134,22 @@ window has actually cleared instead of guessing short. Also raised
 MAX_RETRIES 2->4 so call_llm has enough attempts to survive a real
 per-minute window without exhausting its retry budget first.
 
+PROVIDER SWITCH BACK TO GEMINI (2026-08-17, latest): Groq abandoned entirely
+after a live run proved its 429s can show FULLY replenished per-minute
+headers (1000/1000 requests, 12000/12000 tokens) while still permanently
+429ing every call - meaning Groq's real constraint (very likely the
+undocumented TPD cap) is structurally invisible in anything this script
+can inspect. Every fix attempted below (2026-08-15 through 2026-08-17) was
+tuning a heuristic built on headers that cannot see the actual problem.
+Switched to Gemini (gemini-3.5-flash-lite), the same provider/model
+TechPulse's script/generate_script.py already uses successfully in
+production - see call_llm() for details. GEMINI_API_KEY secret already
+exists in this repo (added 2026-08-06, confirmed present 2026-08-17).
+GROQ_API_KEY, GROQ_MODEL, GROQ_URL, and all Groq-specific quota-guessing
+constants/classes/logic below are now dead history, kept for context on
+why previous fixes didn't work - the current call_llm() no longer uses
+any of them.
+
 MILLISECOND RESET FORMAT + INVERTED FAIL-SAFE FIX (2026-08-17, even later):
 a live run aborted with SuspectedDailyQuotaExhausted despite the 429
 showing a FULLY replenished quota - remaining-requests 1000/1000 and
@@ -176,7 +192,6 @@ from collections import Counter
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
-GROQ_KEY = os.environ["GROQ_API_KEY"]
 
 HEADERS = {
     "apikey": SUPABASE_KEY,
@@ -213,47 +228,13 @@ CHUNK_MIN_SHOTS = MIN_SHOTS // NUM_SHOT_CHUNKS
 CHUNK_MAX_SHOTS = -(-MAX_SHOTS // NUM_SHOT_CHUNKS)  # ceil division
 SHOT_CHUNK_CALL_DELAY_SECONDS = 20
 
-GROQ_MODEL = "llama-3.3-70b-versatile"
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-# TRUNCATED-JSON FIX (2026-08-15 evening): no max_tokens was ever set on the
-# Groq request, so a large shot-breakdown segment (~29 shots of structured
-# JSON) could get silently cut off mid-object by Groq's own default output
-# cap - producing exactly the "Expecting ',' delimiter" parse errors seen on
-# live runs. Setting this explicitly, well above what any single call here
-# needs, removes that as a failure mode entirely. response_format forces
-# Groq's native JSON mode so output is never wrapped in markdown fences or
-# truncated by a stray non-JSON preamble.
-GROQ_MAX_TOKENS = 8000
-GROQ_RESPONSE_FORMAT = {"type": "json_object"}
-# BURST-RISK FIX (2026-08-15 evening): every other retry path in this file
-# waits between Groq calls except the narration continuation loop, which
-# fired back-to-back with zero delay. Closing that gap so this script never
-# self-inflicts a burst against Groq's 30 RPM ceiling.
+GEMINI_KEY = os.environ["GEMINI_API_KEY"]
+GEMINI_MODEL = "gemini-3.5-flash-lite"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_KEY}"
+# BURST-RISK FIX (2026-08-15 evening, still applies under Gemini): every
+# other retry path in this file waits between calls except the narration
+# continuation loop, which fired back-to-back with zero delay.
 CONTINUATION_CALL_DELAY_SECONDS = 10
-
-# SUSPECTED-DAILY-QUOTA-EXHAUSTION FIX (2026-08-15, later): see module
-# docstring. If a 429 comes back with BOTH remaining-requests and
-# remaining-tokens still above these fractions of their reported limits,
-# the per-minute/RPD headers are lying about being the real constraint -
-# treat it as the invisible daily token (TPD) cap instead, which only
-# clears at UTC midnight no matter how this script backs off.
-SUSPECTED_DAILY_QUOTA_REMAINING_RATIO = 0.5
-
-# FALSE-POSITIVE DAILY-QUOTA ABORT FIX (2026-08-17, later): see module
-# docstring. A live run proved the ratio check ALONE isn't enough - a
-# routine TPM window (reset in ~18-33s) satisfied the "plenty of headroom"
-# ratio condition just as easily as a real daily cap would. A reset window
-# shorter than this is treated as an ordinary per-minute limit no matter
-# how the ratios look; only a longer reset window (which a per-minute
-# window can never report) is allowed to trigger the daily-exhaustion abort.
-SUSPECTED_DAILY_QUOTA_MIN_RESET_SECONDS = 120
-
-# WASTEFUL-WAIT FIX (2026-08-17, even later): see module docstring. Only
-# fold x-ratelimit-reset-requests into the ordinary per-minute retry wait
-# when remaining-requests are actually below this fraction of their limit -
-# otherwise that (often much longer, RPD-ish) reset window isn't the real
-# bottleneck, and waiting for it just wastes time on every single retry.
-REQUESTS_NEAR_LIMIT_RATIO = 0.1
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 
@@ -319,70 +300,25 @@ RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class InfraFailure(RuntimeError):
-    """Raised when Groq never returned a usable response within the infra
+    """Raised when Gemini never returned a usable response within the infra
     retry budget - meaning the topic's actual content was never evaluated
     at all. This must NOT be treated the same as a real content failure:
     the topic itself did nothing wrong, so it must stay 'pending' for the
-    next scheduled run to retry once Groq's quota/availability recovers,
+    next scheduled run to retry once Gemini's quota/availability recovers,
     instead of being permanently blacklisted as generation_failed."""
     pass
 
 
-class SuspectedDailyQuotaExhausted(RuntimeError):
-    """Raised (2026-08-15, later fix; tightened 2026-08-17, later and
-    2026-08-17, even later) when a 429 comes back with remaining-requests
-    and remaining-tokens headers BOTH still showing plenty of headroom AND
-    the reset window itself is POSITIVELY KNOWN to be long (not a
-    per-minute TPM/RPM window, and not simply unparseable - see
-    SUSPECTED_DAILY_QUOTA_MIN_RESET_SECONDS) - meaning the visible
-    per-minute limits are not the real constraint. Groq also enforces an
-    undocumented, header-invisible TPD (tokens-per-day) cap that only
-    resets at UTC midnight. Unlike InfraFailure, this should NOT be
-    retried within the same run - every further call will hit the exact
-    same wall, so the whole run should abort immediately instead of
-    burning ~10-15 minutes on doomed retries across every remaining
-    topic."""
+class DailyQuotaExhausted(RuntimeError):
+    """PROVIDER SWITCH (2026-08-17): replaces Groq's SuspectedDailyQuotaExhausted
+    guesswork. Gemini's 429 body is structured JSON with an explicit
+    quotaMetric/quotaId naming the exact limit that was hit (e.g.
+    "generate_content_free_tier_requests") - no more inferring daily-vs-
+    per-minute from ambiguous headers. Raised only when the response body
+    itself names a free-tier daily/per-day quota. Unlike InfraFailure, not
+    retried within the same run - every further call will hit the same
+    wall until Google's daily reset."""
     pass
-
-
-def _parse_ratio(remaining_str, limit_str):
-    try:
-        remaining = float(remaining_str)
-        limit = float(limit_str)
-        if limit <= 0:
-            return None
-        return remaining / limit
-    except (TypeError, ValueError):
-        return None
-
-
-def _parse_reset_seconds(reset_str):
-    """FALSE-POSITIVE DAILY-QUOTA ABORT FIX (2026-08-17, later; extended
-    2026-08-17, even later): see module docstring. Parses Groq's
-    x-ratelimit-reset-* header format. Handles both the "33.159s" /
-    "2m52.8s" form (optional minutes, always seconds) AND the bare
-    millisecond form ("1ms", "500ms") seen when a window is about to roll
-    over - the seconds-only pattern alone silently fails to match "1ms"
-    (no digits precede the "s" once an optional "1m" is consumed), which
-    previously returned None and got misread downstream as "unknown,
-    assume it could be a long window." Returns None only when the header
-    is truly missing or in a genuinely unrecognized format, so callers can
-    treat that as honestly unknown rather than silently zero OR silently
-    long."""
-    if not reset_str:
-        return None
-    s = reset_str.strip()
-
-    ms_match = re.match(r"^([\d.]+)ms$", s)
-    if ms_match:
-        return float(ms_match.group(1)) / 1000.0
-
-    match = re.match(r"^(?:(\d+)m)?([\d.]+)s$", s)
-    if not match:
-        return None
-    minutes = float(match.group(1)) if match.group(1) else 0.0
-    seconds = float(match.group(2))
-    return minutes * 60 + seconds
 
 
 def retryable_request(method, url, max_retries=MAX_RETRIES, **kwargs):
@@ -431,113 +367,63 @@ def get_pending_topics(limit=5):
 
 
 def call_llm(prompt):
-    """PROVIDER SWITCH (2026-08-15): Groq only, using llama-3.3-70b-versatile.
-    OpenAI-compatible chat completions endpoint - 30 RPM / 12,000 TPM /
-    1,000 requests per day free tier, no credit card, 128K context window
-    (comfortably fits this script's large prompt + long JSON output)."""
+    """PROVIDER SWITCH (2026-08-17): Groq replaced with Gemini
+    (gemini-3.5-flash-lite), same call_gemini() pattern already proven
+    working in TechPulse's script/generate_script.py. Reasons: (1) Groq's
+    daily (TPD) cap is completely invisible in its response headers -
+    every diagnostic fix attempted on 2026-08-15/17 was reading headers
+    that structurally cannot reflect TPD exhaustion, so the pipeline kept
+    silently producing zero scripts with no reliable way to detect why.
+    (2) Gemini's 429 body is structured JSON naming the exact quota
+    metric hit (e.g. "generate_content_free_tier_requests") - an
+    unambiguous signal Groq never gave us. (3) Gemini's free tier (1,500
+    requests/day, 1M token context) removes the need for the
+    shot-breakdown chunking hack entirely - the full prompt + narration +
+    shot list fits in a single call. response_mime_type forces native
+    JSON output so it's never wrapped in markdown fences."""
     body = json.dumps({
-        "model": GROQ_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": GROQ_MAX_TOKENS,
-        "response_format": GROQ_RESPONSE_FORMAT,
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"response_mime_type": "application/json"},
     }).encode()
     last_error = None
     for attempt in range(MAX_RETRIES):
         try:
             resp = requests.post(
-                GROQ_URL,
+                GEMINI_URL,
                 data=body,
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {GROQ_KEY}",
-                },
-                timeout=120,
+                headers={"Content-Type": "application/json"},
+                timeout=180,
             )
         except RETRYABLE_NETWORK_EXCEPTIONS as e:
             wait = (attempt + 1) * 15
-            print(f"Groq network error ({e.__class__.__name__}: {e}), waiting {wait}s before retry...")
+            print(f"Gemini network error ({e.__class__.__name__}: {e}), waiting {wait}s before retry...")
             last_error = e
             time.sleep(wait)
             continue
 
         if resp.status_code == 429:
-            remaining_requests = resp.headers.get('x-ratelimit-remaining-requests', '?')
-            limit_requests = resp.headers.get('x-ratelimit-limit-requests', '?')
-            remaining_tokens = resp.headers.get('x-ratelimit-remaining-tokens', '?')
-            limit_tokens = resp.headers.get('x-ratelimit-limit-tokens', '?')
-            reset_requests_str = resp.headers.get('x-ratelimit-reset-requests', '?')
-            reset_tokens_str = resp.headers.get('x-ratelimit-reset-tokens', '?')
+            body_text = resp.text[:800]
+            print(f"Gemini rate limited (429): {body_text}")
 
-            # FALSE-POSITIVE DAILY-QUOTA ABORT FIX (2026-08-17, later): parse
-            # the actual reset windows so the wait below matches reality
-            # instead of a fixed guessed backoff.
-            reset_requests_seconds = _parse_reset_seconds(reset_requests_str)
-            reset_tokens_seconds = _parse_reset_seconds(reset_tokens_str)
+            is_daily = False
+            try:
+                err_json = resp.json()
+                for detail in err_json.get("error", {}).get("details", []):
+                    for violation in detail.get("violations", []):
+                        metric = violation.get("quotaMetric", "") or violation.get("quotaId", "")
+                        if "per_day" in metric.lower() or "daily" in metric.lower() or "free_tier" in metric.lower():
+                            is_daily = True
+            except (requests.exceptions.JSONDecodeError, AttributeError):
+                pass
 
-            # DIAGNOSTIC FIX (2026-08-15 evening): previously logged nothing
-            # but "rate limited" - impossible to tell RPM vs TPM vs RPD from
-            # that alone. Groq returns the real remaining budget on every
-            # response; log it so the next failure is diagnosable from the
-            # Actions log instead of guessed at.
-            print(
-                f"Groq rate limited (429) - "
-                f"remaining requests: {remaining_requests} (resets in {reset_requests_str}), "
-                f"remaining tokens: {remaining_tokens} (resets in {reset_tokens_str})."
-            )
-
-            # SUSPECTED-DAILY-QUOTA-EXHAUSTION FIX (2026-08-15, later;
-            # tightened 2026-08-17, later and 2026-08-17, even later): see
-            # module docstring and class docstring above. A live run showed
-            # the ratio check ALONE is not enough - a routine per-minute TPM
-            # window (reset in 18-33s) satisfies "plenty of headroom on
-            # both" just as easily as a genuine daily cap. A second live run
-            # then showed the reset-window check itself could be fooled the
-            # other way: an unparseable reset value (e.g. Groq's bare
-            # millisecond form "1ms") must count as POSITIVELY KNOWN and
-            # long on both signals, not "unknown, so maybe long" - an
-            # unmeasured reset should never by itself justify aborting the
-            # whole run.
-            req_ratio = _parse_ratio(remaining_requests, limit_requests)
-            tok_ratio = _parse_ratio(remaining_tokens, limit_tokens)
-            looks_like_long_window = (
-                reset_requests_seconds is not None
-                and reset_requests_seconds > SUSPECTED_DAILY_QUOTA_MIN_RESET_SECONDS
-                and reset_tokens_seconds is not None
-                and reset_tokens_seconds > SUSPECTED_DAILY_QUOTA_MIN_RESET_SECONDS
-            )
-            if (
-                req_ratio is not None and req_ratio > SUSPECTED_DAILY_QUOTA_REMAINING_RATIO
-                and tok_ratio is not None and tok_ratio > SUSPECTED_DAILY_QUOTA_REMAINING_RATIO
-                and looks_like_long_window
-            ):
-                raise SuspectedDailyQuotaExhausted(
-                    f"Got 429 but remaining-requests ({remaining_requests}/{limit_requests}) and "
-                    f"remaining-tokens ({remaining_tokens}/{limit_tokens}) both still show plenty of "
-                    f"headroom, AND the reset window (requests: {reset_requests_str}, tokens: "
-                    f"{reset_tokens_str}) is measured and too long to be an ordinary per-minute limit "
-                    f"- this is very likely Groq's undocumented daily token (TPD) cap, not real-time "
-                    f"RPM/TPM throttling. TPD only resets at UTC midnight; no retry/backoff here can "
-                    f"fix this today."
+            if is_daily:
+                raise DailyQuotaExhausted(
+                    f"Gemini 429 explicitly names a free-tier/daily quota metric - will not clear "
+                    f"until Google's daily reset. Body: {body_text}"
                 )
 
-            # Ordinary per-minute rate limit: wait out the ACTUAL reported
-            # reset window (plus a small buffer) rather than a fixed guess,
-            # so the retry lands after the window has genuinely cleared.
-            # WASTEFUL-WAIT FIX (2026-08-17, even later): see module
-            # docstring. reset_requests_seconds reflects Groq's RPD-ish
-            # requests counter, not the real per-minute bottleneck - folding
-            # it into every wait via max(...) was inflating ordinary
-            # TPM-only backoffs (e.g. an actual ~45s token-window reset)
-            # into 260+s waits for no reason, multiplying total run time.
-            # Only factor it in when remaining-requests actually looks
-            # close to exhausted; otherwise the token reset is the real
-            # signal worth waiting on.
-            requests_actually_low = req_ratio is not None and req_ratio < REQUESTS_NEAR_LIMIT_RATIO
-            wait_candidates = [(attempt + 1) * 15, (reset_tokens_seconds or 0) + 3]
-            if requests_actually_low:
-                wait_candidates.append((reset_requests_seconds or 0) + 3)
-            wait = max(wait_candidates)
-            print(f"Waiting {wait:.1f}s before retry...")
+            wait = (attempt + 1) * 15
+            print(f"Ordinary rate limit (not daily-quota-named) - waiting {wait}s before retry...")
             last_error = resp
             time.sleep(wait)
             continue
@@ -546,21 +432,30 @@ def call_llm(prompt):
             resp.raise_for_status()
         except requests.exceptions.HTTPError as e:
             wait = (attempt + 1) * 15
-            print(f"Groq HTTP error {resp.status_code} ({e}): {resp.text[:300]}, waiting {wait}s before retry...")
+            print(f"Gemini HTTP error {resp.status_code} ({e}): {resp.text[:300]}, waiting {wait}s before retry...")
             last_error = resp
             time.sleep(wait)
             continue
 
         try:
-            return resp.json()["choices"][0]["message"]["content"]
-        except (requests.exceptions.JSONDecodeError, KeyError, IndexError) as e:
+            result = resp.json()
+        except requests.exceptions.JSONDecodeError as e:
             wait = (attempt + 1) * 15
-            print(f"Groq response envelope malformed/unparseable ({e}), waiting {wait}s before retry...")
+            print(f"Gemini response envelope malformed/unparseable ({e}), waiting {wait}s before retry...")
             last_error = e
             time.sleep(wait)
             continue
 
-    raise RuntimeError(f"Groq still failing after {MAX_RETRIES} attempts: {last_error}")
+        try:
+            return result["candidates"][0]["content"]["parts"][0]["text"]
+        except (KeyError, IndexError, TypeError) as e:
+            wait = (attempt + 1) * 15
+            print(f"Unexpected Gemini response shape ({e}): {json.dumps(result)[:500]}, waiting {wait}s before retry...")
+            last_error = e
+            time.sleep(wait)
+            continue
+
+    raise RuntimeError(f"Gemini still failing after {MAX_RETRIES} attempts: {last_error}")
 
 
 def sanitize_json_control_chars(text):
@@ -755,14 +650,14 @@ def generate_narration(title, angle):
     while content_attempt < NARRATION_MAX_ATTEMPTS:
         try:
             raw = call_llm(build_narration_prompt(title, angle))
-        except SuspectedDailyQuotaExhausted:
+        except DailyQuotaExhausted:
             # FIX (2026-08-15, later): must NOT be swallowed by the generic
             # RuntimeError/infra-retry handling below - propagate straight
             # up so main() can abort the whole run instead of retrying.
             raise
         except RuntimeError as e:
             infra_attempt += 1
-            last_reason = f"Groq call failed: {e}"
+            last_reason = f"Gemini call failed: {e}"
             print(f"[narration] Infra retry {infra_attempt}/{MAX_INFRA_ATTEMPTS} failed - {last_reason}")
             if infra_attempt >= MAX_INFRA_ATTEMPTS:
                 break
@@ -803,7 +698,7 @@ def generate_narration(title, angle):
                 raw_cont = call_llm(build_narration_continuation_prompt(title, angle, narration, words_so_far))
                 parsed_cont = extract_json(raw_cont)
                 cont_text = (parsed_cont.get("continuation_text") or "").strip()
-            except SuspectedDailyQuotaExhausted:
+            except DailyQuotaExhausted:
                 raise
             except (RuntimeError, ValueError, json.JSONDecodeError) as e:
                 print(f"[narration] Continuation round {continuation_rounds} failed ({e}), stopping continuation "
@@ -832,7 +727,7 @@ def generate_narration(title, angle):
 
     if not ever_reached_content:
         raise InfraFailure(
-            f"Groq never returned a usable response after {infra_attempt} infra retries during "
+            f"Gemini never returned a usable response after {infra_attempt} infra retries during "
             f"narration stage. Last reason: {last_reason}"
         )
     raise RuntimeError(f"Narration generation failed after {content_attempt} content attempts. Last reason: {last_reason}")
@@ -1460,7 +1355,7 @@ def generate_shot_breakdown(title, angle, narration_text):
         for idx, chunk_text in enumerate(chunks):
             if idx > 0:
                 print(f"[shots] Waiting {SHOT_CHUNK_CALL_DELAY_SECONDS}s before segment "
-                      f"{idx + 1}/{num_chunks} call (keeps each Groq call in its own TPM window)...")
+                      f"{idx + 1}/{num_chunks} call...")
                 time.sleep(SHOT_CHUNK_CALL_DELAY_SECONDS)
 
             prior_last_subject = stitched_shots[-1].get("primary_subject") if stitched_shots else None
@@ -1476,13 +1371,13 @@ def generate_shot_breakdown(title, angle, narration_text):
 
             try:
                 raw = call_llm(prompt)
-            except SuspectedDailyQuotaExhausted:
+            except DailyQuotaExhausted:
                 # FIX (2026-08-15, later): propagate straight up, do not
                 # treat as an ordinary per-chunk infra retry.
                 raise
             except RuntimeError as e:
                 infra_attempt += 1
-                last_reason = f"Groq call failed on segment {idx + 1}/{num_chunks}: {e}"
+                last_reason = f"Gemini call failed on segment {idx + 1}/{num_chunks}: {e}"
                 print(f"[shots] Infra retry {infra_attempt}/{MAX_INFRA_ATTEMPTS} failed - {last_reason} "
                       f"(does not count against the {MAX_GENERATION_ATTEMPTS} content attempts)")
                 infra_failed_this_round = True
@@ -1528,7 +1423,7 @@ def generate_shot_breakdown(title, angle, narration_text):
             print(f"[shots] Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
             if content_attempt < MAX_GENERATION_ATTEMPTS:
                 print(f"Waiting {CONTENT_RETRY_WAIT_SECONDS}s before next content attempt "
-                      f"(prevents bursting past Groq's free-tier RPM ceiling)...")
+                      f"(prevents bursting past Gemini's free-tier RPM ceiling)...")
                 time.sleep(CONTENT_RETRY_WAIT_SECONDS)
             continue
 
@@ -1550,12 +1445,12 @@ def generate_shot_breakdown(title, angle, narration_text):
         print(f"[shots] Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
         if content_attempt < MAX_GENERATION_ATTEMPTS:
             print(f"Waiting {CONTENT_RETRY_WAIT_SECONDS}s before next content attempt "
-                  f"(prevents bursting past Groq's free-tier RPM ceiling)...")
+                  f"(prevents bursting past Gemini's free-tier RPM ceiling)...")
             time.sleep(CONTENT_RETRY_WAIT_SECONDS)
 
     if not ever_reached_content:
         raise InfraFailure(
-            f"Groq never returned a usable response after {infra_attempt} infra "
+            f"Gemini never returned a usable response after {infra_attempt} infra "
             f"retries during shot-breakdown stage (narration was already confirmed "
             f"good). Last reason: {last_reason}"
         )
@@ -1625,21 +1520,20 @@ def main():
         print(f"Writing script for: {topic['title']}")
         try:
             result = generate_script(topic["title"], topic["angle"])
-        except SuspectedDailyQuotaExhausted as e:
-            # FIX (2026-08-15, later): see module docstring. Every remaining
-            # topic in this batch would hit the exact same wall - stop the
-            # whole run immediately instead of burning ~10-15 more minutes
-            # on doomed retries. Topic stays 'pending', same as InfraFailure,
-            # since this is not the topic's fault either.
+        except DailyQuotaExhausted as e:
+            # Every remaining topic in this batch would hit the exact same
+            # wall - stop the whole run immediately instead of burning
+            # more time on doomed retries. Topic stays 'pending', same as
+            # InfraFailure, since this is not the topic's fault either.
             print(
-                f"ABORTING RUN - suspected Groq daily token quota (TPD) exhaustion on topic "
+                f"ABORTING RUN - Gemini daily quota exhausted on topic "
                 f"{topic['id']} ({topic['title']}): {e}"
             )
-            print("This will not clear until Groq's daily reset (UTC midnight) - not retrying "
+            print("This will not clear until Google's daily reset - not retrying "
                   "further topics this run. Next scheduled run will retry from the top.")
             return
         except InfraFailure as e:
-            print(f"Groq infra failure on topic {topic['id']} ({topic['title']}) - not the "
+            print(f"Gemini infra failure on topic {topic['id']} ({topic['title']}) - not the "
                   f"topic's fault, leaving it pending and trying the next-oldest candidate "
                   f"this run instead of exiting: {e}")
             continue
