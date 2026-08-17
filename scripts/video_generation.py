@@ -831,20 +831,33 @@ def _generate_one_segment(shot, segment_duration, out_path, setting_and_characte
     num_frames = round_to_valid_frames(raw_frames)
     num_frames = max(MIN_FRAMES, min(MAX_FRAMES, num_frames))
 
-    shot["_has_motion_anchor"] = bool(anchor_image_url)
+        shot["_has_motion_anchor"] = bool(anchor_image_url)
     prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=0)
     try:
         video_id = create_agnes_task(prompt, num_frames, image_url=anchor_image_url)
     except ContentPolicyRejection:
-        print("Content policy rejection on primary prompt - retrying with sanitized-anchor fallback (tier 1)...")
+        # BUG FOUND 2026-08-16: fallback tiers only ever changed the TEXT
+        # prompt - the image anchor (continuity chain, ultimately traced
+        # back to a character-reference image generated from this script's
+        # own setting_and_characters text) was passed unchanged into every
+        # tier. Confirmed on "Hutu Who Hid Tutsi Families" shot 31: its
+        # visual_description was completely mundane (empty room, curtained
+        # window) and tier 2's prompt text carries zero story content by
+        # design - yet it was still rejected. The only remaining shared
+        # element across all 3 tiers was the anchor image itself. Tiers 1
+        # and 2 now drop the image anchor entirely (real text-to-video,
+        # nothing else attached) instead of only sanitizing/genericizing
+        # the text while silently keeping a potentially-flaggable image.
+        print("Content policy rejection on primary prompt - retrying with sanitized-anchor fallback "
+              "(tier 1, image anchor also dropped this attempt)...")
         try:
             fallback_prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=1)
-            video_id = create_agnes_task(fallback_prompt, num_frames, image_url=anchor_image_url)
+            video_id = create_agnes_task(fallback_prompt, num_frames, image_url=None)
         except ContentPolicyRejection:
             print("Sanitized-anchor fallback ALSO rejected - retrying once more with a fully generic, "
-                  "anchor-free prompt (tier 2, last resort before giving up on this shot)...")
+                  "anchor-free prompt AND no image anchor (tier 2, last resort before giving up on this shot)...")
             ultra_prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=2)
-            video_id = create_agnes_task(ultra_prompt, num_frames, image_url=anchor_image_url)
+            video_id = create_agnes_task(ultra_prompt, num_frames, image_url=None)
 
     video_url = poll_agnes_task(video_id)
     download_file(video_url, out_path)
