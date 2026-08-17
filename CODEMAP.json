@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 11,
+  "file_count": 12,
   "env_vars": [
     "EXPECTED_YOUTUBE_CHANNEL_TITLE",
     "FREELLM_API_KEY",
@@ -158,6 +158,93 @@
       ],
       "env_vars": [
         "X"
+      ],
+      "tables": []
+    },
+    {
+      "path": "scripts/health_check.py",
+      "functions": [
+        {
+          "name": "supabase_get",
+          "line": 59,
+          "args": [
+            "path"
+          ],
+          "calls": [
+            "get",
+            "json",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "hours_since",
+          "line": 65,
+          "args": [
+            "iso_timestamp"
+          ],
+          "calls": [
+            "fromisoformat",
+            "now",
+            "replace",
+            "total_seconds"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "check_stale_scripts",
+          "line": 70,
+          "args": [],
+          "calls": [
+            "hours_since",
+            "supabase_get"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "check_stuck_scripts",
+          "line": 85,
+          "args": [],
+          "calls": [
+            "append",
+            "get",
+            "hours_since",
+            "join",
+            "len",
+            "supabase_get"
+          ],
+          "docstring": "No updated_at column exists on `scripts`, so 'stuck' is approximated"
+        },
+        {
+          "name": "check_generation_failed_backlog",
+          "line": 116,
+          "args": [],
+          "calls": [
+            "len",
+            "supabase_get"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 129,
+          "args": [],
+          "calls": [
+            "append",
+            "check",
+            "exit",
+            "isoformat",
+            "join",
+            "now",
+            "print",
+            "startswith"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
       ],
       "tables": []
     },
