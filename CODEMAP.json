@@ -9,7 +9,6 @@
     "FREELLM_API_URL",
     "FREESOUND_API_KEY",
     "GEMINI_API_KEY",
-    "GROQ_API_KEY",
     "HF_TOKEN",
     "SUPABASE_SECRET_KEY",
     "SUPABASE_URL",
@@ -404,34 +403,8 @@
       "path": "scripts/script_writing.py",
       "functions": [
         {
-          "name": "_parse_ratio",
-          "line": 348,
-          "args": [
-            "remaining_str",
-            "limit_str"
-          ],
-          "calls": [
-            "float"
-          ],
-          "docstring": ""
-        },
-        {
-          "name": "_parse_reset_seconds",
-          "line": 359,
-          "args": [
-            "reset_str"
-          ],
-          "calls": [
-            "float",
-            "group",
-            "match",
-            "strip"
-          ],
-          "docstring": "FALSE-POSITIVE DAILY-QUOTA ABORT FIX (2026-08-17, later; extended"
-        },
-        {
           "name": "retryable_request",
-          "line": 388,
+          "line": 324,
           "args": [
             "method",
             "url",
@@ -450,7 +423,7 @@
         },
         {
           "name": "get_pending_topics",
-          "line": 415,
+          "line": 351,
           "args": [
             "limit"
           ],
@@ -462,32 +435,29 @@
         },
         {
           "name": "call_llm",
-          "line": 433,
+          "line": 369,
           "args": [
             "prompt"
           ],
           "calls": [
+            "DailyQuotaExhausted",
             "RuntimeError",
-            "SuspectedDailyQuotaExhausted",
-            "_parse_ratio",
-            "_parse_reset_seconds",
-            "append",
             "dumps",
             "encode",
             "get",
             "json",
-            "max",
+            "lower",
             "post",
             "print",
             "raise_for_status",
             "range",
             "sleep"
           ],
-          "docstring": "PROVIDER SWITCH (2026-08-15): Groq only, using llama-3.3-70b-versatile."
+          "docstring": "PROVIDER SWITCH (2026-08-17): Groq replaced with Gemini"
         },
         {
           "name": "sanitize_json_control_chars",
-          "line": 566,
+          "line": 461,
           "args": [
             "text"
           ],
@@ -500,7 +470,7 @@
         },
         {
           "name": "extract_json",
-          "line": 601,
+          "line": 496,
           "args": [
             "raw_text"
           ],
@@ -519,7 +489,7 @@
         },
         {
           "name": "narration_has_engagement_cta",
-          "line": 630,
+          "line": 525,
           "args": [
             "narration_text"
           ],
@@ -531,7 +501,7 @@
         },
         {
           "name": "build_narration_prompt",
-          "line": 641,
+          "line": 536,
           "args": [
             "title",
             "angle"
@@ -541,7 +511,7 @@
         },
         {
           "name": "build_narration_continuation_prompt",
-          "line": 712,
+          "line": 607,
           "args": [
             "title",
             "angle",
@@ -553,7 +523,7 @@
         },
         {
           "name": "generate_narration",
-          "line": 743,
+          "line": 638,
           "args": [
             "title",
             "angle"
@@ -578,7 +548,7 @@
         },
         {
           "name": "split_narration_into_chunks",
-          "line": 845,
+          "line": 740,
           "args": [
             "narration_text",
             "num_chunks"
@@ -595,7 +565,7 @@
         },
         {
           "name": "normalize_shot",
-          "line": 875,
+          "line": 770,
           "args": [
             "shot",
             "index"
@@ -608,7 +578,7 @@
         },
         {
           "name": "normalize_hook_text",
-          "line": 902,
+          "line": 797,
           "args": [
             "result"
           ],
@@ -623,7 +593,7 @@
         },
         {
           "name": "hook_text_matches_prompt_example",
-          "line": 918,
+          "line": 813,
           "args": [
             "hook_text"
           ],
@@ -637,7 +607,7 @@
         },
         {
           "name": "hook_text_too_long_to_glance",
-          "line": 925,
+          "line": 820,
           "args": [
             "hook_text"
           ],
@@ -649,7 +619,7 @@
         },
         {
           "name": "hook_text_matches_story",
-          "line": 930,
+          "line": 825,
           "args": [
             "hook_text",
             "narration_text"
@@ -665,7 +635,7 @@
         },
         {
           "name": "find_duplicate_shots",
-          "line": 944,
+          "line": 839,
           "args": [
             "normalized_shots"
           ],
@@ -679,7 +649,7 @@
         },
         {
           "name": "find_empty_shots",
-          "line": 956,
+          "line": 851,
           "args": [
             "normalized_shots"
           ],
@@ -691,7 +661,7 @@
         },
         {
           "name": "find_continuation_language_shots",
-          "line": 963,
+          "line": 858,
           "args": [
             "normalized_shots"
           ],
@@ -704,7 +674,7 @@
         },
         {
           "name": "find_loitering_shots",
-          "line": 974,
+          "line": 869,
           "args": [
             "normalized_shots"
           ],
@@ -717,7 +687,7 @@
         },
         {
           "name": "find_missing_onscreen_text_shots",
-          "line": 985,
+          "line": 880,
           "args": [
             "normalized_shots"
           ],
@@ -731,7 +701,7 @@
         },
         {
           "name": "find_dominant_subject",
-          "line": 994,
+          "line": 889,
           "args": [
             "normalized_shots"
           ],
@@ -745,7 +715,7 @@
         },
         {
           "name": "find_excessive_consecutive_subject",
-          "line": 1007,
+          "line": 902,
           "args": [
             "normalized_shots"
           ],
@@ -757,7 +727,7 @@
         },
         {
           "name": "validate_and_normalize_shot_response",
-          "line": 1022,
+          "line": 917,
           "args": [
             "result",
             "narration_text"
@@ -788,7 +758,7 @@
         },
         {
           "name": "build_shot_breakdown_chunk_prompt",
-          "line": 1282,
+          "line": 1177,
           "args": [
             "title",
             "angle",
@@ -810,7 +780,7 @@
         },
         {
           "name": "generate_shot_breakdown",
-          "line": 1437,
+          "line": 1332,
           "args": [
             "title",
             "angle",
@@ -837,7 +807,7 @@
         },
         {
           "name": "generate_script",
-          "line": 1565,
+          "line": 1460,
           "args": [
             "title",
             "angle"
@@ -850,7 +820,7 @@
         },
         {
           "name": "save_script",
-          "line": 1575,
+          "line": 1470,
           "args": [
             "topic_id",
             "narration_text",
@@ -867,7 +837,7 @@
         },
         {
           "name": "mark_topic_scripted",
-          "line": 1594,
+          "line": 1489,
           "args": [
             "topic_id"
           ],
@@ -878,7 +848,7 @@
         },
         {
           "name": "mark_topic_generation_failed",
-          "line": 1604,
+          "line": 1499,
           "args": [
             "topic_id",
             "reason"
@@ -892,7 +862,7 @@
         },
         {
           "name": "main",
-          "line": 1618,
+          "line": 1513,
           "args": [],
           "calls": [
             "generate_script",
@@ -907,7 +877,7 @@
         },
         {
           "name": "_simplify",
-          "line": 919,
+          "line": 814,
           "args": [
             "s"
           ],
@@ -920,7 +890,7 @@
         }
       ],
       "env_vars": [
-        "GROQ_API_KEY",
+        "GEMINI_API_KEY",
         "SUPABASE_SECRET_KEY",
         "SUPABASE_URL"
       ],
