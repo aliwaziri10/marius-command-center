@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 12,
+  "file_count": 13,
   "env_vars": [
     "EXPECTED_YOUTUBE_CHANNEL_TITLE",
     "FREELLM_API_KEY",
@@ -309,6 +309,12 @@
         "SUPABASE_SECRET_KEY",
         "SUPABASE_URL"
       ],
+      "tables": []
+    },
+    {
+      "path": "scripts/llm_client.py",
+      "functions": [],
+      "env_vars": [],
       "tables": []
     },
     {
