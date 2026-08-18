@@ -44,6 +44,21 @@ MAX_SENTENCE_TTS_ATTEMPTS = 3
 # script per run wastes the tighter cron if more than one is pending.
 MAX_SCRIPTS_PER_RUN = 1
 
+# STORAGE 413 FIX (2026-08-18): confirmed live against a real failed run -
+# "ba5d96c8" (31 shots, 15,606-char narration, 119 real sentences) synthesized
+# successfully but failed on upload with a real Supabase Storage 413 Payload
+# Too Large. Root cause: combined_audio was exported as uncompressed WAV
+# (format="wav"), which for a full-length episode easily clears the
+# project's storage size ceiling. video_generation.py already branches on
+# file extension when downloading narration_url (.mp3 vs .wav), so switching
+# the export to MP3 needs no downstream change - it only shrinks the
+# uploaded file (roughly 8-10x smaller than the equivalent WAV) so it clears
+# the limit. MP3 export requires libmp3lame, which ships with the ffmpeg apt
+# package already installed by narration.yml's "Install ffmpeg" step.
+NARRATION_EXPORT_FORMAT = "mp3"
+NARRATION_FILE_EXTENSION = "mp3"
+NARRATION_CONTENT_TYPE = "audio/mpeg"
+
 
 def split_into_segments(narration_text):
     """Splits narration into one segment per SENTENCE, so a pause gets
@@ -231,15 +246,20 @@ def narrate_one_script(supabase, script):
 
         combined_audio = pydub_normalize(combined_audio)
 
-        output_filename = f"narration_{script_id}.wav"
-        combined_audio.export(output_filename, format="wav")
+        # STORAGE 413 FIX (2026-08-18): was format="wav" (uncompressed) -
+        # confirmed via a real failed production run that this clears
+        # Supabase Storage's size ceiling on any full-length episode.
+        # MP3 export needs no downstream change: video_generation.py
+        # already branches on narration_url's file extension.
+        output_filename = f"narration_{script_id}.{NARRATION_FILE_EXTENSION}"
+        combined_audio.export(output_filename, format=NARRATION_EXPORT_FORMAT, bitrate="128k")
         print(f"Audio written to {output_filename}")
 
         with open(output_filename, "rb") as f:
             supabase.storage.from_("narration").upload(
                 output_filename,
                 f,
-                {"content-type": "audio/wav", "upsert": "true"}
+                {"content-type": NARRATION_CONTENT_TYPE, "upsert": "true"}
             )
         public_url = supabase.storage.from_("narration").get_public_url(output_filename)
         print(f"Uploaded. Public URL: {public_url}")
