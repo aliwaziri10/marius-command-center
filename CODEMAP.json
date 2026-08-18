@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 15,
+  "file_count": 16,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -1005,6 +1005,39 @@
         }
       ],
       "env_vars": [],
+      "tables": []
+    },
+    {
+      "path": "scripts/stall_monitor.py",
+      "functions": [
+        {
+          "name": "main",
+          "line": 17,
+          "args": [],
+          "calls": [
+            "append",
+            "create_client",
+            "eq",
+            "execute",
+            "exit",
+            "fromisoformat",
+            "get",
+            "len",
+            "now",
+            "print",
+            "replace",
+            "round",
+            "select",
+            "table",
+            "total_seconds"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
       "tables": []
     },
     {
