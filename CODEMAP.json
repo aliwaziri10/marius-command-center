@@ -404,7 +404,7 @@
       "functions": [
         {
           "name": "split_into_segments",
-          "line": 48,
+          "line": 63,
           "args": [
             "narration_text"
           ],
@@ -416,7 +416,7 @@
         },
         {
           "name": "_max_plausible_duration",
-          "line": 59,
+          "line": 74,
           "args": [
             "text"
           ],
@@ -429,7 +429,7 @@
         },
         {
           "name": "_synthesize_edge",
-          "line": 64,
+          "line": 79,
           "args": [
             "text",
             "out_path"
@@ -442,7 +442,7 @@
         },
         {
           "name": "synthesize_sentence",
-          "line": 69,
+          "line": 84,
           "args": [
             "text",
             "tmp_path"
@@ -461,7 +461,7 @@
         },
         {
           "name": "synthesize_with_pauses",
-          "line": 102,
+          "line": 117,
           "args": [
             "narration_text"
           ],
@@ -478,7 +478,7 @@
         },
         {
           "name": "_assign_shots_to_sentences",
-          "line": 120,
+          "line": 135,
           "args": [
             "sentences",
             "shot_list"
@@ -497,7 +497,7 @@
         },
         {
           "name": "synthesize_per_sentence_with_shot_durations",
-          "line": 168,
+          "line": 183,
           "args": [
             "narration_text",
             "shot_list"
@@ -519,7 +519,7 @@
         },
         {
           "name": "narrate_one_script",
-          "line": 212,
+          "line": 227,
           "args": [
             "supabase",
             "script"
@@ -547,7 +547,7 @@
         },
         {
           "name": "main",
-          "line": 262,
+          "line": 282,
           "args": [],
           "calls": [
             "create_client",
