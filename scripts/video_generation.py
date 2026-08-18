@@ -176,8 +176,9 @@ on direct feedback after watching a finished "Erased" upload:
    scenes and to push back against Agnes's tendency toward a flat,
    desaturated, synthetic-looking default grade.
 
-CHARACTER-CONSISTENCY / SHOT-CONTINUITY FIX (2026-07-31): direct feedback
-after watching another upload flagged three related problems: characters
+CHARACTER-CONSISTENCY / SHOT-CONTINUITY FIX (2026-07-31, PARTIALLY REVERTED
+2026-08-18 - see CONTINUITY-CHAIN REMOVED below): direct feedback after
+watching another upload flagged three related problems: characters
 changing appearance between shots (e.g. an old mother appearing out of
 nowhere), no visual continuity of motion/framing between consecutive shots,
 and occasional visual/content mismatches. Root cause: every shot was being
@@ -293,6 +294,30 @@ on every single invocation since whenever this line landed. No logic
 changed, purely a whitespace fix. Verified the corrected version compiles
 before pushing, per the mandatory debugging methodology in
 DEBUGGING_METHODOLOGY.md.
+
+CONTINUITY-CHAIN REMOVED (2026-08-18): direct feedback from Zia after
+watching the first two uploads produced under the fixed pipeline - scenes
+were not ending cleanly; a subject (e.g. a girl walking) would visibly
+morph/deform mid-transition into the next shot instead of cutting. Root
+cause: process_script was calling get_continuity_anchor()/chaining every
+shot's last frame into the NEXT shot's image-to-video input (the
+2026-07-31 fix above). Agnes has to "unfreeze" from that static anchor
+frame into new motion at the start of every shot, so scene transitions
+never land as a clean hard cut - they resolve through a brief
+morph/deform period instead. Zia confirmed character continuity across
+shots was never an actual requirement. Cross-shot chaining is now fully
+disabled: anchor_image_url is always None going into the per-shot
+generation loop, and the previous shot's last-frame extraction/carry-
+forward after each shot was removed. get_continuity_anchor(),
+extract_last_frame_url(), and generate_character_reference() are left
+defined but unused/dormant (not deleted), in case a future single-
+protagonist format wants chaining back. This does NOT touch the
+SEPARATE intra-shot chain-extension mechanism (MAX_CHAIN_SEGMENTS,
+_generate_one_segment's own internal chaining to cover one shot's
+overflow past MAX_CLIP_SECONDS, or the outro TRAIL_SECONDS chain in
+assemble_final_video) - those anchor a shot's own continuation segments
+to themselves, not to a different, unrelated next shot, so they don't
+produce the same identity-morph artifact and Zia did not flag them.
 """
 
 import os
@@ -615,6 +640,11 @@ def generate_character_reference(script):
     text to anchor to, or if Agnes's image endpoint fails after retries -
     the pipeline still works without it, just without the consistency
     boost.
+
+    DORMANT since 2026-08-18 (see CONTINUITY-CHAIN REMOVED in the file
+    header) - no longer called from process_script's per-shot loop. Left
+    defined in case cross-shot chaining is wanted back for a future
+    single-protagonist format.
     """
     script_id = script["id"]
     existing = script.get("character_reference_url")
@@ -715,6 +745,11 @@ def extract_last_frame_url(script_id, shot_index, local_video_path):
     soft (returns None) on any error, same fail-soft pattern as
     music/SFX/captions elsewhere in this file - continuity is a quality
     improvement, not something that should ever crash a run.
+
+    DORMANT since 2026-08-18 (see CONTINUITY-CHAIN REMOVED in the file
+    header) - no longer called from process_script's per-shot loop. Left
+    defined in case cross-shot chaining is wanted back for a future
+    single-protagonist format.
     """
     try:
         clip = VideoFileClip(local_video_path)
@@ -739,6 +774,11 @@ def get_continuity_anchor(script, video_urls):
       continuity survive across resumed runs, not just within one run)
     - otherwise falls back to the script's character reference image
       (generating it if it doesn't exist yet)
+
+    DORMANT since 2026-08-18 (see CONTINUITY-CHAIN REMOVED in the file
+    header) - no longer called from process_script's per-shot loop. Left
+    defined in case cross-shot chaining is wanted back for a future
+    single-protagonist format.
     """
     if video_urls:
         try:
@@ -919,14 +959,16 @@ def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="
     before. Any remaining duration is covered by chaining up to
     MAX_CHAIN_SEGMENTS additional REAL Agnes clips, each anchored to the
     literal last frame of the previous segment (identical mechanism to
-    cross-shot continuity) - so the shot keeps moving smoothly through
-    the overflow instead of freezing. Only if Agnes fails mid-chain after
-    retries does this fall back to a freeze-hold for whatever duration is
-    still missing, so a flaky API call still can't crash the run.
+    cross-shot continuity, but entirely INTRA-shot - not affected by the
+    2026-08-18 cross-shot chain removal above) - so the shot keeps moving
+    smoothly through the overflow instead of freezing. Only if Agnes fails
+    mid-chain after retries does this fall back to a freeze-hold for
+    whatever duration is still missing, so a flaky API call still can't
+    crash the run.
 
-    anchor_image_url: the starting frame for the FIRST segment only -
-    either the episode's character reference (shot 0) or the previous
-    shot's own last frame (every shot after that).
+    anchor_image_url: the starting frame for the FIRST segment only.
+    Always None as of 2026-08-18 (cross-shot chaining removed) - kept as a
+    parameter in case a caller wants to pass one explicitly in the future.
     """
     capped_duration = min(target_duration, MAX_CLIP_SECONDS)
     _generate_one_segment(shot, capped_duration, out_path, setting_and_characters, anchor_image_url=anchor_image_url)
@@ -1415,7 +1457,9 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
             # for the trail, guaranteeing every single video ended on a
             # frozen frame. Now chain-extends with real continuation
             # footage anchored to this clip's own last frame, same as
-            # mid-shot overflow handling.
+            # mid-shot overflow handling. This trail anchor is INTRA-shot
+            # (this clip continuing itself), not cross-shot, so it is not
+            # affected by the 2026-08-18 cross-shot chain removal above.
             clip = VideoFileClip(raw_path)
             clip = clip.resized(new_size=(WIDTH, HEIGHT))
             if clip.duration < shot_durations[i]:
@@ -1603,11 +1647,19 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
         batch_end = min(next_index + shot_limit, total_shots)
         print(f"Resuming from shot {next_index + 1}/{total_shots} ({len(video_urls)} already done) - generating up to shot {batch_end} this run (budget this call: {shot_limit})")
 
-        anchor_image_url = get_continuity_anchor(script, video_urls)
-        if anchor_image_url:
-            print(f"Using continuity anchor image for shot {next_index + 1}: {anchor_image_url}")
-        else:
-            print(f"No continuity anchor available for shot {next_index + 1} - generating blind (text-to-video only) for this shot.")
+        # CONTINUITY-CHAIN REMOVED (2026-08-18): was calling
+        # get_continuity_anchor()/chaining each shot's last frame into the
+        # next shot's image-to-video input. Root-caused as the source of
+        # the mid-scene "morph" artifact Zia reported (a girl walking
+        # suddenly deforming into another shape) - Agnes has to unfreeze
+        # from a static anchor frame into new motion at every cut, so
+        # scene transitions never land as clean hard cuts. Character
+        # continuity across shots was never a requirement, so every shot
+        # now generates independently from text only. get_continuity_anchor(),
+        # extract_last_frame_url(), and generate_character_reference() are
+        # left defined but unused/dormant, same as Nova, in case a future
+        # single-protagonist format wants chaining back.
+        anchor_image_url = None
 
         for i in range(next_index, batch_end):
             shot = shot_list[i]
@@ -1638,11 +1690,6 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
             save_progress(script_id, video_urls, i + 1)
             shots_used += 1
             print(f"Saved progress: {i + 1}/{total_shots} shots done")
-
-            # Chain the NEXT shot's anchor to THIS shot's own last frame,
-            # extracted from the clip we just generated, before it's removed.
-            next_anchor = extract_last_frame_url(script_id, i, raw_path)
-            anchor_image_url = next_anchor or anchor_image_url
 
             os.remove(raw_path)
             time.sleep(4)
