@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 13,
+  "file_count": 14,
   "env_vars": [
     "EXPECTED_YOUTUBE_CHANNEL_TITLE",
     "FREELLM_API_KEY",
@@ -564,6 +564,72 @@
         "SUPABASE_SECRET_KEY",
         "SUPABASE_URL"
       ],
+      "tables": []
+    },
+    {
+      "path": "scripts/narration_stage.py",
+      "functions": [
+        {
+          "name": "narration_has_engagement_cta",
+          "line": 34,
+          "args": [
+            "narration_text"
+          ],
+          "calls": [
+            "any",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_narration_prompt",
+          "line": 41,
+          "args": [
+            "title",
+            "angle"
+          ],
+          "calls": [],
+          "docstring": ""
+        },
+        {
+          "name": "build_narration_continuation_prompt",
+          "line": 122,
+          "args": [
+            "title",
+            "angle",
+            "so_far",
+            "words_so_far"
+          ],
+          "calls": [],
+          "docstring": ""
+        },
+        {
+          "name": "generate_narration",
+          "line": 153,
+          "args": [
+            "title",
+            "angle"
+          ],
+          "calls": [
+            "InfraFailure",
+            "RuntimeError",
+            "build_narration_continuation_prompt",
+            "build_narration_prompt",
+            "call_llm",
+            "extract_json",
+            "get",
+            "len",
+            "narration_has_engagement_cta",
+            "print",
+            "rstrip",
+            "sleep",
+            "split",
+            "strip"
+          ],
+          "docstring": "Stage 1: produce a narration that already clears the word-count and"
+        }
+      ],
+      "env_vars": [],
       "tables": []
     },
     {
