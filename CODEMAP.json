@@ -313,8 +313,86 @@
     },
     {
       "path": "scripts/llm_client.py",
-      "functions": [],
-      "env_vars": [],
+      "functions": [
+        {
+          "name": "retryable_request",
+          "line": 76,
+          "args": [
+            "method",
+            "url",
+            "max_retries"
+          ],
+          "calls": [
+            "RuntimeError",
+            "isinstance",
+            "print",
+            "raise_for_status",
+            "range",
+            "request",
+            "sleep"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "call_llm",
+          "line": 103,
+          "args": [
+            "prompt"
+          ],
+          "calls": [
+            "DailyQuotaExhausted",
+            "RuntimeError",
+            "dumps",
+            "encode",
+            "get",
+            "json",
+            "lower",
+            "post",
+            "print",
+            "raise_for_status",
+            "range",
+            "sleep"
+          ],
+          "docstring": "PROVIDER SWITCH (2026-08-17): Groq replaced with Gemini"
+        },
+        {
+          "name": "sanitize_json_control_chars",
+          "line": 198,
+          "args": [
+            "text"
+          ],
+          "calls": [
+            "append",
+            "join",
+            "ord"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "extract_json",
+          "line": 233,
+          "args": [
+            "raw_text"
+          ],
+          "calls": [
+            "ValueError",
+            "find",
+            "loads",
+            "rfind",
+            "sanitize_json_control_chars",
+            "split",
+            "startswith",
+            "str",
+            "strip"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "GEMINI_API_KEY",
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
       "tables": []
     },
     {
