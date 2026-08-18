@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 14,
+  "file_count": 15,
   "env_vars": [
     "EXPECTED_YOUTUBE_CHANNEL_TITLE",
     "FREELLM_API_KEY",
@@ -1131,6 +1131,285 @@
         "scripts",
         "topics"
       ]
+    },
+    {
+      "path": "scripts/shot_breakdown_stage.py",
+      "functions": [
+        {
+          "name": "split_narration_into_chunks",
+          "line": 85,
+          "args": [
+            "narration_text",
+            "num_chunks"
+          ],
+          "calls": [
+            "append",
+            "join",
+            "len",
+            "split",
+            "strip",
+            "sum"
+          ],
+          "docstring": "Splits narration into num_chunks pieces, breaking only at sentence"
+        },
+        {
+          "name": "normalize_shot",
+          "line": 115,
+          "args": [
+            "shot",
+            "index"
+          ],
+          "calls": [
+            "get",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "normalize_hook_text",
+          "line": 142,
+          "args": [
+            "result"
+          ],
+          "calls": [
+            "get",
+            "len",
+            "rsplit",
+            "rstrip",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "hook_text_matches_prompt_example",
+          "line": 158,
+          "args": [
+            "hook_text"
+          ],
+          "calls": [
+            "_simplify",
+            "isalnum",
+            "join",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "hook_text_too_long_to_glance",
+          "line": 165,
+          "args": [
+            "hook_text"
+          ],
+          "calls": [
+            "len",
+            "split"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "hook_text_matches_story",
+          "line": 170,
+          "args": [
+            "hook_text",
+            "narration_text"
+          ],
+          "calls": [
+            "any",
+            "len",
+            "lower",
+            "split",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_duplicate_shots",
+          "line": 184,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "Counter",
+            "items",
+            "lower",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_empty_shots",
+          "line": 196,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "enumerate",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_continuation_language_shots",
+          "line": 203,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "append",
+            "enumerate",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_loitering_shots",
+          "line": 214,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "append",
+            "enumerate",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_missing_onscreen_text_shots",
+          "line": 225,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "any",
+            "append",
+            "enumerate",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_dominant_subject",
+          "line": 234,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "Counter",
+            "len",
+            "lower",
+            "most_common"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_excessive_consecutive_subject",
+          "line": 247,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "enumerate",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "validate_and_normalize_shot_response",
+          "line": 262,
+          "args": [
+            "result",
+            "narration_text"
+          ],
+          "calls": [
+            "enumerate",
+            "find_continuation_language_shots",
+            "find_dominant_subject",
+            "find_duplicate_shots",
+            "find_empty_shots",
+            "find_excessive_consecutive_subject",
+            "find_loitering_shots",
+            "find_missing_onscreen_text_shots",
+            "get",
+            "hook_text_matches_prompt_example",
+            "hook_text_matches_story",
+            "hook_text_too_long_to_glance",
+            "isinstance",
+            "len",
+            "max",
+            "normalize_hook_text",
+            "normalize_shot",
+            "split",
+            "strip",
+            "sum"
+          ],
+          "docstring": "Validates everything EXCEPT narration_text/CTA, since those were"
+        },
+        {
+          "name": "build_shot_breakdown_chunk_prompt",
+          "line": 539,
+          "args": [
+            "title",
+            "angle",
+            "chunk_text",
+            "chunk_index",
+            "num_chunks",
+            "min_shots_chunk",
+            "max_shots_chunk",
+            "setting_and_characters",
+            "prior_last_subject",
+            "prior_last_movement"
+          ],
+          "calls": [
+            "append",
+            "format",
+            "join"
+          ],
+          "docstring": "Builds the prompt for ONE narration chunk's shot breakdown. The"
+        },
+        {
+          "name": "generate_shot_breakdown",
+          "line": 694,
+          "args": [
+            "title",
+            "angle",
+            "narration_text"
+          ],
+          "calls": [
+            "InfraFailure",
+            "RuntimeError",
+            "build_shot_breakdown_chunk_prompt",
+            "call_llm",
+            "enumerate",
+            "extend",
+            "extract_json",
+            "get",
+            "isinstance",
+            "len",
+            "print",
+            "sleep",
+            "split_narration_into_chunks",
+            "strip",
+            "validate_and_normalize_shot_response"
+          ],
+          "docstring": "CHUNKED (2026-08-15): splits narration into NUM_SHOT_CHUNKS pieces and"
+        },
+        {
+          "name": "_simplify",
+          "line": 159,
+          "args": [
+            "s"
+          ],
+          "calls": [
+            "isalnum",
+            "join",
+            "lower"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [],
+      "tables": []
     },
     {
       "path": "scripts/test_narration_edgetts.py",
