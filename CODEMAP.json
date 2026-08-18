@@ -1551,7 +1551,6 @@
     },
     {
       "path": "scripts/video_generation.py",
-      "parse_error": "unexpected indent (video_generation.py, line 834)",
       "functions": [],
       "env_vars": [],
       "tables": []
