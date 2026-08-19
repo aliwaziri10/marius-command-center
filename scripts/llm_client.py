@@ -10,9 +10,26 @@ no behavior change - every constant, function, and exception here is
 byte-for-byte the same logic as before, just relocated. See
 script_writing.py's module docstring for the full provider-switch history
 (Gemini -> Groq -> back to Gemini) that led to the current call_llm().
+
+MALFORMED-JSON REPAIR FIX (2026-08-19): a live run showed repeated
+"Expecting property name enclosed in double quotes" / "Expecting value"
+JSON parse failures at a range of small character offsets (691-4484 chars
+into the candidate) - too early in the response to be maxOutputTokens
+truncation (already fixed 2026-08-18, and truncation would fail near the
+END of a large candidate, not a few hundred/thousand chars in). This is
+genuine malformed JSON despite Gemini's native JSON mode being enabled -
+most commonly a trailing comma left before a closing } or ] by the model.
+extract_json() previously only had one repair path (control-character
+escaping) and re-raised immediately on any other JSONDecodeError, burning
+an entire content attempt (and the 25s wait before the next one) on an
+error a cheap regex could often just fix. Added _strip_trailing_commas()
+and a small ordered list of progressively-repaired candidates to try
+before giving up - each one is a no-op (and therefore harmless) if the
+original candidate didn't actually need that specific repair.
 """
 
 import os
+import re
 import json
 import time
 import requests
@@ -230,6 +247,16 @@ def sanitize_json_control_chars(text):
     return "".join(out)
 
 
+def _strip_trailing_commas(text):
+    """MALFORMED-JSON REPAIR FIX (2026-08-19): see module docstring.
+    Removes a comma that appears right before a closing } or ] (with only
+    whitespace between them) - the most common cause of "Expecting
+    property name enclosed in double quotes" / "Expecting value" parse
+    errors from LLM-generated JSON. Safe no-op on text that doesn't have
+    this problem."""
+    return re.sub(r",\s*([}\]])", r"\1", text)
+
+
 def extract_json(raw_text):
     if not raw_text:
         raise ValueError("Model returned empty/None content (likely a dropped or refused generation).")
@@ -251,9 +278,24 @@ def extract_json(raw_text):
         raise ValueError("No JSON object found in model output.")
 
     candidate = text[start:end + 1]
-    try:
-        return json.loads(candidate)
-    except json.JSONDecodeError as e:
-        if "Invalid control character" not in str(e):
-            raise
-        return json.loads(sanitize_json_control_chars(candidate))
+
+    # MALFORMED-JSON REPAIR FIX (2026-08-19): see module docstring. Try the
+    # raw candidate first (the common case - no repair needed), then
+    # progressively try each repair (control-char escaping, trailing-comma
+    # stripping, both combined) before giving up. Each attempt is cheap and
+    # a no-op if that specific problem isn't present, so this never risks
+    # corrupting a candidate that would have parsed fine on its own.
+    attempts = [
+        candidate,
+        sanitize_json_control_chars(candidate),
+        _strip_trailing_commas(candidate),
+        _strip_trailing_commas(sanitize_json_control_chars(candidate)),
+    ]
+    last_error = None
+    for attempt_text in attempts:
+        try:
+            return json.loads(attempt_text)
+        except json.JSONDecodeError as e:
+            last_error = e
+            continue
+    raise last_error
