@@ -11,21 +11,26 @@ byte-for-byte the same logic as before, just relocated. See
 script_writing.py's module docstring for the full provider-switch history
 (Gemini -> Groq -> back to Gemini) that led to the current call_llm().
 
-MALFORMED-JSON REPAIR FIX (2026-08-19): a live run showed repeated
-"Expecting property name enclosed in double quotes" / "Expecting value"
-JSON parse failures at a range of small character offsets (691-4484 chars
-into the candidate) - too early in the response to be maxOutputTokens
-truncation (already fixed 2026-08-18, and truncation would fail near the
-END of a large candidate, not a few hundred/thousand chars in). This is
-genuine malformed JSON despite Gemini's native JSON mode being enabled -
-most commonly a trailing comma left before a closing } or ] by the model.
-extract_json() previously only had one repair path (control-character
-escaping) and re-raised immediately on any other JSONDecodeError, burning
-an entire content attempt (and the 25s wait before the next one) on an
-error a cheap regex could often just fix. Added _strip_trailing_commas()
-and a small ordered list of progressively-repaired candidates to try
-before giving up - each one is a no-op (and therefore harmless) if the
-original candidate didn't actually need that specific repair.
+MALFORMED-JSON REPAIR FIX (2026-08-19) - HYPOTHESIS, NOT YET CONFIRMED:
+a live run showed repeated "Expecting property name enclosed in double
+quotes" / "Expecting value" JSON parse failures at a range of small
+character offsets (691-4484 chars into the candidate) - too early to be
+maxOutputTokens truncation (already fixed 2026-08-18; truncation fails
+near the END of a candidate, not a few hundred/thousand chars in). The
+LEADING THEORY is genuine malformed JSON despite Gemini's native JSON
+mode being enabled - most commonly a trailing comma before a closing }
+or ] - but per this repo's DEBUGGING_METHODOLOGY.md, that has NOT been
+proven: the actual raw failing response text was never captured/logged
+anywhere, so the trailing-comma theory could not be tested against real
+data, only reasoned about from the error offsets alone. Two things were
+done as a result: (1) added _strip_trailing_commas() as one candidate in
+extract_json()'s repair sequence - safe either way, since it's a no-op if
+the real cause turns out to be something else; (2) added diagnostic
+logging (see extract_json() below) so the NEXT parse failure captures
+which repair (if any) actually fixed it, or the raw text if none did -
+turning the next occurrence into real evidence instead of another guess.
+Do not treat the trailing-comma theory as confirmed until that log output
+is reviewed.
 """
 
 import os
@@ -248,16 +253,24 @@ def sanitize_json_control_chars(text):
 
 
 def _strip_trailing_commas(text):
-    """MALFORMED-JSON REPAIR FIX (2026-08-19): see module docstring.
-    Removes a comma that appears right before a closing } or ] (with only
-    whitespace between them) - the most common cause of "Expecting
-    property name enclosed in double quotes" / "Expecting value" parse
-    errors from LLM-generated JSON. Safe no-op on text that doesn't have
-    this problem."""
+    """MALFORMED-JSON REPAIR FIX (2026-08-19, hypothesis - see module
+    docstring). Removes a comma that appears right before a closing } or
+    ] (with only whitespace between them) - the most common cause of
+    "Expecting property name enclosed in double quotes" / "Expecting
+    value" parse errors from LLM-generated JSON, IF that turns out to be
+    the real cause here. Safe no-op on text that doesn't have this
+    problem."""
     return re.sub(r",\s*([}\]])", r"\1", text)
 
 
 def extract_json(raw_text):
+    """DIAGNOSTIC LOGGING ADDED (2026-08-19): see module docstring - the
+    trailing-comma repair below is an unconfirmed hypothesis, not a proven
+    fix. Every repair attempt is now logged so the NEXT parse failure (or
+    the next successful repair) leaves real evidence in the Actions log:
+    which candidate (if any) actually worked, or - if all four fail - a
+    preview of the real raw text, so the actual cause can be read directly
+    instead of guessed at again from an offset."""
     if not raw_text:
         raise ValueError("Model returned empty/None content (likely a dropped or refused generation).")
     text = raw_text.strip()
@@ -279,23 +292,26 @@ def extract_json(raw_text):
 
     candidate = text[start:end + 1]
 
-    # MALFORMED-JSON REPAIR FIX (2026-08-19): see module docstring. Try the
-    # raw candidate first (the common case - no repair needed), then
-    # progressively try each repair (control-char escaping, trailing-comma
-    # stripping, both combined) before giving up. Each attempt is cheap and
-    # a no-op if that specific problem isn't present, so this never risks
-    # corrupting a candidate that would have parsed fine on its own.
     attempts = [
-        candidate,
-        sanitize_json_control_chars(candidate),
-        _strip_trailing_commas(candidate),
-        _strip_trailing_commas(sanitize_json_control_chars(candidate)),
+        ("raw", candidate),
+        ("control-char-escaped", sanitize_json_control_chars(candidate)),
+        ("trailing-comma-stripped", _strip_trailing_commas(candidate)),
+        ("control-char-escaped + trailing-comma-stripped", _strip_trailing_commas(sanitize_json_control_chars(candidate))),
     ]
     last_error = None
-    for attempt_text in attempts:
+    for label, attempt_text in attempts:
         try:
-            return json.loads(attempt_text)
+            parsed = json.loads(attempt_text)
+            if label != "raw":
+                # PROOF POINT: this line firing is what confirms (or, for a
+                # different label than trailing-comma, refutes) the
+                # 2026-08-19 hypothesis above - check this log before
+                # treating that theory as settled.
+                print(f"[extract_json] raw candidate failed to parse; repair '{label}' fixed it.")
+            return parsed
         except json.JSONDecodeError as e:
             last_error = e
             continue
+
+    print(f"[extract_json] all repair attempts failed ({last_error}). Raw candidate (first 1500 chars): {candidate[:1500]!r}")
     raise last_error
