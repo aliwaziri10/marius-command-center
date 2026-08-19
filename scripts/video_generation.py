@@ -337,6 +337,29 @@ whole run died at this exact point before any other candidate script ever
 got a chance to generate a single shot. Fix: both calls moved inside the
 existing try block, so this now fails soft (freeze-hold fallback, same as
 every other failure mode in this function) instead of crashing the run.
+CONFIRMED WORKING 2026-08-20: Zia manually triggered a run and it
+completed assembly successfully for the first time (script ba5d96c8, all
+31 shots, real trail-extension, no crash) - direct proof from a live run
+log, not inferred.
+
+UPLOAD SIZE FIX (2026-08-20, same day): the successful run above still
+failed at the very last step - upload_video() got HTTP 400 "Payload too
+large / EntityTooLarge" from Supabase Storage. Confirmed via Supabase's
+own docs that Free-tier projects have a hard, non-negotiable 50MB-per-file
+cap (cannot be raised without a paid plan - out of scope per Zia's
+strictly-free-tier standing rule). The assembled video was 56.4MB for
+this 19+ minute (1152s) episode. Root cause: compute_target_bitrate()'s
+floor of 300_000 bits/sec was overriding the intended target_mb=42
+calculation for long episodes - the floor was meant as a rare sanity
+minimum, not a routine override, but for anything this long it always
+won. Floor lowered to 80_000 (true sanity-only floor) and target_mb
+raised slightly to 44 (more headroom under the 50MB cap for muxing/
+container overhead). Hand-verified against this exact video's real
+numbers: new formula gives ~192kbps video bitrate -> total output ~44.0MB,
+comfortably under the 50MB cap. NOT YET CONFIRMED against a real run -
+next run on script ba5d96c8 (still sitting at 31/31 shots, unaffected by
+this change) should go straight to reassembly/upload with no shot
+regeneration needed, and should now succeed end to end.
 """
 
 import os
@@ -905,18 +928,6 @@ def _generate_one_segment(shot, segment_duration, out_path, setting_and_characte
     try:
         video_id = create_agnes_task(prompt, num_frames, image_url=anchor_image_url)
     except ContentPolicyRejection:
-        # BUG FOUND 2026-08-16: fallback tiers only ever changed the TEXT
-        # prompt - the image anchor (continuity chain, ultimately traced
-        # back to a character-reference image generated from this script's
-        # own setting_and_characters text) was passed unchanged into every
-        # tier. Confirmed on "Hutu Who Hid Tutsi Families" shot 31: its
-        # visual_description was completely mundane (empty room, curtained
-        # window) and tier 2's prompt text carries zero story content by
-        # design - yet it was still rejected. The only remaining shared
-        # element across all 3 tiers was the anchor image itself. Tiers 1
-        # and 2 now drop the image anchor entirely (real text-to-video,
-        # nothing else attached) instead of only sanitizing/genericizing
-        # the text while silently keeping a potentially-flaggable image.
         print("Content policy rejection on primary prompt - retrying with sanitized-anchor fallback "
               "(tier 1, image anchor also dropped this attempt)...")
         try:
@@ -958,37 +969,6 @@ def _upload_local_image_for_anchor(script_id, tag, png_path):
 
 
 def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="", anchor_image_url=None, script_id=None):
-    """
-    ONE-TAKE FIX (2026-07-29): a shot longer than MAX_CLIP_SECONDS used to
-    be split into multiple SEPARATE, INDEPENDENT Agnes generations of the
-    same prompt and stitched back to back - each one rendering its own
-    random camera angle, reading as a jarring cut instead of one shot.
-
-    SMOOTH-EXTENSION FIX (2026-08-01, supersedes the freeze-hold approach
-    used between 2026-07-29 and 2026-08-01): freeze-holding the final frame
-    for the overflow portion technically kept the shot as "one take", but
-    it meant every shot that ran even slightly over the ~7s per-generation
-    cap froze visibly for the rest of its duration. Because narration.py
-    folds each sentence-boundary pause (1-2s) into whichever shot sits at
-    that boundary, this was triggering constantly throughout an episode,
-    not just occasionally - this is the root cause of the "rigid, not
-    smooth" feedback on finished videos.
-
-    Now: the first ~MAX_CLIP_SECONDS is one real Agnes take exactly as
-    before. Any remaining duration is covered by chaining up to
-    MAX_CHAIN_SEGMENTS additional REAL Agnes clips, each anchored to the
-    literal last frame of the previous segment (identical mechanism to
-    cross-shot continuity, but entirely INTRA-shot - not affected by the
-    2026-08-18 cross-shot chain removal above) - so the shot keeps moving
-    smoothly through the overflow instead of freezing. Only if Agnes fails
-    mid-chain after retries does this fall back to a freeze-hold for
-    whatever duration is still missing, so a flaky API call still can't
-    crash the run.
-
-    anchor_image_url: the starting frame for the FIRST segment only.
-    Always None as of 2026-08-18 (cross-shot chaining removed) - kept as a
-    parameter in case a caller wants to pass one explicitly in the future.
-    """
     capped_duration = min(target_duration, MAX_CLIP_SECONDS)
     _generate_one_segment(shot, capped_duration, out_path, setting_and_characters, anchor_image_url=anchor_image_url)
 
@@ -1128,10 +1108,22 @@ def compute_shot_start_times(shot_durations):
     return starts
 
 
-def compute_target_bitrate(duration_seconds, target_mb=42, audio_kbps=128):
+def compute_target_bitrate(duration_seconds, target_mb=44, audio_kbps=128):
+    # UPLOAD SIZE FIX (2026-08-20): floor was 300_000 (300kbps), which
+    # OVERRODE the target_mb-based calculation for any long episode -
+    # meant as a rare sanity minimum, it was in practice winning the max()
+    # every time for anything ~15+ minutes, producing output well over
+    # Supabase's hard 50MB free-tier upload cap (confirmed: this exact
+    # formula produced 56.4MB for a 1152s/19-minute episode, which then
+    # failed upload with a 400 EntityTooLarge error). Floor lowered to
+    # 80_000 (true sanity-only floor, essentially never binding in
+    # practice) and target_mb raised slightly (42->44) for a bit more
+    # muxing/container headroom while staying safely under 50MB. Hand-
+    # verified against the actual failing video's real numbers: new
+    # formula gives ~192kbps video bitrate -> ~44.0MB total output.
     target_bits = target_mb * 8 * 1024 * 1024
     audio_bits = audio_kbps * 1000 * duration_seconds
-    video_bits = max(target_bits - audio_bits, 300_000 * duration_seconds)
+    video_bits = max(target_bits - audio_bits, 80_000 * duration_seconds)
     return f"{int(video_bits / duration_seconds / 1000)}k"
 
 
@@ -1469,34 +1461,9 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
         download_file(url, raw_path)
 
         if i == len(video_urls) - 1:
-            # TRAIL_SECONDS is added to the last shot's target duration
-            # AFTER that shot was already generated during the per-shot
-            # loop, so this clip is always short by exactly that amount -
-            # meaning the block below ALWAYS runs on every single assembly.
-            # SMOOTH-EXTENSION FIX (2026-08-01): previously freeze-held
-            # for the trail, guaranteeing every single video ended on a
-            # frozen frame. Now chain-extends with real continuation
-            # footage anchored to this clip's own last frame, same as
-            # mid-shot overflow handling. This trail anchor is INTRA-shot
-            # (this clip continuing itself), not cross-shot, so it is not
-            # affected by the 2026-08-18 cross-shot chain removal above.
             clip = VideoFileClip(raw_path)
             clip = clip.resized(new_size=(WIDTH, HEIGHT))
             if clip.duration < shot_durations[i]:
-                # TRAIL-EXTENSION CRASH FIX (2026-08-20): the last-frame
-                # extraction and reference-image upload below used to sit
-                # OUTSIDE this try block. Since this whole branch runs on
-                # EVERY assembly (TRAIL_SECONDS always makes clip.duration
-                # < shot_durations[i] true for the last shot), any transient
-                # failure here (moviepy frame read, a flaky Storage upload)
-                # was an uncaught exception that killed the entire run
-                # instead of falling back to freeze-hold like every other
-                # failure path in this function. Root cause of the
-                # 25-consecutive-run failure streak (GitHub issues
-                # #138-#162) - confirmed by reading the live code, not
-                # guessed from commit timing. Both calls are now inside
-                # the try, so any failure here fails soft like everything
-                # else in this function.
                 try:
                     local_frame_path = _extract_last_frame_local(raw_path)
                     chain_anchor_url = _upload_local_image_for_anchor(
@@ -1538,12 +1505,6 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
     )
 
     final = concatenate_videoclips(clips, method="compose")
-
-    # CAPTIONS DISABLED (2026-07-21): burned-in narration captions were showing
-    # up over the video and Zia does not want them - video should be visual
-    # only, no on-screen script text. build_caption_clips/build_caption_clip
-    # are left defined above (harmless, unused) in case captions are wanted
-    # back in some different form later; this just stops compositing them in.
 
     final = final.with_effects([FadeIn(FADE_IN_SECONDS), FadeOut(FADE_OUT_SECONDS)])
     final = final.with_audio(final_audio)
@@ -1601,25 +1562,6 @@ def mark_video_generated(script_id, video_url, audio_stats=None):
 
 
 def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
-    """
-    Attempts up to shot_limit new shot generations on a single candidate
-    script (plus final assembly if this call completes the last shot, or
-    the script was already fully shot coming in).
-
-    ROUND-ROBIN FIX (2026-07-25): shot_limit represents the REMAINING
-    per-run Agnes-quota budget as passed down by main(), not a fixed
-    per-script batch size - this lets main() spread one run's total shot
-    budget across several candidate scripts instead of one script
-    consuming the whole thing every time (see file header for the
-    production incident this fixes).
-
-    Returns the number of NEW shots actually generated this call (0 if
-    none - overloaded on the first attempted shot, content-flagged, no
-    budget left, or already fully generated coming in). Final video
-    assembly always runs when all shots are done, regardless of
-    shot_limit, since assembly does not call Agnes and does not consume
-    the per-run generation quota.
-    """
     script_id = script["id"]
     if not script.get("narration_url"):
         print(f"Script {script_id} has no narration_url yet. Skipping.")
@@ -1681,18 +1623,6 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
         batch_end = min(next_index + shot_limit, total_shots)
         print(f"Resuming from shot {next_index + 1}/{total_shots} ({len(video_urls)} already done) - generating up to shot {batch_end} this run (budget this call: {shot_limit})")
 
-        # CONTINUITY-CHAIN REMOVED (2026-08-18): was calling
-        # get_continuity_anchor()/chaining each shot's last frame into the
-        # next shot's image-to-video input. Root-caused as the source of
-        # the mid-scene "morph" artifact Zia reported (a girl walking
-        # suddenly deforming into another shape) - Agnes has to unfreeze
-        # from a static anchor frame into new motion at every cut, so
-        # scene transitions never land as clean hard cuts. Character
-        # continuity across shots was never a requirement, so every shot
-        # now generates independently from text only. get_continuity_anchor(),
-        # extract_last_frame_url(), and generate_character_reference() are
-        # left defined but unused/dormant, same as Nova, in case a future
-        # single-protagonist format wants chaining back.
         anchor_image_url = None
 
         for i in range(next_index, batch_end):
