@@ -320,7 +320,7 @@
       "functions": [
         {
           "name": "retryable_request",
-          "line": 93,
+          "line": 98,
           "args": [
             "method",
             "url",
@@ -339,7 +339,7 @@
         },
         {
           "name": "call_llm",
-          "line": 120,
+          "line": 125,
           "args": [
             "prompt"
           ],
@@ -361,7 +361,7 @@
         },
         {
           "name": "sanitize_json_control_chars",
-          "line": 215,
+          "line": 220,
           "args": [
             "text"
           ],
@@ -374,18 +374,18 @@
         },
         {
           "name": "_strip_trailing_commas",
-          "line": 250,
+          "line": 255,
           "args": [
             "text"
           ],
           "calls": [
             "sub"
           ],
-          "docstring": "MALFORMED-JSON REPAIR FIX (2026-08-19): see module docstring."
+          "docstring": "MALFORMED-JSON REPAIR FIX (2026-08-19, hypothesis - see module"
         },
         {
           "name": "extract_json",
-          "line": 260,
+          "line": 266,
           "args": [
             "raw_text"
           ],
@@ -394,13 +394,14 @@
             "_strip_trailing_commas",
             "find",
             "loads",
+            "print",
             "rfind",
             "sanitize_json_control_chars",
             "split",
             "startswith",
             "strip"
           ],
-          "docstring": ""
+          "docstring": "DIAGNOSTIC LOGGING ADDED (2026-08-19): see module docstring - the"
         }
       ],
       "env_vars": [
