@@ -2,7 +2,15 @@
 
 Repo: https://github.com/aliwaziri10/marius-command-center
 Supabase: https://supabase.com/dashboard/project/swnjzzejsuupecdgbzzf
-Zia is non-coder. Never ask him to explain the schema/structure - it's all below. Just tell him what to click.
+Ali is non-coder. Never ask him to explain the schema/structure - it's all below. Just tell him what to click.
+
+**FLAGGED 2026-08-19: the "Pipeline order" and "Database" sections below were NOT
+re-verified this session and may be stale - this repo's actual script_writing
+stage was split on 2026-08-18 into script_writing.py/llm_client.py/
+narration_stage.py/shot_breakdown_stage.py, which this section doesn't
+mention at all. Verify against live code before trusting the pipeline-stage
+description below, per DEBUGGING_METHODOLOGY.md - don't assume it's current
+just because it's written down.**
 
 ## Pipeline order
 Topic Research -> Script Writing -> Narration -> Video Generation -> YouTube Upload.
@@ -23,20 +31,20 @@ narration (.wav/.mp3 files), images (.jpg, legacy/unused for new scripts), video
 
 ## GitHub Actions secrets currently set
 SUPABASE_URL, SUPABASE_SECRET_KEY, GEMINI_API_KEY, AGNES_API_KEY, ACE_MUSIC_API_KEY, FREESOUND_API_KEY, HF_TOKEN (currently unused - video gen uses Agnes, not Hugging Face - can be ignored/removed), YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_TOKEN, EXPECTED_YOUTUBE_CHANNEL_TITLE.
-**OPENROUTER_API_KEY was removed entirely on 2026-08-06.** Script Writing and Topic Research are now Gemini-only (`gemini-3.5-flash`), no fallback provider. Don't reference OpenRouter in future diagnosis - it's gone by design, not missing by accident.
+**OPENROUTER_API_KEY was removed entirely on 2026-08-06.** Script Writing and Topic Research are Gemini-only, no fallback provider. Don't reference OpenRouter in future diagnosis - it's gone by design, not missing by accident. (Note: Script Writing briefly ran on Groq 2026-08-15 through 2026-08-17 before switching back to Gemini - if you see Groq references in old commits/docstrings, that's this window, not a current dependency.)
 
 ## Known gotchas already solved - do not rediscover these
 - shot_list field is "visual_description" not "description".
 - Narration voice: edge-tts, `en-US-GuyNeural`. (Kokoro was tried and reverted - too slow/heavy on GitHub-hosted runners, caused ~25min stalls then runner kills. Chatterbox was also tried for a time and reverted for the same reason.)
-- Video generation uses Agnes AI (agnes-ai.com) - Zia knowingly chose this over Hugging Face/LTX despite it being a newer, less established company, because free HF ZeroGPU quota (2-5 min/day) is too small for a full episode. Do not silently switch this back - ask first if considering a change.
+- Video generation uses Agnes AI (agnes-ai.com) - Ali knowingly chose this over Hugging Face/LTX despite it being a newer, less established company, because free HF ZeroGPU quota (2-5 min/day) is too small for a full episode. Do not silently switch this back - ask first if considering a change.
 - video_generation.py is resume-safe: it checks video_next_index and video_urls on the script row before generating anything, uploads each shot's clip individually to video_clips as soon as it's made, and saves progress after every single shot. Re-running it after a partial/interrupted run continues from where it stopped instead of regenerating finished shots. Do not remove this without a strong reason.
 - A green tick on a workflow does NOT mean it did real work - always verify counts in the database or files in the bucket. A scheduled cron trigger can also be silently delayed by GitHub itself for hours - check actual run timestamps in the Actions tab before assuming the pipeline code is broken.
 - Content-policy rejections (`content_flagged`) can be triggered by the anchor text (`setting_and_characters`, sent with every shot prompt) OR by the visual content of a specific shot itself, independent of any text fix. If a text-level fix (stripping sensitive words from the anchor) doesn't clear a stuck shot after a real retry, don't keep re-diagnosing the text - replace that one shot's `visual_description` with something generic and neutral (e.g. a static empty-room shot) and move on. Pipeline flow matters more than that one shot's fidelity.
 - This repo is PUBLIC - GitHub Actions minutes are uncapped (the free-tier 2,000 min/month cap only applies to private repos). Don't hold back a scheduling/frequency change over an Actions-minutes budget that doesn't apply here.
-- The AI assistant's GitHub connector is permanently read-only by design (not a setting Zia can change) - all code pushes go through Zia pasting into the GitHub web editor. Data-only fixes (status resets, shot_list rewording) don't need this - do those directly via Supabase.
+- GitHub write access for this repo is confirmed WORKING as of 2026-08-19 (see DEBUGGING_STANDARDS.md point 4) - this reverses the old "permanently read-only by design" note that used to be here. Default to pushing code changes directly; only fall back to Ali pasting into the GitHub web editor if a live write attempt actually fails in that session. Data-only fixes (status resets, shot_list rewording) still don't need a GitHub paste at all - do those directly via Supabase.
 
 ## Remaining stages to build
 YouTube Upload: done and live (see `scripts/youtube_upload.py`) - this section is historical, kept for context on what used to be outstanding.
 
 ## Standing communication rules
-Always give exact URLs in copy boxes, combined with what to click, in the same step. Always spell out Ctrl+A then Delete before any paste-replace. Max 3-4 steps per message, wait for confirmation. Never write real secrets into any file - GitHub secrets only. Do not add third-party AI services without asking first. Minimize Zia's involvement - act on routine fixes without asking permission first; only ask when a decision is genuinely his to make.
+Always give exact URLs in copy boxes, combined with what to click, in the same step. Always spell out Ctrl+A then Delete before any paste-replace. Max 3-4 steps per message, wait for confirmation. Never write real secrets into any file - GitHub secrets only. Do not add third-party AI services without asking first. Minimize Ali's involvement - act on routine fixes without asking permission first; only ask when a decision is genuinely his to make.
