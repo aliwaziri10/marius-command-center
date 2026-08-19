@@ -2,7 +2,7 @@
 Read this file FIRST, before touching any code, data, or docs in this repo.
 This replaces the old `DEBUGGING_STANDARDS.md` — same purpose, wider scope.
 
-Zia (the owner) is a non-coder, browser-only, no terminal. Your job is
+Ali (the owner) is a non-coder, browser-only, no terminal. Your job is
 smooth, uninterrupted pipeline flow with minimal demands on his time. Act,
 don't ask, unless you've hit a wall you genuinely can't get past yourself.
 
@@ -34,24 +34,27 @@ and cleaned up one pile of abandoned duplicate logs — don't start a new one.
    `CONTINUATION.md` for a worked example — text-level fix worked for one
    script, didn't for two others, and that gap mattered), say so plainly
    instead of declaring victory early.
-3. **Minimize Zia's involvement, but don't fake progress to do it.** Use
+3. **Minimize Ali's involvement, but don't fake progress to do it.** Use
    GitHub/Supabase tools yourself to check state, diagnose, and fix
-   end-to-end. Only involve Zia for: (a) something requiring his literal
-   click/paste because GitHub write is 403'd for the AI connector, or
-   (b) a decision that's genuinely his to make (spending money, changing
-   what the channel covers, deleting something irreversible). Don't ask
-   permission for routine fixes that keep the pipeline moving — do them,
-   then report what you did.
-4. **When you can't push code directly** (confirmed 403 on
-   `create_or_update_file` / `push_files` for this repo), give the exact
-   `.../edit/main/<path>` URL in its own copy block, then the full file
-   content in a chat code block. Never tell Zia to find or edit a specific
-   line — always full-file replace. Deletions are simpler: trash icon on
-   the file's page, no paste needed.
+   end-to-end. Only involve Ali for: (a) something a tool genuinely can't
+   do (see point 4 below on GitHub write access), or (b) a decision
+   that's genuinely his to make (spending money, changing what the
+   channel covers, deleting something irreversible). Don't ask permission
+   for routine fixes that keep the pipeline moving — do them, then report
+   what you did.
+4. **GitHub write access for this repo is confirmed WORKING as of
+   2026-08-19** (multiple `create_or_update_file` commits landed and were
+   read back successfully in the same session) — this reverses the
+   standing "403, read-only" note that was here previously (that was true
+   as of earlier sessions; it is not true now, whatever changed on the
+   permissions side). Default to pushing code changes directly. Only fall
+   back to giving Ali a `.../edit/main/<path>` URL + full file content to
+   paste if a real write attempt actually fails live in that session -
+   don't assume the old block still applies without testing it first.
 5. **Data-only fixes don't need a GitHub paste at all.** If the fix is
    rewording a shot's `visual_description`, resetting a `status` column,
    or similar, just do it directly via Supabase. Reserve the paste
-   workflow for actual code changes.
+   workflow (see point 4) for the case where a live write attempt fails.
 6. **One copyable thing per code block.** URLs, paths, IDs, secrets —
    each in its own block, never combined, never inline in prose.
 7. **Say what you don't know.** If you can't access Actions run logs
@@ -68,4 +71,10 @@ and cleaned up one pile of abandoned duplicate logs — don't start a new one.
 ## Before ending any session
 Update `CONTINUATION.md` with: what changed, what's confirmed live-working,
 what's still open/unverified, and the concrete next step. Don't write a
-new file to do this — edit the existing one.
+new file to do this — edit the existing one. This rule exists precisely
+because this file and `DEBUGGING_METHODOLOGY.md` describe HOW to behave,
+never WHAT happened - only `CONTINUATION.md` carries that narrative
+forward. A stale `CONTINUATION.md` actively misleads the next session
+(confirmed 2026-08-19: it had gone 12 days without an update through
+three major architecture changes) - update it every time, not just when
+something feels big enough to justify it.
