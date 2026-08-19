@@ -360,6 +360,41 @@ comfortably under the 50MB cap. NOT YET CONFIRMED against a real run -
 next run on script ba5d96c8 (still sitting at 31/31 shots, unaffected by
 this change) should go straight to reassembly/upload with no shot
 regeneration needed, and should now succeed end to end.
+
+CODEC SWITCH TO HEVC/H.265 (2026-08-20, same day, item 4 of that day's
+CONTINUATION.md): the UPLOAD SIZE FIX above solved the crash but only by
+crushing video bitrate to ~192kbps at 1280x720, which looks close to
+144p - confirmed directly by Zia watching the actual upload. Root cause
+of the trade-off: H.264 (libx264) needs roughly 2500-4000kbps at 720p to
+look normal, and the 50MB Supabase free-tier cap can't fit that for a
+~19-minute episode no matter how compute_target_bitrate() is tuned - the
+cap and H.264 at this length/resolution are fundamentally incompatible
+at watchable quality. Per Zia's explicit decision, switched the FINAL
+assembled video's encode (assemble_final_video's write_videofile call
+only - NOT the intermediate chain-extension segment encode a few hundred
+lines above, which gets re-encoded at final assembly anyway and stays on
+libx264 for speed) from codec="libx264" to codec="libx265". HEVC is
+roughly 40-50% more efficient than H.264 at the same bitrate, so the same
+~44MB budget now buys meaningfully better perceived quality, without
+touching resolution, episode length, or the 50MB cap itself. Confirmed
+BEFORE pushing (per DEBUGGING_METHODOLOGY.md - do not assume a runner has
+a codec without checking) that libx265 is actually present in the exact
+static ffmpeg binary moviepy/imageio-ffmpeg bundles and runs on GitHub's
+Ubuntu runners (johnvansickle.com static build, built with
+--enable-libx265) - this is NOT a system package and there is no apt-get
+ffmpeg step in video_generation.yml, so this had to be verified against
+the real bundled binary, not assumed from the OS image's installed-
+software list (ffmpeg is not in that list at all). Added
+ffmpeg_params=["-preset", "fast", "-tag:v", "hvc1"]: "-preset fast"
+because libx265 encodes noticeably slower than libx264 and
+video_generation.yml's job has a 60-minute timeout that a ~19-minute
+episode's encode should not be allowed to threaten; "-tag:v hvc1" because
+HEVC-in-MP4 defaults to a "hev1" tag that some players/services handle
+inconsistently, while "hvc1" is the more broadly compatible tag for HEVC
+in an MP4 container. NOT YET CONFIRMED against a real run - next
+assembly run should be watched end-to-end (encode completes within the
+60-minute job timeout, output uploads successfully, and Zia confirms the
+picture quality is actually improved) before this is considered proven.
 """
 
 import os
@@ -1513,12 +1548,13 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
     final.write_videofile(
         output_path,
         fps=FRAME_RATE,
-        codec="libx264",
+        codec="libx265",
         audio_codec="aac",
         audio_bitrate="128k",
         bitrate=target_bitrate,
         threads=2,
         logger=None,
+        ffmpeg_params=["-preset", "fast", "-tag:v", "hvc1"],
     )
     return output_path, audio_stats
 
