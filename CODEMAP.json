@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 17,
+  "file_count": 18,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -643,6 +643,66 @@
             "strip"
           ],
           "docstring": "Stage 1: produce a narration that already clears the word-count and"
+        }
+      ],
+      "env_vars": [],
+      "tables": []
+    },
+    {
+      "path": "scripts/quality_checker.py",
+      "functions": [
+        {
+          "name": "_run_grader",
+          "line": 44,
+          "args": [
+            "prompt",
+            "context_label"
+          ],
+          "calls": [
+            "bool",
+            "call_llm",
+            "extract_json",
+            "get",
+            "join",
+            "print",
+            "str",
+            "strip"
+          ],
+          "docstring": "Shared grading-call wrapper. Returns (passed: bool, reason: str)."
+        },
+        {
+          "name": "grade_narration",
+          "line": 122,
+          "args": [
+            "title",
+            "angle",
+            "narration_text"
+          ],
+          "calls": [
+            "_run_grader",
+            "format"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "grade_shot_breakdown",
+          "line": 187,
+          "args": [
+            "title",
+            "angle",
+            "setting_and_characters",
+            "color_palette",
+            "shot_list"
+          ],
+          "calls": [
+            "_run_grader",
+            "enumerate",
+            "format",
+            "get",
+            "join",
+            "len"
+          ],
+          "docstring": ""
         }
       ],
       "env_vars": [],
