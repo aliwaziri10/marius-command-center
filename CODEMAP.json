@@ -1603,7 +1603,7 @@
       "functions": [
         {
           "name": "round_to_valid_frames",
-          "line": 521,
+          "line": 147,
           "args": [
             "num_frames"
           ],
@@ -1615,7 +1615,7 @@
         },
         {
           "name": "get_ready_scripts",
-          "line": 533,
+          "line": 159,
           "args": [
             "limit"
           ],
@@ -1628,7 +1628,7 @@
         },
         {
           "name": "download_file",
-          "line": 543,
+          "line": 169,
           "args": [
             "url",
             "out_path"
@@ -1643,7 +1643,7 @@
         },
         {
           "name": "_sanitize_anchor_for_fallback",
-          "line": 590,
+          "line": 216,
           "args": [
             "anchor"
           ],
@@ -1658,7 +1658,7 @@
         },
         {
           "name": "_strip_named_characters_for_group_shot",
-          "line": 625,
+          "line": 251,
           "args": [
             "anchor"
           ],
@@ -1672,7 +1672,7 @@
         },
         {
           "name": "build_agnes_prompt",
-          "line": 635,
+          "line": 261,
           "args": [
             "shot",
             "setting_and_characters",
@@ -1693,7 +1693,7 @@
         },
         {
           "name": "build_character_reference_prompt",
-          "line": 698,
+          "line": 324,
           "args": [
             "setting_and_characters"
           ],
@@ -1705,7 +1705,7 @@
         },
         {
           "name": "generate_character_reference",
-          "line": 709,
+          "line": 335,
           "args": [
             "script"
           ],
@@ -1727,7 +1727,7 @@
         },
         {
           "name": "upload_reference_image",
-          "line": 795,
+          "line": 421,
           "args": [
             "script_id",
             "file_name",
@@ -1743,7 +1743,7 @@
         },
         {
           "name": "extract_last_frame_url",
-          "line": 816,
+          "line": 442,
           "args": [
             "script_id",
             "shot_index",
@@ -1765,7 +1765,7 @@
         },
         {
           "name": "get_continuity_anchor",
-          "line": 846,
+          "line": 472,
           "args": [
             "script",
             "video_urls"
@@ -1782,7 +1782,7 @@
         },
         {
           "name": "create_agnes_task",
-          "line": 874,
+          "line": 500,
           "args": [
             "prompt",
             "num_frames",
@@ -1803,7 +1803,7 @@
         },
         {
           "name": "extract_video_url",
-          "line": 916,
+          "line": 542,
           "args": [
             "data"
           ],
@@ -1818,7 +1818,7 @@
         },
         {
           "name": "poll_agnes_task",
-          "line": 927,
+          "line": 553,
           "args": [
             "video_id",
             "max_wait",
@@ -1839,7 +1839,7 @@
         },
         {
           "name": "_generate_one_segment",
-          "line": 955,
+          "line": 581,
           "args": [
             "shot",
             "segment_duration",
@@ -1863,7 +1863,7 @@
         },
         {
           "name": "_extract_last_frame_local",
-          "line": 982,
+          "line": 608,
           "args": [
             "video_path"
           ],
@@ -1880,7 +1880,7 @@
         },
         {
           "name": "_upload_local_image_for_anchor",
-          "line": 996,
+          "line": 622,
           "args": [
             "script_id",
             "tag",
@@ -1894,7 +1894,7 @@
         },
         {
           "name": "generate_shot_clip",
-          "line": 1006,
+          "line": 632,
           "args": [
             "shot",
             "target_duration",
@@ -1924,7 +1924,7 @@
         },
         {
           "name": "fit_clip_to_duration",
-          "line": 1058,
+          "line": 684,
           "args": [
             "clip",
             "target"
@@ -1941,7 +1941,7 @@
         },
         {
           "name": "fit_audio_to_duration",
-          "line": 1068,
+          "line": 694,
           "args": [
             "audio_clip",
             "target"
@@ -1955,7 +1955,7 @@
         },
         {
           "name": "upload_clip",
-          "line": 1076,
+          "line": 702,
           "args": [
             "script_id",
             "index",
@@ -1972,7 +1972,7 @@
         },
         {
           "name": "save_progress",
-          "line": 1097,
+          "line": 723,
           "args": [
             "script_id",
             "video_urls",
@@ -1986,7 +1986,7 @@
         },
         {
           "name": "mark_content_flagged",
-          "line": 1107,
+          "line": 733,
           "args": [
             "script_id",
             "shot_index",
@@ -2001,7 +2001,7 @@
         },
         {
           "name": "compute_shot_durations",
-          "line": 1118,
+          "line": 744,
           "args": [
             "shot_list",
             "total_duration"
@@ -2016,7 +2016,7 @@
         },
         {
           "name": "get_shot_durations",
-          "line": 1124,
+          "line": 750,
           "args": [
             "script",
             "shot_list",
@@ -2035,7 +2035,7 @@
         },
         {
           "name": "compute_shot_start_times",
-          "line": 1137,
+          "line": 763,
           "args": [
             "shot_durations"
           ],
@@ -2046,21 +2046,50 @@
         },
         {
           "name": "compute_target_bitrate",
-          "line": 1146,
+          "line": 772,
           "args": [
             "duration_seconds",
-            "target_mb",
             "audio_kbps"
           ],
-          "calls": [
-            "int",
-            "max"
-          ],
+          "calls": [],
           "docstring": ""
         },
         {
+          "name": "estimate_output_size_mb",
+          "line": 786,
+          "args": [
+            "duration_seconds",
+            "video_kbps",
+            "audio_kbps"
+          ],
+          "calls": [],
+          "docstring": ""
+        },
+        {
+          "name": "split_video_into_chunks",
+          "line": 792,
+          "args": [
+            "local_path",
+            "max_chunk_mb"
+          ],
+          "calls": [
+            "VideoFileClip",
+            "append",
+            "ceil",
+            "close",
+            "getsize",
+            "min",
+            "print",
+            "range",
+            "replace",
+            "subclipped",
+            "write_videofile"
+          ],
+          "docstring": "Splits an already-encoded local video file into N sequential chunks,"
+        },
+        {
           "name": "poll_ace_music_task",
-          "line": 1165,
+          "line": 841,
           "args": [
             "task_id",
             "out_path",
@@ -2083,7 +2112,7 @@
         },
         {
           "name": "generate_background_music",
-          "line": 1204,
+          "line": 880,
           "args": [
             "prompt",
             "duration",
@@ -2104,7 +2133,7 @@
         },
         {
           "name": "generate_background_music_musicgen",
-          "line": 1238,
+          "line": 914,
           "args": [
             "prompt",
             "duration",
@@ -2125,7 +2154,7 @@
         },
         {
           "name": "search_freesound_sfx",
-          "line": 1279,
+          "line": 955,
           "args": [
             "query",
             "out_path"
@@ -2140,7 +2169,7 @@
         },
         {
           "name": "apply_safety_limiter",
-          "line": 1314,
+          "line": 990,
           "args": [
             "audio_clip",
             "ceiling"
@@ -2157,7 +2186,7 @@
         },
         {
           "name": "extract_original_clip_audio",
-          "line": 1334,
+          "line": 1010,
           "args": [
             "video_clips",
             "shot_durations",
@@ -2176,7 +2205,7 @@
         },
         {
           "name": "build_audio_mix",
-          "line": 1351,
+          "line": 1027,
           "args": [
             "narration_path",
             "music_mood",
@@ -2208,7 +2237,7 @@
         },
         {
           "name": "_load_caption_font",
-          "line": 1391,
+          "line": 1067,
           "args": [
             "size"
           ],
@@ -2222,7 +2251,7 @@
         },
         {
           "name": "_wrap_caption_text",
-          "line": 1402,
+          "line": 1078,
           "args": [
             "text",
             "font",
@@ -2239,7 +2268,7 @@
         },
         {
           "name": "render_caption_image",
-          "line": 1419,
+          "line": 1095,
           "args": [
             "text",
             "video_width",
@@ -2264,7 +2293,7 @@
         },
         {
           "name": "build_caption_clip",
-          "line": 1465,
+          "line": 1141,
           "args": [
             "text",
             "start",
@@ -2283,7 +2312,7 @@
         },
         {
           "name": "build_caption_clips",
-          "line": 1479,
+          "line": 1155,
           "args": [
             "shot_list",
             "shot_durations",
@@ -2304,7 +2333,7 @@
         },
         {
           "name": "assemble_final_video",
-          "line": 1492,
+          "line": 1168,
           "args": [
             "script_id",
             "video_urls",
@@ -2348,7 +2377,7 @@
         },
         {
           "name": "upload_video",
-          "line": 1562,
+          "line": 1244,
           "args": [
             "script_id",
             "file_path"
@@ -2364,11 +2393,49 @@
           "docstring": ""
         },
         {
+          "name": "upload_video_chunk",
+          "line": 1268,
+          "args": [
+            "script_id",
+            "chunk_index",
+            "file_path"
+          ],
+          "calls": [
+            "getsize",
+            "open",
+            "print",
+            "put",
+            "raise_for_status",
+            "read"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "upload_video_chunked",
+          "line": 1292,
+          "args": [
+            "script_id",
+            "local_path"
+          ],
+          "calls": [
+            "append",
+            "enumerate",
+            "len",
+            "print",
+            "remove",
+            "split_video_into_chunks",
+            "upload_video",
+            "upload_video_chunk"
+          ],
+          "docstring": "CHUNKED-UPLOAD QUALITY FIX (2026-08-20): replaces a single upload_video"
+        },
+        {
           "name": "mark_video_generated",
-          "line": 1586,
+          "line": 1324,
           "args": [
             "script_id",
             "video_url",
+            "video_chunk_urls",
             "audio_stats"
           ],
           "calls": [
@@ -2380,7 +2447,7 @@
         },
         {
           "name": "process_script",
-          "line": 1600,
+          "line": 1342,
           "args": [
             "script",
             "shot_limit"
@@ -2409,13 +2476,13 @@
             "sleep",
             "str",
             "upload_clip",
-            "upload_video"
+            "upload_video_chunked"
           ],
           "docstring": ""
         },
         {
           "name": "main",
-          "line": 1722,
+          "line": 1467,
           "args": [],
           "calls": [
             "get_ready_scripts",
