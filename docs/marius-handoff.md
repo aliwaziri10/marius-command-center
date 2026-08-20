@@ -1,93 +1,98 @@
 # Marius Command Center — Handoff Doc
-Last updated: 2026-08-17
+Last updated: 2026-08-20
 Re-verify against live data — don't trust this doc at face value.
 
+## READ BEFORE EDITING ANY FILE IN scripts/
+Any session (any AI, any tool) must `view`/fetch the FULL current content
+of a file from GitHub main immediately before editing it. Do not edit
+from memory of an earlier version, a chat-log summary, or a cached
+snippet — files here have been rewritten multiple times in the same week
+by different sessions. Pasting an old version back overwrites newer fixes
+with no error or warning.
+
+Current `scripts/` files (2026-08-20):
+`health_check.py`, `llm_client.py`, `narration.py`, `narration_stage.py`,
+`quality_checker.py`, `script_writing.py`, `shot_breakdown_stage.py`,
+`stall_monitor.py`, `thumbnail_generation.py`, `topic_research.py`,
+`update_status.py`, `verify_run_output.py`, `video_generation.py`,
+`youtube_upload.py`. (`image_generation.py`, `test_narration_edgetts.py`,
+`test_narration_freellm.py` also present — legacy/test, not in the live
+pipeline path; confirm before touching.)
+
 ## Pipeline
-topic_research → script_writing → narration → images_generated →
-video_generation (resumable, CLIP_BATCH_LIMIT=8 shots/run) →
-video_generated → uploaded. Channel: @erased.fromhistory (Erased From History).
+topic_research → script_writing (now split: llm_client.py +
+narration_stage.py + shot_breakdown_stage.py, orchestrated by
+script_writing.py) → narration → images_generated → video_generation
+(resumable) → video_generated → uploaded. Channel: @erased.fromhistory
+(Erased From History).
 
-## Current LLM provider
-Groq, `llama-3.3-70b-versatile`, free tier: 30 RPM, 12,000 TPM, AND an
-undocumented daily token cap (TPD) not exposed in any response header
-(~100K tokens/day, per Groq docs/community — not officially confirmed).
-Gemini and OpenRouter were both removed as providers earlier (Aug 6/15).
+## Current LLM provider: Gemini (`gemini-3.5-flash-lite`)
+Switched back from Groq 2026-08-17. Uses `GEMINI_API_KEY` secret
+(confirmed present in repo). Groq abandoned because its 429s can show
+FULLY replenished per-minute headers (1000/1000 requests, 12000/12000
+tokens) while still permanently failing — the real constraint (likely
+Groq's daily TPD cap) is structurally invisible in anything readable from
+the response. Gemini's 429 body instead names the exact quota metric hit
+(`quotaMetric`/`quotaId`) — an unambiguous signal Groq never gave.
+`llm_client.py` now raises `DailyQuotaExhausted` only when the body
+explicitly names a daily/free-tier metric, not from guessed headers.
 
-## What was broken (confirmed live, 2026-08-17)
-Nothing shipped since **2026-08-06**. Verified via Supabase
-`swnjzzejsuupecdgbzzf`:
+**Do not switch providers again without a live test proving the new
+provider's failure mode is actually diagnosable — Groq's silent-failure
+behavior is exactly why it was replaced. See DailyQuotaExhausted class
+docstring in llm_client.py for the full reasoning.**
+
+## Confirmed working (2026-08-20)
 ```sql
 select id, status, created_at from scripts order by created_at desc limit 5;
 ```
-Latest row: `82eb9746...` created `2026-08-06 00:23:27`. Nothing since.
+5 new scripts since 2026-08-19, most recent same-day. Status breakdown:
+23 `uploaded`, 18 `archived`, 7 `images_generated` (normal queue depth).
+Zero-output period (2026-08-06 to 2026-08-17) is resolved.
 
-GitHub Actions shows 5 `script_writing.yml` runs Aug 15-16, ALL
-`conclusion: success` — but zero scripts saved in that window. This is
-NOT a contradiction: `main()` in `script_writing.py` deliberately
-`return`s with exit code 0 when it catches `SuspectedDailyQuotaExhausted`,
-so a run that hit Groq's daily cap on the first topic shows green in
-GitHub Actions while doing nothing. Confirmed from two angles: (1) code
-read directly — the `except SuspectedDailyQuotaExhausted: ... return` in
-`main()`, (2) live Supabase data — zero new rows across all 5 "successful"
-runs.
+## File split (2026-08-18, separate session)
+`script_writing.py` used to hold everything. Now:
+- `llm_client.py`: `call_llm()`, `retryable_request()`, `InfraFailure`,
+  `DailyQuotaExhausted`, JSON extraction/sanitization
+- `narration_stage.py`: `generate_narration()` and its prompts
+- `shot_breakdown_stage.py`: `generate_shot_breakdown()`, shot validation,
+  chunking logic
+- `script_writing.py`: orchestration only (fetch topic, call both
+  stages, save, update status)
+No behavior change from the split itself — same logic, moved.
 
-The 2026-08-15 chunked-shot-breakdown fix (splitting one 60-85 shot
-request into 3 Groq calls to stay under the 12,000 TPM per-minute cap)
-was necessary but not sufficient — it fixed the *per-minute* ceiling but
-not the *per-day* one, since the daily cap is on total tokens across ALL
-calls in a day, not just the size of any one call.
+## Video quality fix (2026-08-20, separate session)
+19-minute upload ("The Gambian Weaver and Refugee Relief",
+`ba5d96c8-5c00-4619-9d84-830291ed9aab`) came out visibly bad quality.
+Root cause: video bitrate scaled down as episode duration increased.
+Fixed in `video_generation.py` — bitrate now fixed at 3000 kbps
+regardless of duration (`QUALITY_VIDEO_BITRATE_KBPS`). That script was
+reset to `images_generated` with video fields cleared on 2026-08-20 to
+regenerate at the corrected bitrate — **will create a NEW public YouTube
+upload, does not overwrite the old one**. Old video
+(`youtube.com/watch?v=g_dJrGizi9Q`) needs manual deletion by Zia once the
+new one is confirmed live.
 
-## Fix applied 2026-08-17 (this session)
-`scripts/script_writing.py`:
-- `MIN_SHOTS` 60→**25**, `MAX_SHOTS` 85→**35**
-- `NUM_SHOT_CHUNKS` 3→**2**
-
-Rationale: cannot monitor or raise Groq's daily cap (invisible, free tier,
-no-spend rule forbids paid tier) — only lever is reducing total tokens
-spent per script. Fewer shots = smaller output per chunk call. Fewer
-chunks = the full narration text (repeated in full as input on every
-chunk call — the dominant cost) gets sent 2x instead of 3x per script.
-
-Verified: file compiles (`python -m py_compile`), constants confirmed via
-`findstr` after edit.
-
-**NOT yet verified**: whether this actually gets a script under the daily
-cap. Groq's TPD is invisible — the only way to confirm is watching the
-next real run(s) land a new row in `scripts`.
-
-## Still unverified — check first next session
-- Did a new script actually save after this fix? Check:
-  `select count(*) from scripts where created_at > '2026-08-17';`
-- If still zero after 2+ scheduled runs: the shot-count cut wasn't enough.
-  Next lever: reduce `NARRATION_MAX_CONTINUATIONS` (currently 3) or
-  `NARRATION_TARGET_WORDS` (currently 1800) — narration continuation calls
-  also re-send prior narration text as input each time, same repeated-input
-  cost pattern as chunking.
-- Two scripts still stuck `content_flagged` (long-standing, unrelated to
-  this fix):
-  - `92dec2f9-05e6-4d32-8fa3-6c5e76f97c9b` "The Bakery That Hid 25" —
-    flagged shot: WWII/Nazi imagery
-  - `716623f1-583b-4f6f-a8b8-9dfefe29fcf2` "The Hutu Who Hid Tutsi
-    Families in Rwanda's 1994 Genocide" — flagged shot index 30/72
-- Secondary known bug, not yet fixed: mid-continuation 429s can call
-  `mark_topic_generation_failed()`, permanently blacklisting a topic whose
-  real failure was rate-limiting, not bad content. Currently low-impact —
-  264 topics sit `pending`, only 4 total `generation_failed` (all from
-  July) — but worth revisiting if `generation_failed` count climbs.
+## Color/style — do not confuse with Nova
+Marius `QUALITY_GUARD` (in `video_generation.py`) explicitly requires
+**vivid saturated color**, explicitly bans desaturation/sepia/monochrome.
+Marius has never had a monochrome guard. Full-motion black & white is
+**Nova-only** (separate repo, separate pipeline). Confirmed live in code
+2026-08-20 — do not carry Nova's B&W direction into Marius work.
 
 ## Standing gotchas
 - GitHub App connector ("Claude for GitHub") is permanently **read-only**
-  (admin/code/metadata read access only) — cannot be changed from GitHub
-  settings or Claude's connector UI. Confirmed 2026-08-17.
-- Working write path (as of 2026-08-17): Zia has this repo cloned locally
-  on Windows, with a PAT (repo+workflow scopes) embedded in
-  `git remote set-url origin` — pushes directly from CMD via `git push`,
-  no connector needed. Token was set locally only, never shared in chat.
-- `youtube_video_id` column has silently failed to write back since
-  ~July 20 even on successful uploads — read real progress from
-  `video_next_index` + `jsonb_array_length(video_urls)` instead.
-- `InfraFailure` and `SuspectedDailyQuotaExhausted` both exit quietly (no
-  crash, no GitHub issue, exit code 0/"success") by design — a green run
-  in GitHub Actions does NOT mean anything was produced. Always check live
-  Supabase state (`scripts` table `created_at`), never trust run status
-  alone.
+  on this repo (admin/code/metadata read access only).
+- Working write path: Zia has this repo cloned locally on Windows, PAT
+  (repo+workflow scopes) embedded in `git remote set-url origin` — pushes
+  via `git push` from CMD, no connector needed. Token never shared in
+  chat.
+- `InfraFailure` and `DailyQuotaExhausted` both exit quietly (exit code 0)
+  by design when every topic in a batch is blocked — a green run in
+  GitHub Actions does NOT mean a script was produced. Always check live
+  Supabase `scripts.created_at`, never trust run status alone.
+- Two scripts still stuck `content_flagged` (unrelated to any fix above):
+  - `92dec2f9-05e6-4d32-8fa3-6c5e76f97c9b` "The Bakery That Hid 25" —
+    WWII/Nazi imagery flagged
+  - `716623f1-583b-4f6f-a8b8-9dfefe29fcf2` "The Hutu Who Hid Tutsi
+    Families in Rwanda's 1994 Genocide" — shot index 30/72 flagged
