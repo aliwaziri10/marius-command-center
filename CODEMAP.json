@@ -806,7 +806,7 @@
       "functions": [
         {
           "name": "split_narration_into_chunks",
-          "line": 101,
+          "line": 112,
           "args": [
             "narration_text",
             "num_chunks"
@@ -823,7 +823,7 @@
         },
         {
           "name": "normalize_shot",
-          "line": 131,
+          "line": 142,
           "args": [
             "shot",
             "index"
@@ -836,7 +836,7 @@
         },
         {
           "name": "normalize_hook_text",
-          "line": 169,
+          "line": 180,
           "args": [
             "result"
           ],
@@ -851,7 +851,7 @@
         },
         {
           "name": "hook_text_matches_prompt_example",
-          "line": 185,
+          "line": 196,
           "args": [
             "hook_text"
           ],
@@ -865,7 +865,7 @@
         },
         {
           "name": "hook_text_too_long_to_glance",
-          "line": 192,
+          "line": 203,
           "args": [
             "hook_text"
           ],
@@ -877,7 +877,7 @@
         },
         {
           "name": "hook_text_matches_story",
-          "line": 197,
+          "line": 208,
           "args": [
             "hook_text",
             "narration_text"
@@ -893,7 +893,7 @@
         },
         {
           "name": "find_duplicate_shots",
-          "line": 211,
+          "line": 222,
           "args": [
             "normalized_shots"
           ],
@@ -907,7 +907,7 @@
         },
         {
           "name": "find_empty_shots",
-          "line": 223,
+          "line": 234,
           "args": [
             "normalized_shots"
           ],
@@ -919,19 +919,6 @@
         },
         {
           "name": "find_continuation_language_shots",
-          "line": 230,
-          "args": [
-            "normalized_shots"
-          ],
-          "calls": [
-            "append",
-            "enumerate",
-            "lower"
-          ],
-          "docstring": ""
-        },
-        {
-          "name": "find_loitering_shots",
           "line": 241,
           "args": [
             "normalized_shots"
@@ -944,8 +931,21 @@
           "docstring": ""
         },
         {
-          "name": "find_missing_onscreen_text_shots",
+          "name": "find_loitering_shots",
           "line": 252,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "append",
+            "enumerate",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_missing_onscreen_text_shots",
+          "line": 263,
           "args": [
             "normalized_shots"
           ],
@@ -959,7 +959,7 @@
         },
         {
           "name": "find_dominant_subject",
-          "line": 261,
+          "line": 272,
           "args": [
             "normalized_shots"
           ],
@@ -973,7 +973,7 @@
         },
         {
           "name": "find_excessive_consecutive_subject",
-          "line": 274,
+          "line": 285,
           "args": [
             "normalized_shots"
           ],
@@ -985,7 +985,7 @@
         },
         {
           "name": "find_location_change_without_establishing",
-          "line": 289,
+          "line": 300,
           "args": [
             "normalized_shots"
           ],
@@ -998,7 +998,7 @@
         },
         {
           "name": "validate_and_normalize_shot_response",
-          "line": 306,
+          "line": 317,
           "args": [
             "result",
             "narration_text"
@@ -1030,7 +1030,7 @@
         },
         {
           "name": "build_shot_breakdown_chunk_prompt",
-          "line": 635,
+          "line": 646,
           "args": [
             "title",
             "angle",
@@ -1053,7 +1053,7 @@
         },
         {
           "name": "generate_shot_breakdown",
-          "line": 812,
+          "line": 823,
           "args": [
             "title",
             "angle",
@@ -1068,6 +1068,7 @@
             "extend",
             "extract_json",
             "get",
+            "grade_shot_breakdown",
             "isinstance",
             "len",
             "print",
@@ -1080,7 +1081,7 @@
         },
         {
           "name": "_simplify",
-          "line": 186,
+          "line": 197,
           "args": [
             "s"
           ],
