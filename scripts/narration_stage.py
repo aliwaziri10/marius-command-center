@@ -5,11 +5,21 @@ and CTA bar before the shot-list stage ever runs.
 
 SPLIT OUT (2026-08-18): relocated from script_writing.py with no behavior
 change. See script_writing.py's module docstring for full history.
+
+WRITER/CHECKER SPLIT (2026-08-20, Loop Skill 2): after a draft clears the
+existing deterministic checks (word count, CTA present), it's now also
+graded by a fresh, independent LLM call (quality_checker.grade_narration)
+against the channel's house rules before being accepted - catches quality
+issues (weak hook, repetitive "gasping", generic CTA, truncated arc) that
+pass the mechanical checks but violate the spirit of the rules the writer
+was given. A checker rejection is treated exactly like any other content
+failure below - same retry/wait/attempt-count loop, no new infra.
 """
 
 import time
 
 from llm_client import call_llm, extract_json, DailyQuotaExhausted, InfraFailure
+from quality_checker import grade_narration
 
 MIN_NARRATION_WORDS = 1500
 NARRATION_MAX_ATTEMPTS = 3
@@ -55,8 +65,8 @@ seconds of narration determine whether the viewer stays or leaves, so follow
 this exact structure for the opening lines:
 
 1. STAKE (first 1-2 sentences): State the single most dramatic, concrete fact
-   of the story immediately. Do NOT say "today we'll look at" or "this is the
-   story of" or introduce the channel/topic first. Lead with the fact itself,
+   of the story immediately. Do NOT say "today we'll look at" or "this is
+   the story of" or introduce the channel/topic first. Lead with the fact itself,
    as if the viewer already knows what's at risk. Use a real, specific number,
    name, or consequence from the story - not a vague tease.
    Bad: "Today we're going to talk about a forgotten hero of history."
@@ -237,7 +247,17 @@ def generate_narration(title, angle):
                 time.sleep(CONTENT_RETRY_WAIT_SECONDS)
             continue
 
-        print(f"[narration] Confirmed at {word_count} words.")
+        # WRITER/CHECKER SPLIT (2026-08-20, Loop Skill 2): fresh independent
+        # grading call against the house rules above, before acceptance.
+        passed, grade_reason = grade_narration(title, angle, narration)
+        if not passed:
+            last_reason = f"checker rejected narration - {grade_reason}"
+            print(f"[narration] Attempt {content_attempt}/{NARRATION_MAX_ATTEMPTS} failed - {last_reason}")
+            if content_attempt < NARRATION_MAX_ATTEMPTS:
+                time.sleep(CONTENT_RETRY_WAIT_SECONDS)
+            continue
+
+        print(f"[narration] Confirmed at {word_count} words - checker passed ({grade_reason}).")
         return narration
 
     if not ever_reached_content:
