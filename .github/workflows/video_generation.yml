@@ -31,6 +31,11 @@ jobs:
           FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: python scripts/video_generation.py
+      - name: Verify run output
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python scripts/verify_run_output.py --stage video_generation
       - name: Open issue on failure
         if: failure()
         env:
