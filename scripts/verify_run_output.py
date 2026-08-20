@@ -46,6 +46,14 @@ CHECK_SAMPLE_SIZE = 5        # most-recent N scripts per relevant status, each r
 MIN_VIDEO_BYTES = 1_000_000  # 1MB floor - catches empty/near-empty/truncated uploads
 HTTP_TIMEOUT = 30
 
+# FIX (2026-08-20): color_palette was added to shot_breakdown_stage.py in
+# commit 4b9c3fc (2026-08-20T01:48:19Z / 07:18:19+05:30 IST) as part of the
+# director-features change. Scripts created before this timestamp legitimately
+# have no color_palette - they predate the field, not a real regression.
+# Checking for it on those older rows was producing false-positive failures
+# on every run. Any script created at/after this cutoff still must have it.
+COLOR_PALETTE_FIELD_ADDED_AT = datetime.fromisoformat("2026-08-20T01:48:19+00:00")
+
 
 def fetch_scripts(status, limit=CHECK_SAMPLE_SIZE, order="created_at.desc"):
     resp = requests.get(
@@ -109,8 +117,21 @@ def verify_shot_breakdown_script(script):
 
     if not (script.get("setting_and_characters") or "").strip():
         problems.append("setting_and_characters empty")
-    if not (script.get("color_palette") or "").strip():
-        problems.append("color_palette empty")
+
+    # FIX (2026-08-20): only enforce color_palette on scripts created at/after
+    # the field's introduction - see COLOR_PALETTE_FIELD_ADDED_AT above.
+    created_at_raw = script.get("created_at")
+    created_at = None
+    if created_at_raw:
+        try:
+            created_at = datetime.fromisoformat(created_at_raw.replace("Z", "+00:00"))
+        except ValueError:
+            created_at = None
+
+    if created_at is None or created_at >= COLOR_PALETTE_FIELD_ADDED_AT:
+        if not (script.get("color_palette") or "").strip():
+            problems.append("color_palette empty")
+
     if not (script.get("narration_url") or "").strip():
         problems.append("narration_url empty")
 
