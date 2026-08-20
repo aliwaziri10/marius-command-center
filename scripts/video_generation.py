@@ -1,402 +1,3 @@
-"""
-Marius Command Center - Video Generation Agent
-Takes the oldest script with images generated and generates one real AI
-video clip per shot using Agnes AI, sized to match narration timing, then
-assembles the final video with a 4-layer audio mix: original shot-clip
-ambience, narration, background score, and SFX.
-
-RESUME-SAFE: generated clips are uploaded to storage and recorded in
-video_urls/video_next_index after every single shot, so a run that gets
-cut off (timeout, crash, manual stop) picks up exactly where it left off
-on the next run instead of regenerating finished shots.
-
-QUOTA-SAFE: Agnes's free tier appears to silently repeat/stale past a
-per-run quota ceiling, so each run generates at most CLIP_BATCH_LIMIT new
-clips total across all candidates combined, then stops cleanly. The
-resume logic above picks up the rest on the next scheduled run.
-
-RETRY-SAFE: create_agnes_task retries transient backend errors (429 rate
-limit, 500/502/503/504 server-side issues) with backoff before giving up,
-so a single flaky Agnes response doesn't kill the whole run. Clip
-verification (HEAD checks on already-generated shots) also retries before
-concluding a shot is genuinely broken, so a single transient network
-blip doesn't discard already-finished work.
-
-OVERLOAD-RESILIENT: if Agnes is still failing after all retries (upstream
-load saturated) - either at task-creation time or while polling for
-completion - this now exits quietly (exit code 0, no crash, no GitHub
-issue opened) instead of raising and killing the whole run. Progress is
-already saved after every completed shot, so nothing is lost; the next
-scheduled run picks up exactly where this one stopped, typically ~20
-minutes later once Agnes's load has eased.
-
-CONTENT-POLICY-RESILIENT (2026-08-12 upgrade - see 3-TIER note below):
-if Agnes rejects a shot's prompt on content-policy grounds, this now
-tries up to THREE progressively more stripped-down prompts before giving
-up on the shot. Only if all three are rejected is the script marked
-status='content_flagged' (not left at 'images_generated') and the run
-moves on to the next-oldest eligible script instead of crash-looping on
-the same one forever. A flagged script is invisible to future runs until
-its status is manually changed back - review shot_list in the scripts
-table, reword the offending shot, and reset status to 'images_generated'
-to resume it.
-
-ACE-MUSIC-RESILIENT: ACE Music's free hosted API has had reported
-reliability issues (endpoint 404s/502s). generate_background_music now
-tries every host in ACE_MUSIC_BASES in order and only skips background
-music entirely if all of them fail, instead of giving up on the first
-error.
-
-LIGHTING FIX (2026-07-19): Agnes prompts had no lighting/exposure cue at
-all, so the model defaulted to moody/underlit documentary-style footage
-on nearly every shot. build_agnes_prompt now appends a "well-lit, balanced
-exposure" cue automatically, UNLESS the shot's own visual_description
-already implies a deliberately dark scene (night, dusk, shadow, etc.) -
-in which case we leave it alone so genuinely dark scenes aren't forced
-bright.
-
-AUDIO-DIAGNOSTICS (2026-07-19): generate_background_music/search_freesound_sfx
-were designed to fail silently (print + continue) so a bad API response
-never crashes a run - but that also meant there was no way to tell,
-without reading raw Action logs, whether music/SFX actually made it into
-a given video. build_audio_mix now returns pass/fail stats alongside the
-mixed audio, and mark_video_generated persists them to the scripts table
-(music_generated bool, sfx_applied_count int) so this is now a plain DB
-query instead of a log-hunting exercise.
-
-SUBTITLES (2026-07-19): added burned-in captions, one per shot, using each
-shot's own narration_excerpt (the same field narration.py already uses for
-per-shot audio, so captions are guaranteed to match what's actually being
-spoken - not a separate re-split of narration_text). Captions are timed to
-the exact same shot_starts/shot_durations already computed for audio sync,
-rendered as word-wrapped white text with a black outline on a semi-
-transparent bar near the bottom, and composited onto the video in
-assemble_final_video right before the fade effects are applied. Font is
-DejaVu Sans Bold (present on GitHub's Ubuntu runner images via
-fonts-dejavu-core); falls back to PIL's built-in default font if that
-path is ever missing, and a single bad caption never breaks the whole
-assembly (same fail-soft pattern as music/SFX in this file).
-
-CAPTION SIZE FIX (2026-07-20): captions were rendering at font size 42
-across 86% of the frame width, which on longer narration_excerpt text
-wrapped into a tall multi-line block that visually covered close to half
-the screen - and since these are burned into the video pixels (not a real
-YouTube caption track), toggling CC did nothing. Font size dropped to 28
-and max width ratio dropped to 0.70 to bring this back to a normal
-subtitle-sized footprint near the bottom of the frame.
-
-ORIGINAL-CLIP-AUDIO FIX (2026-07-20): individual shot clips downloaded
-straight from Agnes/storage already contain usable ambience/music baked
-in by the video model itself - confirmed by listening to pre-stitch
-clips directly in Supabase Storage. But assemble_final_video was calling
-concatenate_videoclips(clips) (which keeps that original audio) and then
-immediately final.with_audio(final_audio) - and with_audio() REPLACES a
-clip's audio track rather than layering onto it. So the good original
-per-clip audio was being silently discarded and replaced by only
-narration+music+SFX every single time, regardless of whether that
-generated music/SFX mix succeeded or came back empty. build_audio_mix now
-also accepts and mixes in the original per-shot audio (extracted from the
-same downloaded shot clips already used for video) as its 4th layer,
-volume-matched below narration/music via ORIGINAL_CLIP_AUDIO_VOLUME, so
-the ambience you already confirmed sounds right is no longer thrown away.
-
-MULTI-CANDIDATE / HEAD-OF-LINE-BLOCKING FIX (2026-07-21): main() used to
-fetch only the single oldest 'images_generated' script and hard-return the
-instant it hit AgnesOverloadedError, even with zero progress made this
-run. Because the queue is strict oldest-first, one episode stuck on a
-single overloaded shot silently blocked every newer script behind it
-indefinitely - confirmed in production: one script sat at 8/53 shots for
-5 days while 8 fully-scripted episodes behind it never got touched. main()
-now pulls the CANDIDATE_POOL_SIZE oldest ready scripts and works through
-them in order within the same run.
-
-CAPTIONS REMOVED (2026-07-21): burned-in narration captions were showing up
-on screen over the finished video ("The Courier of the Siege" upload) -
-Zia wants video only, no visible script text. assemble_final_video no
-longer composites caption_clips onto the final video. The caption-building
-functions are left in place, just unused, in case this is wanted back in
-a different form later.
-
-RUN-MONOPOLIZATION FIX (2026-07-25): the 2026-07-21 fix only helped when a
-candidate made ZERO progress (fully overloaded on its first shot). It did
-NOT help when a candidate was healthy and slowly working - process_script
-used to return as soon as ANY shot succeeded, taking a full CLIP_BATCH_LIMIT
-batch (up to 8 shots) from whichever script was oldest, then main() stopped
-the entire run right there. Confirmed in production: "The Laundress of
-Lawrence" (63 shots, oldest ready script) consumed every single run's full
-shot budget for over a week straight, while 13 other fully-scripted episodes
-behind it sat at 0/N shots the entire time - a slow-but-working script
-starved everything else just as badly as a fully-stalled one did.
-process_script now takes a shot_limit argument and returns the number of
-shots it actually generated (not a bool), and main() round-robins the same
-total per-run Agnes-quota budget (CLIP_BATCH_LIMIT) across every candidate
-in the pool each run, moving to the next candidate as soon as one either
-runs out of its slice of the budget or hits a wall - so every stuck script
-gets at least a little progress every run instead of one script hogging
-the whole budget for hours. CANDIDATE_POOL_SIZE also raised from 5 to 15 so
-every currently-stuck script is in the rotation from the very next run,
-not just the 5 oldest.
-
-AUDIO BALANCE FIX (2026-07-29): NARRATION_VOLUME/MUSIC_VOLUME/SFX_VOLUME had
-drifted away from the documented spec (narration full, music ducked to 0.18,
-SFX at 0.85) to 0.70/0.34/1.0 - narration was turned down while music and
-SFX were turned up, so music was drowning out narration in every video.
-Restored to spec: NARRATION_VOLUME=1.0, MUSIC_VOLUME=0.18, SFX_VOLUME=0.85.
-
-LIGHTING FIX PART 2 (2026-07-29): the 2026-07-19 lighting fix appended
-"well-lit, balanced exposure" at the END of the prompt, after the full
-visual_description. Video generation models weight earlier tokens more
-heavily, so a long moody documentary-style description up front (fog,
-smoke, archives, etc. - none of which trip DARK_SCENE_KEYWORDS but still
-read as visually dark) was drowning out a lighting cue tacked on at the
-back, and nearly every shot was still rendering underlit. build_agnes_prompt
-now puts a stronger "bright natural daylight, high-key lighting,
-well-exposed, vivid colors" cue FIRST in the prompt instead of last,
-for shots that don't already imply a deliberately dark scene.
-
-ONE-TAKE / ANCHOR / ANACHRONISM FIX (2026-07-29): three related fixes based
-on direct feedback after watching a finished "Erased" upload:
-1. Shots longer than MAX_CLIP_SECONDS were being split into multiple
-   SEPARATE Agnes generations of the same prompt and stitched together -
-   since Agnes has no memory between calls, each independent generation
-   rendered its own random camera angle, so a single "shot" visibly cut
-   between 2-3 unrelated takes instead of playing as one continuous shot.
-   generate_shot_clip now generates exactly ONE take (up to the cap) and
-   extends any remaining duration by holding its final frame instead.
-2. script_writing.py's setting_and_characters anchor (real-world location/
-   era/ethnicity + fixed character descriptions) was never actually being
-   passed into build_agnes_prompt despite an earlier changelog entry
-   claiming this was wired up - it wasn't. It is now threaded through
-   generate_shot_clip -> _generate_one_segment -> build_agnes_prompt, so
-   every shot's prompt is anchored to the episode's real setting/era.
-3. Added an explicit ANACHRONISM_GUARD ("no modern technology, no cars, no
-   drones, no modern clothing, no digital devices") and QUALITY_GUARD
-   ("shot on film, vivid saturated color, no sepia, no CGI look") to every
-   prompt, to stop modern-day objects/vehicles leaking into historical
-   scenes and to push back against Agnes's tendency toward a flat,
-   desaturated, synthetic-looking default grade.
-
-CHARACTER-CONSISTENCY / SHOT-CONTINUITY FIX (2026-07-31, PARTIALLY REVERTED
-2026-08-18 - see CONTINUITY-CHAIN REMOVED below): direct feedback after
-watching another upload flagged three related problems: characters
-changing appearance between shots (e.g. an old mother appearing out of
-nowhere), no visual continuity of motion/framing between consecutive shots,
-and occasional visual/content mismatches. Root cause: every shot was being
-generated as a pure text-to-video call with zero visual anchor, so Agnes
-had nothing to hold identity or continuity to across independent
-generations. Two additions, both confirmed against Agnes's own live API
-docs (agnes-image-2.1-flash for images, agnes-video-v2.0 image-to-video
-mode for video) and both still within the $0/free-tier ceiling:
-1. generate_character_reference() calls Agnes's image model ONCE per
-   script, right before shot 0, using the same setting_and_characters
-   anchor text already used for prompts, plus the quality/anachronism
-   guards. The resulting image URL is stored in scripts.character_reference_url
-   (new column) so it's generated at most once per script, ever - reused
-   on every resumed run.
-2. Every shot's Agnes video call now passes an "image" anchor: shot 0 uses
-   the character reference image; every shot after that uses the LAST
-   FRAME of the previous shot's own clip (extracted via moviepy, uploaded
-   to storage, passed as image-to-video input). This chains shots visually
-   frame-to-frame instead of generating each one blind, which is the same
-   mechanism Agnes's own docs describe for maintaining "consistent character
-   identity" and "natural camera movement" across a sequence. On resume
-   (script picked up mid-way through a later run), the anchor is
-   reconstructed by downloading the most recently completed clip and
-   extracting its last frame, so continuity isn't lost across run
-   boundaries.
-This does NOT use true keyframe-interpolation mode (which needs a known
-END frame, which we don't have ahead of generation) - it uses Agnes's
-image-to-video mode with a single starting anchor image, which is the
-correct mode for "continue from here" rather than "interpolate between
-two known points".
-
-UPLOAD UPSERT FIX (2026-07-31): upload_clip/upload_reference_image/
-upload_video used plain PUT with no upsert flag, so re-uploading to a
-path that already exists (e.g. a script manually reset back to shot 0
-for regeneration) fails with a duplicate-object conflict and crashes the
-whole run instead of overwriting. All three now send "x-upsert: true" so
-regenerating an already-existing script's clips/reference/final video
-always succeeds.
-
-SMOOTH-EXTENSION FIX (2026-08-01): covered in MAX_CHAIN_SEGMENTS comment
-below - chains real Agnes footage instead of freezing on shot/trail
-overflow past MAX_CLIP_SECONDS.
-
-FREEZE-FRAME ROUNDING FIX (2026-08-03): round_to_valid_frames() used
-round-to-nearest when snapping a target frame count to Agnes's valid
-"8n+1" frame grid, which rounds DOWN roughly half the time - producing a
-clip up to ~0.3s shorter than the requested duration, silently eaten by a
-frozen last frame at assembly time. Zia confirmed a persistent ~0.5s
-freeze on every shot despite the 2026-08-01 chain-extension fix, which
-only covers overflow past MAX_CLIP_SECONDS, not this smaller per-shot
-rounding shortfall. Switched to ceiling rounding so every generated clip
-is always >= its target duration - nothing left to freeze except
-sub-frame (a few milliseconds) remainders.
-
-ANACHRONISM GUARD STRENGTHENED (2026-08-03): a generic "no digital
-devices" phrase in ANACHRONISM_GUARD wasn't specific enough - Agnes
-rendered people sitting behind laptops in a 1994 Rwanda scene despite it.
-Added explicit named objects (laptops, computers, smartphones, tablets,
-screens/monitors, modern furniture, electrical wiring, plastic) so the
-model has concrete nouns to avoid instead of a vague category.
-
-CONTENT-POLICY FALLBACK, FIRST PASS (2026-08-07): content_flagged scripts
-(9404bc29 - Bosnian siege, 716623f1 - Rwandan genocide, 92dec2f9 - Nazi-era
-Germany) were all flagged on individually mundane shots. The hypothesis at
-the time was that setting_and_characters itself (prepended to every shot's
-prompt) was the trigger, since it routinely contains ethnic-group names and
-genocide/war-crime context (Hutu, Tutsi, Bosniak, Serb, Nazi, SS, siege...).
-A single-level fallback was added: on ContentPolicyRejection, retry once
-with visual_description dropped and the anchor run through
-_sanitize_anchor_for_fallback (strips clauses containing a fixed keyword
-list). This was only a PARTIAL fix.
-
-3-TIER FALLBACK (2026-08-12): all 4 scripts reset after the 2026-08-07 fix
-landed re-flagged anyway - including "The Mechanic Who Kept Solidarity
-Rolling" (82eb9746, 1980s communist Poland), which has ZERO ethnicity or
-atrocity content in its setting_and_characters at all. This proves the
-single sanitized-anchor fallback was never a complete fix: whatever Agnes
-is actually reacting to on some shots isn't fully captured by the
-ethnicity/atrocity keyword list, and once that one fallback also gets
-rejected there was nowhere further to go except flag the whole script.
-build_agnes_prompt now supports a THIRD, anchor-free tier: if the
-sanitized-anchor fallback (tier 1) is ALSO rejected, _generate_one_segment
-retries once more with a fully generic, episode-agnostic prompt (no anchor,
-no character names, no location/ethnicity text at all - just shot_type +
-lighting/quality/anachronism guards). Only if that ultra-generic prompt is
-STILL rejected does the shot actually fail and the script get flagged -
-which should now be rare to the point of near-zero, since tier 2 carries
-no story-specific content whatsoever for Agnes to react to.
-
-VISUAL-STYLE MODERNIZATION (2026-08-15): QUALITY_GUARD previously pushed a
-"shot on film, natural film grain" look - this fought sepia/washed-out
-grading (good) but the grain/film framing itself still read as classic
-analog rather than modern digital cinema, and every fallback tier's
-"{shot_type} cinematic documentary shot" phrasing nudged Agnes toward a
-dated, observational documentary aesthetic on top of that. Story content
-(setting_and_characters, ANACHRONISM_GUARD) stays historically accurate as
-before - only the camera/color-grade language changed. QUALITY_GUARD now
-describes a modern high-end digital cinema look (crisp clarity, shallow
-depth of field, professional color grading, cinematic lighting) instead of
-film grain, while still explicitly guarding against a flat/synthetic AI
-look so dropping the grain cue doesn't let AI artifacts show through more.
-Every fallback-tier "cinematic documentary shot" phrase was replaced with
-"modern high-production cinematic shot" so the visual-style language no
-longer nudges toward a documentary look; the fallback tiers' actual story
-content (or lack of it, in tier 2) is unchanged.
-
-SYNTAX FIX (2026-08-18): _generate_one_segment had a stray over-indented
-line (`shot["_has_motion_anchor"] = bool(anchor_image_url)` at 8 spaces
-instead of 4) - a plain Python IndentationError, confirmed live against
-the deployed file and against a real failed run's traceback
-(video_generation.py, line 834), meaning this script has been crashing
-on every single invocation since whenever this line landed. No logic
-changed, purely a whitespace fix. Verified the corrected version compiles
-before pushing, per the mandatory debugging methodology in
-DEBUGGING_METHODOLOGY.md.
-
-CONTINUITY-CHAIN REMOVED (2026-08-18): direct feedback from Zia after
-watching the first two uploads produced under the fixed pipeline - scenes
-were not ending cleanly; a subject (e.g. a girl walking) would visibly
-morph/deform mid-transition into the next shot instead of cutting. Root
-cause: process_script was calling get_continuity_anchor()/chaining every
-shot's last frame into the NEXT shot's image-to-video input (the
-2026-07-31 fix above). Agnes has to "unfreeze" from that static anchor
-frame into new motion at the start of every shot, so scene transitions
-never land as a clean hard cut - they resolve through a brief
-morph/deform period instead. Zia confirmed character continuity across
-shots was never an actual requirement. Cross-shot chaining is now fully
-disabled: anchor_image_url is always None going into the per-shot
-generation loop, and the previous shot's last-frame extraction/carry-
-forward after each shot was removed. get_continuity_anchor(),
-extract_last_frame_url(), and generate_character_reference() are left
-defined but unused/dormant (not deleted), in case a future single-
-protagonist format wants chaining back. This does NOT touch the
-SEPARATE intra-shot chain-extension mechanism (MAX_CHAIN_SEGMENTS,
-_generate_one_segment's own internal chaining to cover one shot's
-overflow past MAX_CLIP_SECONDS, or the outro trail chaining in
-assemble_final_video) - those anchor a shot's own continuation segments
-to themselves, not to a different, unrelated next shot, so they don't
-produce the same identity-morph artifact and Zia did not flag them.
-
-TRAIL-EXTENSION CRASH FIX (2026-08-20): root-caused the 25-consecutive-run
-failure streak (GitHub issues #138-#162). assemble_final_video's trail-
-extension block for the LAST shot (which ALWAYS triggers, since
-TRAIL_SECONDS is always added to the last shot's target duration before
-assembly, so clip.duration < shot_durations[i] is unconditionally true
-every single time this function runs) was calling
-_extract_last_frame_local() and _upload_local_image_for_anchor() OUTSIDE
-the surrounding try/except - so any transient failure there (moviepy frame
-extraction, a flaky Supabase Storage upload) threw an uncaught exception
-straight out of process_script() and killed the entire run with a non-zero
-exit, instead of being caught by the existing "fall back to freeze-hold"
-except block right below it. Because scripts are processed oldest-first
-and script ba5d96c8 (31/31 shots done, stuck at assembly) has been the
-oldest ready candidate on every run, it was hit first every time - so the
-whole run died at this exact point before any other candidate script ever
-got a chance to generate a single shot. Fix: both calls moved inside the
-existing try block, so this now fails soft (freeze-hold fallback, same as
-every other failure mode in this function) instead of crashing the run.
-CONFIRMED WORKING 2026-08-20: Zia manually triggered a run and it
-completed assembly successfully for the first time (script ba5d96c8, all
-31 shots, real trail-extension, no crash) - direct proof from a live run
-log, not inferred.
-
-UPLOAD SIZE FIX (2026-08-20, same day): the successful run above still
-failed at the very last step - upload_video() got HTTP 400 "Payload too
-large / EntityTooLarge" from Supabase Storage. Confirmed via Supabase's
-own docs that Free-tier projects have a hard, non-negotiable 50MB-per-file
-cap (cannot be raised without a paid plan - out of scope per Zia's
-strictly-free-tier standing rule). The assembled video was 56.4MB for
-this 19+ minute (1152s) episode. Root cause: compute_target_bitrate()'s
-floor of 300_000 bits/sec was overriding the intended target_mb=42
-calculation for long episodes - the floor was meant as a rare sanity
-minimum, not a routine override, but for anything this long it always
-won. Floor lowered to 80_000 (true sanity-only floor) and target_mb
-raised slightly to 44 (more headroom under the 50MB cap for muxing/
-container overhead). Hand-verified against this exact video's real
-numbers: new formula gives ~192kbps video bitrate -> total output ~44.0MB,
-comfortably under the 50MB cap. NOT YET CONFIRMED against a real run -
-next run on script ba5d96c8 (still sitting at 31/31 shots, unaffected by
-this change) should go straight to reassembly/upload with no shot
-regeneration needed, and should now succeed end to end.
-
-CODEC SWITCH TO HEVC/H.265 (2026-08-20, same day, item 4 of that day's
-CONTINUATION.md): the UPLOAD SIZE FIX above solved the crash but only by
-crushing video bitrate to ~192kbps at 1280x720, which looks close to
-144p - confirmed directly by Zia watching the actual upload. Root cause
-of the trade-off: H.264 (libx264) needs roughly 2500-4000kbps at 720p to
-look normal, and the 50MB Supabase free-tier cap can't fit that for a
-~19-minute episode no matter how compute_target_bitrate() is tuned - the
-cap and H.264 at this length/resolution are fundamentally incompatible
-at watchable quality. Per Zia's explicit decision, switched the FINAL
-assembled video's encode (assemble_final_video's write_videofile call
-only - NOT the intermediate chain-extension segment encode a few hundred
-lines above, which gets re-encoded at final assembly anyway and stays on
-libx264 for speed) from codec="libx264" to codec="libx265". HEVC is
-roughly 40-50% more efficient than H.264 at the same bitrate, so the same
-~44MB budget now buys meaningfully better perceived quality, without
-touching resolution, episode length, or the 50MB cap itself. Confirmed
-BEFORE pushing (per DEBUGGING_METHODOLOGY.md - do not assume a runner has
-a codec without checking) that libx265 is actually present in the exact
-static ffmpeg binary moviepy/imageio-ffmpeg bundles and runs on GitHub's
-Ubuntu runners (johnvansickle.com static build, built with
---enable-libx265) - this is NOT a system package and there is no apt-get
-ffmpeg step in video_generation.yml, so this had to be verified against
-the real bundled binary, not assumed from the OS image's installed-
-software list (ffmpeg is not in that list at all). Added
-ffmpeg_params=["-preset", "fast", "-tag:v", "hvc1"]: "-preset fast"
-because libx265 encodes noticeably slower than libx264 and
-video_generation.yml's job has a 60-minute timeout that a ~19-minute
-episode's encode should not be allowed to threaten; "-tag:v hvc1" because
-HEVC-in-MP4 defaults to a "hev1" tag that some players/services handle
-inconsistently, while "hvc1" is the more broadly compatible tag for HEVC
-in an MP4 container. NOT YET CONFIRMED against a real run - next
-assembly run should be watched end-to-end (encode completes within the
-60-minute job timeout, output uploads successfully, and Zia confirms the
-picture quality is actually improved) before this is considered proven.
-"""
-
 import os
 import re
 import json
@@ -508,6 +109,31 @@ CAPTION_STROKE_COLOR = (0, 0, 0, 255)
 CAPTION_STROKE_WIDTH = 3
 CAPTION_BG_COLOR = (0, 0, 0, 140)
 CAPTION_BG_PADDING = 16
+
+# CHUNKED-UPLOAD QUALITY FIX (2026-08-20, replaces UPLOAD SIZE FIX from
+# earlier the same day): the earlier same-day fix kept every video under
+# Supabase's 50MB free-tier cap by CRUSHING bitrate to whatever fit in one
+# file - fine for short episodes, but for this pipeline's typical 15-20+
+# minute episodes it forced the video down to ~144p-equivalent quality
+# (confirmed directly by Zia watching a 19-minute upload). Two of the
+# earlier uploads (shorter episodes) looked fine under that scheme; the
+# 19-minute one did not - proving the bitrate-crushing approach doesn't
+# scale with episode length. Root fix, per Zia's explicit direction:
+# NEVER shrink bitrate to hit a size cap again. Bitrate is now fixed at a
+# genuinely good quality level regardless of duration
+# (QUALITY_VIDEO_BITRATE_KBPS). If the resulting file would exceed the
+# 50MB cap, the final video is instead split into multiple sequential
+# chunks - each safely under MAX_CHUNK_MB - uploaded as separate files
+# (script_id/part_001.mp4, part_002.mp4, ...), with all chunk URLs saved
+# to the new video_chunk_urls column. video_url (singular) is still set
+# ONLY when the episode fit in one file, for backward compatibility with
+# anything downstream still reading that column.
+# NOT YET WIRED: re-stitching these chunks back into one file happens
+# OUTSIDE Supabase (wherever the video next leaves Supabase, e.g. a
+# YouTube upload step) - that stitching step does not exist yet as of
+# this commit and is the deliberate next task, not part of this fix.
+QUALITY_VIDEO_BITRATE_KBPS = 3000   # fixed, duration-independent - healthy 720p HEVC quality
+MAX_CHUNK_MB = 45                   # safety margin under Supabase's hard 50MB cap
 
 
 class ContentPolicyRejection(Exception):
@@ -1143,23 +769,73 @@ def compute_shot_start_times(shot_durations):
     return starts
 
 
-def compute_target_bitrate(duration_seconds, target_mb=44, audio_kbps=128):
-    # UPLOAD SIZE FIX (2026-08-20): floor was 300_000 (300kbps), which
-    # OVERRODE the target_mb-based calculation for any long episode -
-    # meant as a rare sanity minimum, it was in practice winning the max()
-    # every time for anything ~15+ minutes, producing output well over
-    # Supabase's hard 50MB free-tier upload cap (confirmed: this exact
-    # formula produced 56.4MB for a 1152s/19-minute episode, which then
-    # failed upload with a 400 EntityTooLarge error). Floor lowered to
-    # 80_000 (true sanity-only floor, essentially never binding in
-    # practice) and target_mb raised slightly (42->44) for a bit more
-    # muxing/container headroom while staying safely under 50MB. Hand-
-    # verified against the actual failing video's real numbers: new
-    # formula gives ~192kbps video bitrate -> ~44.0MB total output.
-    target_bits = target_mb * 8 * 1024 * 1024
-    audio_bits = audio_kbps * 1000 * duration_seconds
-    video_bits = max(target_bits - audio_bits, 80_000 * duration_seconds)
-    return f"{int(video_bits / duration_seconds / 1000)}k"
+def compute_target_bitrate(duration_seconds=None, audio_kbps=128):
+    # CHUNKED-UPLOAD QUALITY FIX (2026-08-20): no longer takes duration or
+    # target_mb into account at all - bitrate used to be squeezed down as
+    # episodes got longer, which is exactly what produced the ~144p-looking
+    # 19-minute upload Zia flagged. Video bitrate is now a FIXED quality
+    # value (QUALITY_VIDEO_BITRATE_KBPS) regardless of how long the episode
+    # is. If a fixed-bitrate encode would be too big for one 50MB file,
+    # that's handled by chunking the output afterward (see
+    # split_video_into_chunks / upload_video_chunked below) - never by
+    # dropping quality. duration_seconds/audio_kbps args kept for call-site
+    # compatibility but no longer change the result.
+    return f"{QUALITY_VIDEO_BITRATE_KBPS}k"
+
+
+def estimate_output_size_mb(duration_seconds, video_kbps=QUALITY_VIDEO_BITRATE_KBPS, audio_kbps=128):
+    total_kbps = video_kbps + audio_kbps
+    total_bits = total_kbps * 1000 * duration_seconds
+    return total_bits / 8 / 1024 / 1024
+
+
+def split_video_into_chunks(local_path, max_chunk_mb=MAX_CHUNK_MB):
+    """
+    Splits an already-encoded local video file into N sequential chunks,
+    each estimated to land safely under max_chunk_mb, using the file's
+    actual on-disk size (not an estimate) to decide N. Chunks are cut on
+    plain time boundaries (not shot-aligned) - acceptable for now since
+    re-stitching happens downstream before anything is watched; shot-
+    aligned cutting can be added later if clean cut points matter for the
+    eventual stitch step.
+    Returns a list of local file paths (chunk_paths), NOT URLs - caller is
+    responsible for uploading and cleanup.
+    """
+    actual_size_mb = os.path.getsize(local_path) / (1024 * 1024)
+    if actual_size_mb <= max_chunk_mb:
+        return [local_path]
+
+    num_chunks = math.ceil(actual_size_mb / max_chunk_mb)
+    clip = VideoFileClip(local_path)
+    total_duration = clip.duration
+    chunk_duration = total_duration / num_chunks
+
+    print(f"Final video is {actual_size_mb:.1f}MB, over the {max_chunk_mb}MB per-file chunk target - "
+          f"splitting into {num_chunks} chunks (~{chunk_duration:.1f}s each) instead of shrinking bitrate.")
+
+    chunk_paths = []
+    for i in range(num_chunks):
+        start = i * chunk_duration
+        end = min((i + 1) * chunk_duration, total_duration)
+        sub = clip.subclipped(start, end)
+        chunk_path = local_path.replace(".mp4", f"_part{i + 1:02d}.mp4")
+        sub.write_videofile(
+            chunk_path,
+            fps=FRAME_RATE,
+            codec="libx265",
+            audio_codec="aac",
+            audio_bitrate="128k",
+            bitrate=f"{QUALITY_VIDEO_BITRATE_KBPS}k",
+            threads=2,
+            logger=None,
+            ffmpeg_params=["-preset", "fast", "-tag:v", "hvc1"],
+        )
+        chunk_paths.append(chunk_path)
+        chunk_size_mb = os.path.getsize(chunk_path) / (1024 * 1024)
+        print(f"  Chunk {i + 1}/{num_chunks}: {chunk_size_mb:.1f}MB")
+
+    clip.close()
+    return chunk_paths
 
 
 def poll_ace_music_task(task_id, out_path, base_url=None, max_wait=180, interval=8):
@@ -1543,8 +1219,14 @@ def assemble_final_video(script_id, video_urls, narration_path, music_mood, shot
 
     final = final.with_effects([FadeIn(FADE_IN_SECONDS), FadeOut(FADE_OUT_SECONDS)])
     final = final.with_audio(final_audio)
-    target_bitrate = compute_target_bitrate(total_duration)
-    print(f"Target video bitrate: {target_bitrate} (duration {total_duration:.1f}s)")
+    # CHUNKED-UPLOAD QUALITY FIX (2026-08-20): bitrate is now fixed/quality-
+    # driven (see compute_target_bitrate above) - duration no longer
+    # affects it, so the encode below is always done at full quality.
+    # Whether the result needs chunking to fit Supabase's 50MB cap is
+    # decided AFTER this encode, in process_script, based on the real
+    # output file size - not by lowering bitrate ahead of time.
+    target_bitrate = compute_target_bitrate()
+    print(f"Target video bitrate: {target_bitrate} (fixed, quality-driven - duration was {total_duration:.1f}s)")
     final.write_videofile(
         output_path,
         fps=FRAME_RATE,
@@ -1583,8 +1265,68 @@ def upload_video(script_id, file_path):
     return f"{SUPABASE_URL}/storage/v1/object/public/{VIDEO_BUCKET}/{file_name}"
 
 
-def mark_video_generated(script_id, video_url, audio_stats=None):
-    update = {"status": "video_generated", "video_url": video_url}
+def upload_video_chunk(script_id, chunk_index, file_path):
+    file_name = f"{script_id}/part_{chunk_index:03d}.mp4"
+    file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    print(f"Uploading chunk {chunk_index}: {file_size_mb:.1f}MB")
+    with open(file_path, "rb") as f:
+        file_bytes = f.read()
+
+    resp = requests.put(
+        f"{SUPABASE_URL}/storage/v1/object/{VIDEO_BUCKET}/{file_name}",
+        headers={
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "video/mp4",
+            "x-upsert": "true",
+        },
+        data=file_bytes,
+        timeout=300,
+    )
+    if resp.status_code >= 400:
+        print(f"Chunk upload failed - status {resp.status_code}: {resp.text}")
+    resp.raise_for_status()
+    return f"{SUPABASE_URL}/storage/v1/object/public/{VIDEO_BUCKET}/{file_name}"
+
+
+def upload_video_chunked(script_id, local_path):
+    """
+    CHUNKED-UPLOAD QUALITY FIX (2026-08-20): replaces a single upload_video
+    call at the point where the final assembled video is uploaded.
+    Checks the real on-disk size of the already-encoded (full-quality)
+    output file; if it fits under Supabase's 50MB cap as one file, uploads
+    it exactly as before (single video_url, unchanged behavior). If not,
+    splits it into multiple full-quality chunks (split_video_into_chunks)
+    and uploads each separately, returning a list of chunk URLs instead.
+    Local chunk files are cleaned up after upload either way.
+    Returns (video_url_or_None, video_chunk_urls_list_or_None) - exactly
+    one of the two will be non-None.
+    """
+    chunk_paths = split_video_into_chunks(local_path)
+
+    if len(chunk_paths) == 1 and chunk_paths[0] == local_path:
+        video_url = upload_video(script_id, local_path)
+        return video_url, None
+
+    chunk_urls = []
+    for i, chunk_path in enumerate(chunk_paths, start=1):
+        chunk_url = upload_video_chunk(script_id, i, chunk_path)
+        chunk_urls.append(chunk_url)
+        os.remove(chunk_path)
+
+    print(f"Uploaded {len(chunk_urls)} chunks for script {script_id}. "
+          f"NOTE: re-stitching into one file is a separate, not-yet-built step - "
+          f"chunk_urls are stored in order and are individually complete, playable "
+          f"video files in the meantime.")
+    return None, chunk_urls
+
+
+def mark_video_generated(script_id, video_url=None, video_chunk_urls=None, audio_stats=None):
+    update = {"status": "video_generated"}
+    if video_url is not None:
+        update["video_url"] = video_url
+    if video_chunk_urls is not None:
+        update["video_chunk_urls"] = video_chunk_urls
     if audio_stats is not None:
         update["music_generated"] = audio_stats.get("music_generated", False)
         update["sfx_applied_count"] = audio_stats.get("sfx_applied_count", 0)
@@ -1710,10 +1452,13 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
         output_path = "/tmp/final_video.mp4"
         output_path, audio_stats = assemble_final_video(script_id, video_urls, audio_path, music_mood, shot_list, shot_durations, output_path, setting_and_characters=setting_and_characters)
 
-        video_url = upload_video(script_id, output_path)
-        print(f"Uploaded: {video_url}")
+        video_url, video_chunk_urls = upload_video_chunked(script_id, output_path)
+        if video_url:
+            print(f"Uploaded as a single file: {video_url}")
+        else:
+            print(f"Uploaded as {len(video_chunk_urls)} chunks (single-file would have exceeded 50MB at full quality).")
 
-        mark_video_generated(script_id, video_url, audio_stats)
+        mark_video_generated(script_id, video_url=video_url, video_chunk_urls=video_chunk_urls, audio_stats=audio_stats)
         print("Done.")
 
     return shots_used
