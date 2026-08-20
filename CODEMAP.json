@@ -745,7 +745,7 @@
       "functions": [
         {
           "name": "split_narration_into_chunks",
-          "line": 85,
+          "line": 101,
           "args": [
             "narration_text",
             "num_chunks"
@@ -762,7 +762,7 @@
         },
         {
           "name": "normalize_shot",
-          "line": 115,
+          "line": 131,
           "args": [
             "shot",
             "index"
@@ -775,7 +775,7 @@
         },
         {
           "name": "normalize_hook_text",
-          "line": 142,
+          "line": 169,
           "args": [
             "result"
           ],
@@ -790,7 +790,7 @@
         },
         {
           "name": "hook_text_matches_prompt_example",
-          "line": 158,
+          "line": 185,
           "args": [
             "hook_text"
           ],
@@ -804,7 +804,7 @@
         },
         {
           "name": "hook_text_too_long_to_glance",
-          "line": 165,
+          "line": 192,
           "args": [
             "hook_text"
           ],
@@ -816,7 +816,7 @@
         },
         {
           "name": "hook_text_matches_story",
-          "line": 170,
+          "line": 197,
           "args": [
             "hook_text",
             "narration_text"
@@ -832,7 +832,7 @@
         },
         {
           "name": "find_duplicate_shots",
-          "line": 184,
+          "line": 211,
           "args": [
             "normalized_shots"
           ],
@@ -846,7 +846,7 @@
         },
         {
           "name": "find_empty_shots",
-          "line": 196,
+          "line": 223,
           "args": [
             "normalized_shots"
           ],
@@ -858,7 +858,7 @@
         },
         {
           "name": "find_continuation_language_shots",
-          "line": 203,
+          "line": 230,
           "args": [
             "normalized_shots"
           ],
@@ -871,7 +871,7 @@
         },
         {
           "name": "find_loitering_shots",
-          "line": 214,
+          "line": 241,
           "args": [
             "normalized_shots"
           ],
@@ -884,7 +884,7 @@
         },
         {
           "name": "find_missing_onscreen_text_shots",
-          "line": 225,
+          "line": 252,
           "args": [
             "normalized_shots"
           ],
@@ -898,7 +898,7 @@
         },
         {
           "name": "find_dominant_subject",
-          "line": 234,
+          "line": 261,
           "args": [
             "normalized_shots"
           ],
@@ -912,7 +912,7 @@
         },
         {
           "name": "find_excessive_consecutive_subject",
-          "line": 247,
+          "line": 274,
           "args": [
             "normalized_shots"
           ],
@@ -923,8 +923,21 @@
           "docstring": ""
         },
         {
+          "name": "find_location_change_without_establishing",
+          "line": 289,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "append",
+            "enumerate",
+            "lower"
+          ],
+          "docstring": "DIRECTOR FEATURE (2026-08-20): whenever location_tag changes between"
+        },
+        {
           "name": "validate_and_normalize_shot_response",
-          "line": 262,
+          "line": 306,
           "args": [
             "result",
             "narration_text"
@@ -936,6 +949,7 @@
             "find_duplicate_shots",
             "find_empty_shots",
             "find_excessive_consecutive_subject",
+            "find_location_change_without_establishing",
             "find_loitering_shots",
             "find_missing_onscreen_text_shots",
             "get",
@@ -955,7 +969,7 @@
         },
         {
           "name": "build_shot_breakdown_chunk_prompt",
-          "line": 539,
+          "line": 635,
           "args": [
             "title",
             "angle",
@@ -965,6 +979,7 @@
             "min_shots_chunk",
             "max_shots_chunk",
             "setting_and_characters",
+            "color_palette",
             "prior_last_subject",
             "prior_last_movement"
           ],
@@ -977,7 +992,7 @@
         },
         {
           "name": "generate_shot_breakdown",
-          "line": 694,
+          "line": 812,
           "args": [
             "title",
             "angle",
@@ -1004,7 +1019,7 @@
         },
         {
           "name": "_simplify",
-          "line": 159,
+          "line": 186,
           "args": [
             "s"
           ],
