@@ -10,6 +10,16 @@ change. See script_writing.py's module docstring for full history.
 DIRECTOR FEATURES ADDED (2026-08-20): lighting, beat_intensity, and
 location_tag per-shot fields, plus an episode-wide color_palette anchor
 (carried across chunks the same way setting_and_characters is).
+
+WRITER/CHECKER SPLIT (2026-08-20, Loop Skill 2): once a stitched shot list
+passes validate_and_normalize_shot_response's deterministic checks, it's
+now also graded by a fresh, independent LLM call
+(quality_checker.grade_shot_breakdown) against the channel's house rules -
+catches violations (shots that dodge the banned-phrase keyword scans via
+paraphrasing, visual drift from the setting anchor, monotonous pacing) that
+slip past keyword/structural checks while still violating their spirit. A
+checker rejection is treated exactly like any other content failure below -
+same retry/wait/attempt-count loop, no new infra.
 """
 
 import re
@@ -17,6 +27,7 @@ import time
 from collections import Counter
 
 from llm_client import call_llm, extract_json, DailyQuotaExhausted, InfraFailure
+from quality_checker import grade_shot_breakdown
 
 MIN_SHOTS = 25
 MAX_SHOTS = 35
@@ -816,7 +827,10 @@ def generate_shot_breakdown(title, angle, narration_text):
     provider's free-tier token ceiling. All chunk shot_lists are stitched
     and renumbered, then validated with the exact same episode-wide rules
     as before chunking (validate_and_normalize_shot_response is unchanged
-    in structure, only extended with the new color_palette/location checks)."""
+    in structure, only extended with the new color_palette/location checks).
+    A stitched list that passes those deterministic checks is then graded
+    by quality_checker.grade_shot_breakdown (2026-08-20, Loop Skill 2)
+    before being accepted - see module docstring."""
     chunks = split_narration_into_chunks(narration_text, NUM_SHOT_CHUNKS)
     num_chunks = len(chunks)
 
@@ -924,6 +938,23 @@ def generate_shot_breakdown(title, angle, narration_text):
 
         is_valid, validated = validate_and_normalize_shot_response(result, narration_text)
         if is_valid:
+            # WRITER/CHECKER SPLIT (2026-08-20, Loop Skill 2): fresh
+            # independent grading call against the house rules, before
+            # acceptance. Treated exactly like any other content failure.
+            passed, grade_reason = grade_shot_breakdown(
+                title, angle,
+                validated["setting_and_characters"], validated["color_palette"], validated["shot_list"],
+            )
+            if not passed:
+                last_reason = f"checker rejected shot list - {grade_reason}"
+                print(f"[shots] Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
+                if content_attempt < MAX_GENERATION_ATTEMPTS:
+                    print(f"Waiting {CONTENT_RETRY_WAIT_SECONDS}s before next content attempt "
+                          f"(prevents bursting past the free-tier RPM ceiling)...")
+                    time.sleep(CONTENT_RETRY_WAIT_SECONDS)
+                continue
+
+            print(f"[shots] Checker passed ({grade_reason}).")
             return validated
 
         last_reason = validated
