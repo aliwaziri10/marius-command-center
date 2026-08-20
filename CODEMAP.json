@@ -1680,7 +1680,7 @@
       "functions": [
         {
           "name": "fetch_scripts",
-          "line": 50,
+          "line": 58,
           "args": [
             "status",
             "limit",
@@ -1695,7 +1695,7 @@
         },
         {
           "name": "check_url_alive",
-          "line": 61,
+          "line": 69,
           "args": [
             "url",
             "min_bytes"
@@ -1709,24 +1709,26 @@
         },
         {
           "name": "verify_shot_breakdown_script",
-          "line": 80,
+          "line": 88,
           "args": [
             "script"
           ],
           "calls": [
             "append",
             "enumerate",
+            "fromisoformat",
             "get",
             "isinstance",
             "len",
             "loads",
+            "replace",
             "strip"
           ],
           "docstring": "Any script that has passed shot breakdown (status images_generated"
         },
         {
           "name": "verify_video_generated_script",
-          "line": 120,
+          "line": 141,
           "args": [
             "script"
           ],
@@ -1742,7 +1744,7 @@
         },
         {
           "name": "check_stalled_scripts",
-          "line": 150,
+          "line": 171,
           "args": [],
           "calls": [
             "append",
@@ -1754,7 +1756,7 @@
         },
         {
           "name": "run_verification",
-          "line": 165,
+          "line": 186,
           "args": [
             "stage"
           ],
@@ -1774,7 +1776,7 @@
         },
         {
           "name": "main",
-          "line": 194,
+          "line": 215,
           "args": [],
           "calls": [
             "ArgumentParser",
