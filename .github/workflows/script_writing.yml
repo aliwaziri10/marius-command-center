@@ -31,6 +31,12 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python scripts/script_writing.py
 
+      - name: Verify run output
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python scripts/verify_run_output.py --stage script_writing
+
       - name: Open issue on failure
         if: failure()
         env:
