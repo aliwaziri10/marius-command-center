@@ -6,6 +6,10 @@ the LLM's per-request token ceiling.
 
 SPLIT OUT (2026-08-18): relocated from script_writing.py with no behavior
 change. See script_writing.py's module docstring for full history.
+
+DIRECTOR FEATURES ADDED (2026-08-20): lighting, beat_intensity, and
+location_tag per-shot fields, plus an episode-wide color_palette anchor
+(carried across chunks the same way setting_and_characters is).
 """
 
 import re
@@ -22,6 +26,8 @@ MAX_HOOK_TEXT_CHARS = 40
 MAX_HOOK_TEXT_WORDS = 5
 MIN_SETTING_CHARS = 40
 MAX_SETTING_CHARS = 900
+MIN_PALETTE_CHARS = 20
+MAX_PALETTE_CHARS = 400
 MAX_SHOT_REPEAT_COUNT = 2
 CONTENT_RETRY_WAIT_SECONDS = 25
 
@@ -47,6 +53,16 @@ VALID_CAMERA_MOVEMENTS = {
 VALID_LENS_EFFECTS = {
     "shallow_depth_of_field", "lens_flare", "film_grain", "none"
 }
+
+# DIRECTOR FEATURES (2026-08-20)
+VALID_LIGHTING = {
+    "dawn", "morning", "midday", "golden_hour", "dusk", "night",
+    "overcast", "firelight", "interior_lamp", "moonlight",
+}
+DEFAULT_LIGHTING = "midday"
+
+VALID_BEAT_INTENSITY = {"low", "mid", "high"}
+DEFAULT_BEAT_INTENSITY = "mid"
 
 ZOOM_FAMILY_MOVEMENTS = {"push_in", "crash_zoom", "zoom_in", "snap_zoom", "dolly_in"}
 MAX_ZOOM_SHOT_RATIO = 0.32
@@ -125,6 +141,14 @@ def normalize_shot(shot, index):
     if lens_effect not in VALID_LENS_EFFECTS:
         lens_effect = "none"
 
+    lighting = shot.get("lighting")
+    if lighting not in VALID_LIGHTING:
+        lighting = DEFAULT_LIGHTING
+
+    beat_intensity = shot.get("beat_intensity")
+    if beat_intensity not in VALID_BEAT_INTENSITY:
+        beat_intensity = DEFAULT_BEAT_INTENSITY
+
     return {
         "shot_number": shot.get("shot_number", index + 1),
         "visual_description": shot.get("visual_description", ""),
@@ -136,6 +160,9 @@ def normalize_shot(shot, index):
         "sfx_cue": shot.get("sfx_cue", ""),
         "primary_subject": (shot.get("primary_subject") or "").strip(),
         "required_onscreen_text": (shot.get("required_onscreen_text") or "").strip(),
+        "lighting": lighting,
+        "beat_intensity": beat_intensity,
+        "location_tag": (shot.get("location_tag") or "").strip(),
     }
 
 
@@ -259,12 +286,30 @@ def find_excessive_consecutive_subject(normalized_shots):
     return None
 
 
+def find_location_change_without_establishing(normalized_shots):
+    """DIRECTOR FEATURE (2026-08-20): whenever location_tag changes between
+    consecutive shots (and both are non-empty), the new shot must be
+    'wide' or 'establishing' shot_type. Shots with no location_tag set are
+    skipped entirely (opt-in field, never blocks scripts that don't use it)."""
+    hits = []
+    prev_location = None
+    for i, s in enumerate(normalized_shots):
+        loc = s["location_tag"]
+        if loc and prev_location and loc.lower() != prev_location.lower():
+            if s["shot_type"] not in ("wide", "establishing"):
+                hits.append((i, prev_location, loc))
+        if loc:
+            prev_location = loc
+    return hits
+
+
 def validate_and_normalize_shot_response(result, narration_text):
     """Validates everything EXCEPT narration_text/CTA, since those were
     already confirmed during the narration stage before this is ever called.
     Runs on the FULL stitched shot list (all chunks combined), so every
     episode-wide check here (total shot count, zoom ratio, subject
-    dominance, etc.) still applies exactly as before chunking was added."""
+    dominance, location/establishing discipline, etc.) still applies
+    exactly as before chunking was added."""
     setting_and_characters = (result.get("setting_and_characters") or "").strip()
     if len(setting_and_characters) < MIN_SETTING_CHARS:
         return False, (
@@ -274,6 +319,15 @@ def validate_and_normalize_shot_response(result, narration_text):
             f"recurring character's appearance"
         )
     result["setting_and_characters"] = setting_and_characters[:MAX_SETTING_CHARS]
+
+    color_palette = (result.get("color_palette") or "").strip()
+    if len(color_palette) < MIN_PALETTE_CHARS:
+        return False, (
+            f"color_palette missing or too short ({len(color_palette)} chars, need "
+            f"at least {MIN_PALETTE_CHARS}) - must give a concrete episode-wide color "
+            f"and mood palette (e.g. dominant tones, saturation, contrast feel)"
+        )
+    result["color_palette"] = color_palette[:MAX_PALETTE_CHARS]
 
     shot_list = result.get("shot_list")
     if not isinstance(shot_list, list) or len(shot_list) == 0:
@@ -391,6 +445,16 @@ def validate_and_normalize_shot_response(result, narration_text):
             f"of almost every single shot."
         )
 
+    location_hits = find_location_change_without_establishing(normalized_shots)
+    if location_hits:
+        idx, prev_loc, new_loc = location_hits[0]
+        return False, (
+            f"shot {idx} moves location from {prev_loc!r} to {new_loc!r} without using "
+            f"a 'wide' or 'establishing' shot_type - whenever the story cuts to a new "
+            f"location, the first shot there must re-establish it wide before cutting "
+            f"closer, exactly like a real documentary edit."
+        )
+
     result["shot_list"] = normalized_shots
     result["music_mood"] = result.get("music_mood", "").strip() or (
         "Tense cinematic thriller score, sparse low piano and rising strings "
@@ -432,6 +496,11 @@ Every shot's "visual_description" must stay consistent with the
 and any recurring person described there must match their fixed appearance
 in every shot they appear in. Do not introduce a different ethnicity,
 region, or unplanned recurring character partway through.
+
+COLOR AND LIGHT (episode-wide "color_palette" anchor given below): every
+shot's mood and lighting choice must feel like it belongs to the same
+graded film - do not swing from warm golden tones to cold blue tones and
+back without a real story reason (time-of-day or location change).
 
 VARY PHYSICAL REACTIONS - DO NOT DEFAULT TO GASPING: when a shot's
 visual_description shows a character reacting to shock, danger, or a
@@ -481,6 +550,23 @@ the camera angle, framing, and body orientation, but keep their fixed
 physical description IDENTICAL to what's stated in "setting_and_characters"
 every single time.
 
+LOCATION CHANGES MUST RE-ESTABLISH (HARD RULE): fill "location_tag" with a
+short consistent name for where the shot physically takes place (e.g.
+"village square", "riverbank", "soldier's tent"). Whenever the story moves
+to a new location, the FIRST shot in that new location must use shot_type
+"wide" or "establishing" before cutting closer - never open a new location
+on a medium or close_up shot. If a shot doesn't have a clearly defined
+location, leave location_tag as "".
+
+MATCH CUTS AND VISUAL RHYMES: where two moments in the story naturally
+echo each other (e.g. hands closing a diary early on, hands closing a
+coffin later), compose both shots with matching framing/composition so the
+visual rhyme reads clearly - this is a major driver of a "crafted" feel.
+
+SILENCE AS A TOOL: not every shot needs an sfx_cue. Before a major reveal
+or emotional beat, it is often stronger to deliberately leave sfx_cue as ""
+and let the moment sit in silence rather than filling it with sound.
+
 LEGIBLE ON-SCREEN TEXT (HARD RULE - THIS IS THE #1 CAUSE OF REJECTED SHOT
 LISTS): if a shot's visual_description mentions ANY of the following words -
 newspaper, letter, document, sign, headline, inscription, poster, map,
@@ -511,6 +597,15 @@ For each shot, provide:
   "" for pure B-roll shots.
 - "required_onscreen_text": if this shot deliberately shows readable text,
   the exact wording that must appear, correctly spelled. Otherwise "".
+- "lighting": one of "dawn", "morning", "midday", "golden_hour", "dusk",
+  "night", "overcast", "firelight", "interior_lamp", "moonlight" - must
+  stay consistent with the story's actual timeline, not jump around
+  without reason.
+- "beat_intensity": one of "low", "mid", "high" - how emotionally charged
+  this exact moment is. Use this to shape pacing: mostly "low"/"mid" early,
+  building toward more "high" beats near the episode's climax.
+- "location_tag": short consistent name for where this shot takes place,
+  or "" if not clearly a distinct location.
 
 PACING RHYTHM (Gen Z attention span - keep it moving):
 - Default to quick shots (roughly 2-4 seconds of narration each).
@@ -533,20 +628,23 @@ SOUND DESIGNER:
 - For each shot, include "sfx_cue" for both loud dramatic moments and
   quieter ambient/atmospheric sound. Aim for at least half of all shots to
   carry some sfx_cue, leaving "" only where truly no distinct sound would
-  be audible."""
+  be audible or where silence is the deliberate choice (see SILENCE AS A
+  TOOL above)."""
 
 
 def build_shot_breakdown_chunk_prompt(
     title, angle, chunk_text, chunk_index, num_chunks,
     min_shots_chunk, max_shots_chunk,
-    setting_and_characters=None, prior_last_subject=None, prior_last_movement=None,
+    setting_and_characters=None, color_palette=None,
+    prior_last_subject=None, prior_last_movement=None,
 ):
     """Builds the prompt for ONE narration chunk's shot breakdown. The
     first chunk (chunk_index == 0) also produces the episode-wide
-    setting_and_characters/hook_text/music_mood anchor; later chunks are
-    handed that same anchor text back so every shot stays visually
-    consistent, and are given a short note on the previous chunk's last
-    shot so cutaway discipline carries across the chunk boundary."""
+    setting_and_characters/hook_text/music_mood/color_palette anchor; later
+    chunks are handed that same anchor text back so every shot stays
+    visually consistent, and are given a short note on the previous
+    chunk's last shot so cutaway discipline carries across the chunk
+    boundary."""
     segment_label = f"segment {chunk_index + 1} of {num_chunks}"
 
     if chunk_index == 0:
@@ -571,6 +669,13 @@ This full anchor will be attached to every single shot's image/video
 generation prompt later in the pipeline (across all {num_chunks} segments),
 so write it as a standalone paragraph that makes sense with no other
 context - 2-5 sentences.
+
+COLOR PALETTE - include "color_palette": a fixed episode-wide color and
+mood grade (e.g. "desaturated blues and greys with warm amber highlights
+at emotional peaks, high contrast, slightly crushed blacks"). This will
+also be attached to every shot's generation prompt, so every shot stays
+visually part of the same graded film rather than looking like disconnected
+images. 1-3 sentences.
 
 THUMBNAIL HOOK TEXT - a short, punchy line of thumbnail cover text that
 would make someone scrolling YouTube stop and click. This is NOT a
@@ -598,6 +703,7 @@ the biggest reveal, then resolving.
 
 """
         json_extra_fields = """  "setting_and_characters": "2-5 sentence fixed anchor for the WHOLE episode.",
+  "color_palette": "1-3 sentence fixed color/mood grade for the WHOLE episode.",
   "hook_text": "Short punchy thumbnail cover line, max {max_words} words and under {max_chars} characters.",
   "music_mood": "Background score prompt for the whole episode, describing its build-up arc.",
 """.format(max_words=MAX_HOOK_TEXT_WORDS, max_chars=MAX_HOOK_TEXT_CHARS)
@@ -612,8 +718,15 @@ character named in it):
 {setting_and_characters}
 ---
 
-Do NOT invent a new setting_and_characters, hook_text, or music_mood in
-this response - this segment only returns a shot_list.
+COLOR PALETTE - this is ALSO ALREADY FIXED for the whole episode. Every
+shot's lighting/mood must stay consistent with it:
+
+---
+{color_palette}
+---
+
+Do NOT invent a new setting_and_characters, color_palette, hook_text, or
+music_mood in this response - this segment only returns a shot_list.
 
 """
         json_extra_fields = ""
@@ -664,7 +777,9 @@ poster, map, book, plaque, telegram, postcard, banner, ledger, diary,
 certificate, or gravestone/tombstone - you MUST fill in
 required_onscreen_text with the exact wording, or rewrite that shot so no
 readable text is the focus. A shot with one of those words present and
-required_onscreen_text left empty will be rejected outright.
+required_onscreen_text left empty will be rejected outright. Also confirm
+every shot has "lighting", "beat_intensity", and "location_tag" filled in,
+and that any location change is opened with a wide/establishing shot.
 
 Return ONLY valid JSON, no other text, no markdown fences, in this exact
 format:
@@ -681,7 +796,10 @@ format:
       "lens_effect": "none",
       "sfx_cue": "",
       "primary_subject": "",
-      "required_onscreen_text": "REQUIRED if visual_description names a newspaper/letter/sign/document/etc - the exact wording, otherwise leave as empty string"
+      "required_onscreen_text": "REQUIRED if visual_description names a newspaper/letter/sign/document/etc - the exact wording, otherwise leave as empty string",
+      "lighting": "midday",
+      "beat_intensity": "mid",
+      "location_tag": "short consistent location name, or empty string"
     }}
   ]
 }}
@@ -697,7 +815,8 @@ def generate_shot_breakdown(title, angle, narration_text):
     apart), instead of one huge call that structurally cannot fit under the
     provider's free-tier token ceiling. All chunk shot_lists are stitched
     and renumbered, then validated with the exact same episode-wide rules
-    as before chunking (validate_and_normalize_shot_response is unchanged)."""
+    as before chunking (validate_and_normalize_shot_response is unchanged
+    in structure, only extended with the new color_palette/location checks)."""
     chunks = split_narration_into_chunks(narration_text, NUM_SHOT_CHUNKS)
     num_chunks = len(chunks)
 
@@ -708,6 +827,7 @@ def generate_shot_breakdown(title, angle, narration_text):
 
     while content_attempt < MAX_GENERATION_ATTEMPTS:
         setting_and_characters = None
+        color_palette = None
         hook_text = None
         music_mood = None
         stitched_shots = []
@@ -727,6 +847,7 @@ def generate_shot_breakdown(title, angle, narration_text):
                 title, angle, chunk_text, idx, num_chunks,
                 CHUNK_MIN_SHOTS, CHUNK_MAX_SHOTS,
                 setting_and_characters=setting_and_characters,
+                color_palette=color_palette,
                 prior_last_subject=prior_last_subject,
                 prior_last_movement=prior_last_movement,
             )
@@ -754,6 +875,7 @@ def generate_shot_breakdown(title, angle, narration_text):
 
             if idx == 0:
                 setting_and_characters = (parsed.get("setting_and_characters") or "").strip()
+                color_palette = (parsed.get("color_palette") or "").strip()
                 hook_text = (parsed.get("hook_text") or "").strip()
                 music_mood = (parsed.get("music_mood") or "").strip()
 
@@ -794,6 +916,7 @@ def generate_shot_breakdown(title, angle, narration_text):
 
         result = {
             "setting_and_characters": setting_and_characters,
+            "color_palette": color_palette,
             "hook_text": hook_text,
             "music_mood": music_mood,
             "shot_list": stitched_shots,
