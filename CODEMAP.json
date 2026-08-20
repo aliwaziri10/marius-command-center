@@ -587,7 +587,7 @@
       "functions": [
         {
           "name": "narration_has_engagement_cta",
-          "line": 34,
+          "line": 44,
           "args": [
             "narration_text"
           ],
@@ -599,7 +599,7 @@
         },
         {
           "name": "build_narration_prompt",
-          "line": 41,
+          "line": 51,
           "args": [
             "title",
             "angle"
@@ -609,7 +609,7 @@
         },
         {
           "name": "build_narration_continuation_prompt",
-          "line": 122,
+          "line": 132,
           "args": [
             "title",
             "angle",
@@ -621,7 +621,7 @@
         },
         {
           "name": "generate_narration",
-          "line": 153,
+          "line": 163,
           "args": [
             "title",
             "angle"
@@ -634,6 +634,7 @@
             "call_llm",
             "extract_json",
             "get",
+            "grade_narration",
             "len",
             "narration_has_engagement_cta",
             "print",
