@@ -1615,9 +1615,125 @@
     },
     {
       "path": "scripts/verify_run_output.py",
-      "functions": [],
-      "env_vars": [],
-      "tables": []
+      "functions": [
+        {
+          "name": "fetch_scripts",
+          "line": 50,
+          "args": [
+            "status",
+            "limit",
+            "order"
+          ],
+          "calls": [
+            "get",
+            "json",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "check_url_alive",
+          "line": 61,
+          "args": [
+            "url",
+            "min_bytes"
+          ],
+          "calls": [
+            "get",
+            "head",
+            "int"
+          ],
+          "docstring": "HEAD request - confirms the URL is actually live and (optionally)"
+        },
+        {
+          "name": "verify_shot_breakdown_script",
+          "line": 80,
+          "args": [
+            "script"
+          ],
+          "calls": [
+            "append",
+            "enumerate",
+            "get",
+            "isinstance",
+            "len",
+            "loads",
+            "strip"
+          ],
+          "docstring": "Any script that has passed shot breakdown (status images_generated"
+        },
+        {
+          "name": "verify_video_generated_script",
+          "line": 120,
+          "args": [
+            "script"
+          ],
+          "calls": [
+            "append",
+            "check_url_alive",
+            "enumerate",
+            "get",
+            "isinstance",
+            "len"
+          ],
+          "docstring": "A script marked video_generated must have a video that's actually"
+        },
+        {
+          "name": "check_stalled_scripts",
+          "line": 150,
+          "args": [],
+          "calls": [
+            "append",
+            "fetch_scripts",
+            "get",
+            "len"
+          ],
+          "docstring": "Non-fatal early warning for the exact pattern STATUS.md is showing"
+        },
+        {
+          "name": "run_verification",
+          "line": 165,
+          "args": [
+            "stage"
+          ],
+          "calls": [
+            "ValueError",
+            "append",
+            "check_stalled_scripts",
+            "extend",
+            "fetch_scripts",
+            "get",
+            "isoformat",
+            "now",
+            "verify_shot_breakdown_script",
+            "verify_video_generated_script"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 194,
+          "args": [],
+          "calls": [
+            "ArgumentParser",
+            "add_argument",
+            "dumps",
+            "exit",
+            "len",
+            "parse_args",
+            "print",
+            "run_verification"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": [
+        "scripts"
+      ]
     },
     {
       "path": "scripts/video_generation.py",
