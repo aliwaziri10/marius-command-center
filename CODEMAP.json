@@ -2,10 +2,14 @@
   "generated_by": "generate_codemap.py",
   "file_count": 18,
   "env_vars": [
+    "ACE_MUSIC_API_KEY",
+    "AGNES_API_KEY",
     "EXPECTED_YOUTUBE_CHANNEL_TITLE",
     "FREELLM_API_KEY",
     "FREELLM_API_URL",
+    "FREESOUND_API_KEY",
     "GEMINI_API_KEY",
+    "HF_TOKEN",
     "SUPABASE_SECRET_KEY",
     "SUPABASE_URL",
     "X",
@@ -1797,10 +1801,943 @@
     },
     {
       "path": "scripts/video_generation.py",
-      "parse_error": "unexpected indent (video_generation.py, line 344)",
-      "functions": [],
-      "env_vars": [],
-      "tables": []
+      "functions": [
+        {
+          "name": "round_to_valid_frames",
+          "line": 170,
+          "args": [
+            "num_frames"
+          ],
+          "calls": [
+            "ceil",
+            "max"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "get_ready_scripts",
+          "line": 182,
+          "args": [
+            "limit"
+          ],
+          "calls": [
+            "get",
+            "json",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "download_file",
+          "line": 192,
+          "args": [
+            "url",
+            "out_path"
+          ],
+          "calls": [
+            "get",
+            "open",
+            "raise_for_status",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "record_error",
+          "line": 200,
+          "args": [
+            "script_id",
+            "error_text"
+          ],
+          "calls": [
+            "gmtime",
+            "patch",
+            "print",
+            "raise_for_status",
+            "strftime"
+          ],
+          "docstring": "VERIFIER-GATE FIX (2026-08-22): persists the real exception (full"
+        },
+        {
+          "name": "clear_error",
+          "line": 224,
+          "args": [
+            "script_id"
+          ],
+          "calls": [
+            "patch",
+            "print",
+            "raise_for_status"
+          ],
+          "docstring": "Clears a previously recorded last_error once a script succeeds, so"
+        },
+        {
+          "name": "_sanitize_anchor_for_fallback",
+          "line": 289,
+          "args": [
+            "anchor"
+          ],
+          "calls": [
+            "any",
+            "join",
+            "lower",
+            "split",
+            "strip"
+          ],
+          "docstring": "Drops clauses/sentences containing ethnicity- or atrocity-related"
+        },
+        {
+          "name": "_strip_named_characters_for_group_shot",
+          "line": 346,
+          "args": [
+            "anchor"
+          ],
+          "calls": [
+            "join",
+            "lower",
+            "split",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_agnes_prompt",
+          "line": 356,
+          "args": [
+            "shot",
+            "setting_and_characters",
+            "fallback_level"
+          ],
+          "calls": [
+            "_sanitize_anchor_for_fallback",
+            "_strip_named_characters_for_group_shot",
+            "any",
+            "append",
+            "get",
+            "join",
+            "lower",
+            "replace",
+            "strip"
+          ],
+          "docstring": "fallback_level 0 (primary): full anchor + full visual_description."
+        },
+        {
+          "name": "build_character_reference_prompt",
+          "line": 448,
+          "args": [
+            "setting_and_characters"
+          ],
+          "calls": [
+            "join",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "generate_character_reference",
+          "line": 459,
+          "args": [
+            "script"
+          ],
+          "calls": [
+            "build_character_reference_prompt",
+            "get",
+            "isinstance",
+            "json",
+            "patch",
+            "post",
+            "print",
+            "raise_for_status",
+            "range",
+            "sleep",
+            "str",
+            "strip"
+          ],
+          "docstring": "Generates ONE reference image per script (via agnes-image-2.1-flash),"
+        },
+        {
+          "name": "upload_reference_image",
+          "line": 545,
+          "args": [
+            "script_id",
+            "file_name",
+            "local_path"
+          ],
+          "calls": [
+            "open",
+            "print",
+            "put",
+            "read"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "extract_last_frame_url",
+          "line": 566,
+          "args": [
+            "script_id",
+            "shot_index",
+            "local_video_path"
+          ],
+          "calls": [
+            "VideoFileClip",
+            "close",
+            "fromarray",
+            "get_frame",
+            "max",
+            "print",
+            "remove",
+            "replace",
+            "save",
+            "upload_reference_image"
+          ],
+          "docstring": "Pulls the final frame of a just-generated (or already-downloaded) shot"
+        },
+        {
+          "name": "get_continuity_anchor",
+          "line": 596,
+          "args": [
+            "script",
+            "video_urls"
+          ],
+          "calls": [
+            "download_file",
+            "extract_last_frame_url",
+            "generate_character_reference",
+            "len",
+            "print",
+            "remove"
+          ],
+          "docstring": "Reconstructs the correct anchor image for the NEXT shot to generate:"
+        },
+        {
+          "name": "create_agnes_task",
+          "line": 624,
+          "args": [
+            "prompt",
+            "num_frames",
+            "image_url"
+          ],
+          "calls": [
+            "AgnesOverloadedError",
+            "ContentPolicyRejection",
+            "get",
+            "json",
+            "post",
+            "print",
+            "raise_for_status",
+            "range",
+            "sleep"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "extract_video_url",
+          "line": 666,
+          "args": [
+            "data"
+          ],
+          "calls": [
+            "endswith",
+            "get",
+            "isinstance",
+            "startswith",
+            "values"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "poll_agnes_task",
+          "line": 677,
+          "args": [
+            "video_id",
+            "max_wait",
+            "interval"
+          ],
+          "calls": [
+            "AgnesOverloadedError",
+            "ContentPolicyRejection",
+            "RuntimeError",
+            "extract_video_url",
+            "get",
+            "json",
+            "print",
+            "raise_for_status",
+            "sleep"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_generate_one_segment",
+          "line": 705,
+          "args": [
+            "shot",
+            "segment_duration",
+            "out_path",
+            "setting_and_characters",
+            "anchor_image_url"
+          ],
+          "calls": [
+            "build_agnes_prompt",
+            "create_agnes_task",
+            "download_file",
+            "int",
+            "max",
+            "min",
+            "poll_agnes_task",
+            "print",
+            "round_to_valid_frames"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_extract_last_frame_local",
+          "line": 731,
+          "args": [
+            "video_path"
+          ],
+          "calls": [
+            "VideoFileClip",
+            "close",
+            "fromarray",
+            "get_frame",
+            "max",
+            "replace",
+            "save"
+          ],
+          "docstring": "Extracts the last frame of a local clip file and uploads it nowhere -"
+        },
+        {
+          "name": "_upload_local_image_for_anchor",
+          "line": 745,
+          "args": [
+            "script_id",
+            "tag",
+            "png_path"
+          ],
+          "calls": [
+            "remove",
+            "upload_reference_image"
+          ],
+          "docstring": "Chain-extension anchors must be passed to Agnes as a URL (same as"
+        },
+        {
+          "name": "generate_shot_clip",
+          "line": 755,
+          "args": [
+            "shot",
+            "target_duration",
+            "out_path",
+            "setting_and_characters",
+            "anchor_image_url",
+            "script_id"
+          ],
+          "calls": [
+            "VideoFileClip",
+            "_extract_last_frame_local",
+            "_generate_one_segment",
+            "_upload_local_image_for_anchor",
+            "append",
+            "basename",
+            "close",
+            "concatenate_videoclips",
+            "exists",
+            "fit_clip_to_duration",
+            "min",
+            "print",
+            "remove",
+            "replace",
+            "write_videofile"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "fit_clip_to_duration",
+          "line": 807,
+          "args": [
+            "clip",
+            "target"
+          ],
+          "calls": [
+            "concatenate_videoclips",
+            "max",
+            "subclipped",
+            "to_ImageClip",
+            "with_duration",
+            "with_fps"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "fit_audio_to_duration",
+          "line": 817,
+          "args": [
+            "audio_clip",
+            "target"
+          ],
+          "calls": [
+            "concatenate_audioclips",
+            "int",
+            "subclipped"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "upload_clip",
+          "line": 825,
+          "args": [
+            "script_id",
+            "index",
+            "file_path"
+          ],
+          "calls": [
+            "open",
+            "print",
+            "put",
+            "raise_for_status",
+            "read"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "save_progress",
+          "line": 846,
+          "args": [
+            "script_id",
+            "video_urls",
+            "next_index"
+          ],
+          "calls": [
+            "patch",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "mark_content_flagged",
+          "line": 856,
+          "args": [
+            "script_id",
+            "shot_index",
+            "reason"
+          ],
+          "calls": [
+            "patch",
+            "print",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "compute_shot_durations",
+          "line": 867,
+          "args": [
+            "shot_list",
+            "total_duration"
+          ],
+          "calls": [
+            "get",
+            "len",
+            "max",
+            "sum"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "get_shot_durations",
+          "line": 873,
+          "args": [
+            "script",
+            "shot_list",
+            "audio_clip"
+          ],
+          "calls": [
+            "all",
+            "compute_shot_durations",
+            "get",
+            "isinstance",
+            "len",
+            "list",
+            "print"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "compute_shot_start_times",
+          "line": 886,
+          "args": [
+            "shot_durations"
+          ],
+          "calls": [
+            "append"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "compute_target_bitrate",
+          "line": 895,
+          "args": [
+            "duration_seconds",
+            "audio_kbps"
+          ],
+          "calls": [],
+          "docstring": ""
+        },
+        {
+          "name": "estimate_output_size_mb",
+          "line": 909,
+          "args": [
+            "duration_seconds",
+            "video_kbps",
+            "audio_kbps"
+          ],
+          "calls": [],
+          "docstring": ""
+        },
+        {
+          "name": "split_video_into_chunks",
+          "line": 915,
+          "args": [
+            "local_path",
+            "max_chunk_mb"
+          ],
+          "calls": [
+            "VideoFileClip",
+            "append",
+            "ceil",
+            "close",
+            "getsize",
+            "min",
+            "print",
+            "range",
+            "replace",
+            "subclipped",
+            "write_videofile"
+          ],
+          "docstring": "Splits an already-encoded local video file into N sequential chunks,"
+        },
+        {
+          "name": "poll_ace_music_task",
+          "line": 964,
+          "args": [
+            "task_id",
+            "out_path",
+            "base_url",
+            "max_wait",
+            "interval"
+          ],
+          "calls": [
+            "get",
+            "json",
+            "loads",
+            "open",
+            "post",
+            "print",
+            "raise_for_status",
+            "sleep",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "generate_background_music",
+          "line": 1003,
+          "args": [
+            "prompt",
+            "duration",
+            "out_path"
+          ],
+          "calls": [
+            "generate_background_music_musicgen",
+            "get",
+            "int",
+            "json",
+            "max",
+            "min",
+            "poll_ace_music_task",
+            "post",
+            "print"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "generate_background_music_musicgen",
+          "line": 1037,
+          "args": [
+            "prompt",
+            "duration",
+            "out_path"
+          ],
+          "calls": [
+            "get",
+            "int",
+            "json",
+            "min",
+            "open",
+            "post",
+            "print",
+            "sleep",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "search_freesound_sfx",
+          "line": 1078,
+          "args": [
+            "query",
+            "out_path"
+          ],
+          "calls": [
+            "download_file",
+            "get",
+            "json",
+            "print"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "apply_safety_limiter",
+          "line": 1113,
+          "args": [
+            "audio_clip",
+            "ceiling"
+          ],
+          "calls": [
+            "abs",
+            "float",
+            "max",
+            "print",
+            "to_soundarray",
+            "with_volume_scaled"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "extract_original_clip_audio",
+          "line": 1133,
+          "args": [
+            "video_clips",
+            "shot_durations",
+            "shot_starts",
+            "total_duration"
+          ],
+          "calls": [
+            "append",
+            "enumerate",
+            "print",
+            "subclipped",
+            "with_start",
+            "with_volume_scaled"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_audio_mix",
+          "line": 1150,
+          "args": [
+            "narration_path",
+            "music_mood",
+            "shot_list",
+            "shot_durations",
+            "shot_starts",
+            "total_duration",
+            "original_clip_audio_layers"
+          ],
+          "calls": [
+            "AudioFileClip",
+            "CompositeAudioClip",
+            "append",
+            "apply_safety_limiter",
+            "enumerate",
+            "extend",
+            "fit_audio_to_duration",
+            "generate_background_music",
+            "get",
+            "len",
+            "print",
+            "search_freesound_sfx",
+            "strip",
+            "subclipped",
+            "with_start",
+            "with_volume_scaled"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_load_caption_font",
+          "line": 1190,
+          "args": [
+            "size"
+          ],
+          "calls": [
+            "exists",
+            "load_default",
+            "print",
+            "truetype"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_wrap_caption_text",
+          "line": 1201,
+          "args": [
+            "text",
+            "font",
+            "max_width",
+            "draw"
+          ],
+          "calls": [
+            "append",
+            "split",
+            "strip",
+            "textbbox"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "render_caption_image",
+          "line": 1218,
+          "args": [
+            "text",
+            "video_width",
+            "video_height"
+          ],
+          "calls": [
+            "Draw",
+            "_load_caption_font",
+            "_wrap_caption_text",
+            "append",
+            "int",
+            "len",
+            "max",
+            "new",
+            "rounded_rectangle",
+            "strip",
+            "text",
+            "textbbox",
+            "zip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_caption_clip",
+          "line": 1264,
+          "args": [
+            "text",
+            "start",
+            "duration",
+            "video_width",
+            "video_height"
+          ],
+          "calls": [
+            "ImageClip",
+            "array",
+            "print",
+            "render_caption_image",
+            "with_start"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_caption_clips",
+          "line": 1278,
+          "args": [
+            "shot_list",
+            "shot_durations",
+            "shot_starts",
+            "video_width",
+            "video_height"
+          ],
+          "calls": [
+            "append",
+            "build_caption_clip",
+            "enumerate",
+            "get",
+            "len",
+            "print",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "assemble_final_video",
+          "line": 1291,
+          "args": [
+            "script_id",
+            "video_urls",
+            "narration_path",
+            "music_mood",
+            "shot_list",
+            "shot_durations",
+            "output_path",
+            "setting_and_characters"
+          ],
+          "calls": [
+            "AudioFadeIn",
+            "AudioFadeOut",
+            "FadeIn",
+            "FadeOut",
+            "VideoFileClip",
+            "_extract_last_frame_local",
+            "_generate_one_segment",
+            "_upload_local_image_for_anchor",
+            "append",
+            "basename",
+            "build_audio_mix",
+            "compute_shot_start_times",
+            "compute_target_bitrate",
+            "concatenate_videoclips",
+            "download_file",
+            "enumerate",
+            "extract_original_clip_audio",
+            "fit_clip_to_duration",
+            "len",
+            "min",
+            "print",
+            "replace",
+            "resized",
+            "sum",
+            "with_audio",
+            "with_effects",
+            "write_videofile"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "upload_video",
+          "line": 1367,
+          "args": [
+            "script_id",
+            "file_path"
+          ],
+          "calls": [
+            "getsize",
+            "open",
+            "print",
+            "put",
+            "raise_for_status",
+            "read"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "upload_video_chunk",
+          "line": 1391,
+          "args": [
+            "script_id",
+            "chunk_index",
+            "file_path"
+          ],
+          "calls": [
+            "getsize",
+            "open",
+            "print",
+            "put",
+            "raise_for_status",
+            "read"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "upload_video_chunked",
+          "line": 1415,
+          "args": [
+            "script_id",
+            "local_path"
+          ],
+          "calls": [
+            "append",
+            "enumerate",
+            "len",
+            "print",
+            "remove",
+            "split_video_into_chunks",
+            "upload_video",
+            "upload_video_chunk"
+          ],
+          "docstring": "CHUNKED-UPLOAD QUALITY FIX (2026-08-20): replaces a single upload_video"
+        },
+        {
+          "name": "mark_video_generated",
+          "line": 1447,
+          "args": [
+            "script_id",
+            "video_url",
+            "video_chunk_urls",
+            "audio_stats"
+          ],
+          "calls": [
+            "get",
+            "patch",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "process_script",
+          "line": 1465,
+          "args": [
+            "script",
+            "shot_limit"
+          ],
+          "calls": [
+            "AudioFileClip",
+            "append",
+            "assemble_final_video",
+            "clear_error",
+            "download_file",
+            "endswith",
+            "enumerate",
+            "format_exc",
+            "generate_shot_clip",
+            "get",
+            "get_shot_durations",
+            "head",
+            "isinstance",
+            "len",
+            "loads",
+            "mark_content_flagged",
+            "mark_video_generated",
+            "min",
+            "print",
+            "range",
+            "record_error",
+            "remove",
+            "save_progress",
+            "sleep",
+            "str",
+            "upload_clip",
+            "upload_video_chunked"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 1609,
+          "args": [],
+          "calls": [
+            "format_exc",
+            "get_ready_scripts",
+            "len",
+            "print",
+            "process_script",
+            "record_error"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "ACE_MUSIC_API_KEY",
+        "AGNES_API_KEY",
+        "FREESOUND_API_KEY",
+        "HF_TOKEN",
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": [
+        "scripts"
+      ]
     },
     {
       "path": "scripts/youtube_upload.py",
