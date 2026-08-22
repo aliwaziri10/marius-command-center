@@ -91,11 +91,33 @@ CLIP_VERIFY_RETRY_WAIT = 5
 # freeze-hold for whatever's left rather than crashing the run.
 MAX_CHAIN_SEGMENTS = 3
 
-DARK_SCENE_KEYWORDS = (
-    "night", "dark", "dim", "shadow", "silhouette", "dusk", "twilight",
-    "candlelit", "moonlit", "underground", "cave", "storm", "eclipse",
-    "blackout", "gloom",
-)
+# LIGHTING FIELD FIX (2026-08-22): the shot's own "lighting" field
+# (dawn/morning/midday/golden_hour/dusk/night/overcast/firelight/
+# interior_lamp/moonlight - added 2026-08-20 in shot_breakdown_stage.py,
+# validated by the checker) was never actually read here. This file was
+# still keyword-scanning visual_description text and unconditionally
+# appending "bright natural daylight" whenever no DARK_SCENE_KEYWORDS
+# matched - but words like "overcast", "hazy", "grey sky" never matched
+# that list, so shots correctly written as overcast/dusk/hazy still got
+# a contradicting "bright daylight" cue jammed into the same prompt as
+# their own moody sky description. Two conflicting lighting instructions
+# in one prompt is the confirmed cause of daytime shots rendering dark/
+# underlit. Fix: derive the lighting cue from the shot's own validated
+# "lighting" field instead of guessing from free text.
+LIGHTING_PROMPT_MAP = {
+    "dawn": "soft dawn light, pale golden horizon glow, gentle long shadows, clearly visible detail",
+    "morning": "clear bright morning daylight, soft directional sunlight, well-exposed, vivid colors",
+    "midday": "bright natural daylight, high-key lighting, well-exposed, vivid colors",
+    "golden_hour": "warm golden hour sunlight, long soft shadows, rich amber tones, well-exposed",
+    "dusk": "fading dusk light, deep blue-orange twilight sky, moody but clearly visible detail",
+    "night": "deliberate nighttime lighting, moonlit or artificial light sources, intentionally low-key",
+    "overcast": "soft diffused overcast daylight, even flat lighting, muted but clearly visible, no harsh shadows, not dark",
+    "firelight": "warm flickering firelight or lantern light, intentionally low-key, orange glow, clearly visible subject",
+    "interior_lamp": "warm interior lamp or candle lighting, intentionally low-key, intimate glow, clearly visible subject",
+    "moonlight": "cool pale moonlight, intentionally low-key night lighting, clearly visible subject",
+}
+
+DEFAULT_LIGHTING_KEY = "midday"
 
 CAPTION_FONT_PATHS = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -319,6 +341,9 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
     lens_effect = shot.get("lens_effect") or "none"
     anchor = (setting_and_characters or "").strip()
 
+        lighting_key = shot.get("lighting") or DEFAULT_LIGHTING_KEY
+    lighting_cue = LIGHTING_PROMPT_MAP.get(lighting_key, LIGHTING_PROMPT_MAP[DEFAULT_LIGHTING_KEY])
+
     if fallback_level == 0:
         visual = shot.get("visual_description", "").strip()
         if any(kw in visual.lower() for kw in CROWD_OR_GROUP_KEYWORDS):
@@ -326,28 +351,31 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
         parts = []
         if anchor:
             parts.append(anchor)
-        if not any(kw in visual.lower() for kw in DARK_SCENE_KEYWORDS):
-            parts.append("bright natural daylight, high-key lighting, well-exposed, vivid colors")
         parts.append(QUALITY_GUARD)
         parts.append(ANACHRONISM_GUARD)
         parts.append(DISTINCT_INDIVIDUALS_GUARD)
         parts.append(visual)
+        # Lighting cue placed LAST, after visual_description, so it is the
+        # most recent/authoritative instruction and matches the shot's own
+        # validated lighting field instead of conflicting with whatever
+        # mood language the script wrote into visual_description.
+        parts.append(lighting_cue)
         parts.append(f"{shot_type} shot")
     elif fallback_level == 1:
         anchor = _sanitize_anchor_for_fallback(anchor)
         parts = []
         if anchor:
             parts.append(anchor)
-        parts.append("bright natural daylight, high-key lighting, well-exposed")
         parts.append(QUALITY_GUARD)
         parts.append(ANACHRONISM_GUARD)
+        parts.append(lighting_cue)
         parts.append(f"{shot_type} modern high-production cinematic shot")
     else:
         parts = [
             "generic historical documentary reenactment scene, unspecified period figures",
-            "bright natural daylight, high-key lighting, well-exposed",
             QUALITY_GUARD,
             ANACHRONISM_GUARD,
+            lighting_cue,
             f"{shot_type} modern high-production cinematic shot",
         ]
 
