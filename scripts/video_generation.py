@@ -250,11 +250,22 @@ ANACHRONISM_GUARD = (
 # depth of field, professional color grading, cinematic lighting), while
 # still explicitly guarding against a flat/synthetic AI look so dropping
 # the grain cue doesn't let AI artifacts show through more.
+#
+# SKIN-REALISM STRENGTHENING (2026-08-22): "no plastic skin" alone was too
+# weak - Zia flagged real output as "chocolaty", "fluid", "candy", "not
+# natural" skin/rendering (confirmed against 2 screenshots he provided).
+# Added specific, concrete texture language (pore detail, imperfections,
+# matte finish) rather than only negative instructions, since generation
+# models respond more reliably to being told what TO render than only
+# what to avoid.
 QUALITY_GUARD = (
     "modern high-end digital cinema, crisp sharp clarity, professional color grading, "
     "shallow depth of field, cinematic lighting, vivid saturated color, no sepia tone, "
     "no heavy desaturation, no muted documentary color grading, no grainy vintage film look, "
-    "no artificial CGI look, no flat synthetic AI look, no plastic skin"
+    "natural realistic human skin with visible pore texture and natural skin imperfections, "
+    "matte skin finish, not glossy, not waxy, not airbrushed, not overly smooth, no beauty-filter look, "
+    "no artificial CGI look, no flat synthetic AI look, no plastic skin, no doll-like skin, "
+    "no candy-coated or glazed look, photographically real, not illustrated, not animated, not stylized"
 )
 
 
@@ -309,6 +320,28 @@ MOTION_CONTINUITY_GUARD = (
     "backward, no sudden stop-and-restart, no pausing mid-motion"
 )
 
+# NEW GUARDS (2026-08-22) - added directly from Zia's review of a live
+# published video against 2 screenshots he provided:
+ORIENTATION_CONSISTENCY_GUARD = (
+    "each person's body orientation, facing direction, and pose stay logically "
+    "consistent for the full duration of this shot - a person's back, front, "
+    "or profile does not suddenly swap or flip to a different orientation "
+    "mid-shot"
+)
+
+PURPOSEFUL_ACTION_GUARD = (
+    "every person visible in this shot is doing a specific, purposeful action "
+    "tied to the scene - no one stands frozen, idle, or posed like a statue "
+    "with nothing to do; if a person has no active role in this moment, they "
+    "are not included in the frame"
+)
+
+OBJECT_PERMANENCE_GUARD = (
+    "objects only move when a visible person is actively holding, touching, "
+    "or manipulating them - no object moves, stirs, or animates on its own "
+    "with no hand present"
+)
+
 
 def _strip_named_characters_for_group_shot(anchor):
     if not anchor:
@@ -335,13 +368,19 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
         every trigger Agnes reacts to on some shots. Level 2 carries zero
         episode-specific content (no names, no location, no ethnicity) so
         a single stubborn shot can no longer take down the whole episode.
+
+    MOTION/ORIENTATION/ACTION/OBJECT guards (2026-08-22): added to every
+    fallback tier, since they're generic technical instructions with zero
+    episode-specific content - they cannot be what triggers a content-policy
+    rejection, so there's no reason to withhold them even on the ultra-safe
+    tier 2 path.
     """
     shot_type = (shot.get("shot_type") or "medium").replace("_", " ")
     camera_movement = (shot.get("camera_movement") or "static").replace("_", " ")
     lens_effect = shot.get("lens_effect") or "none"
     anchor = (setting_and_characters or "").strip()
 
-        lighting_key = shot.get("lighting") or DEFAULT_LIGHTING_KEY
+    lighting_key = shot.get("lighting") or DEFAULT_LIGHTING_KEY
     lighting_cue = LIGHTING_PROMPT_MAP.get(lighting_key, LIGHTING_PROMPT_MAP[DEFAULT_LIGHTING_KEY])
 
     if fallback_level == 0:
@@ -354,6 +393,9 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
         parts.append(QUALITY_GUARD)
         parts.append(ANACHRONISM_GUARD)
         parts.append(DISTINCT_INDIVIDUALS_GUARD)
+        parts.append(ORIENTATION_CONSISTENCY_GUARD)
+        parts.append(PURPOSEFUL_ACTION_GUARD)
+        parts.append(OBJECT_PERMANENCE_GUARD)
         parts.append(visual)
         # Lighting cue placed LAST, after visual_description, so it is the
         # most recent/authoritative instruction and matches the shot's own
@@ -368,6 +410,9 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
             parts.append(anchor)
         parts.append(QUALITY_GUARD)
         parts.append(ANACHRONISM_GUARD)
+        parts.append(ORIENTATION_CONSISTENCY_GUARD)
+        parts.append(PURPOSEFUL_ACTION_GUARD)
+        parts.append(OBJECT_PERMANENCE_GUARD)
         parts.append(lighting_cue)
         parts.append(f"{shot_type} modern high-production cinematic shot")
     else:
@@ -375,6 +420,9 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
             "generic historical documentary reenactment scene, unspecified period figures",
             QUALITY_GUARD,
             ANACHRONISM_GUARD,
+            ORIENTATION_CONSISTENCY_GUARD,
+            PURPOSEFUL_ACTION_GUARD,
+            OBJECT_PERMANENCE_GUARD,
             lighting_cue,
             f"{shot_type} modern high-production cinematic shot",
         ]
@@ -383,8 +431,16 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
         parts.append(f"camera {camera_movement}")
     if lens_effect != "none":
         parts.append(lens_effect.replace("_", " "))
-    if shot.get("_has_motion_anchor"):
-        parts.append(MOTION_CONTINUITY_GUARD)
+    # MOTION_CONTINUITY_GUARD now applied unconditionally (2026-08-22 fix).
+    # Previously gated on shot.get("_has_motion_anchor"), but cross-shot
+    # image anchoring is dormant (see CONTINUITY-CHAIN REMOVED, 2026-08-18) -
+    # nothing sets an anchor image for primary shots anymore, so
+    # _has_motion_anchor was False almost always, meaning this guard was
+    # silently never applied where it mattered most. Confirmed as the
+    # direct cause of the forward-then-snap-back motion Zia flagged.
+    # Motion consistency within a single generated clip is wanted
+    # regardless of whether cross-shot anchoring is active.
+    parts.append(MOTION_CONTINUITY_GUARD)
 
     return ", ".join(p for p in parts if p)
 
@@ -652,7 +708,6 @@ def _generate_one_segment(shot, segment_duration, out_path, setting_and_characte
     num_frames = round_to_valid_frames(raw_frames)
     num_frames = max(MIN_FRAMES, min(MAX_FRAMES, num_frames))
 
-    shot["_has_motion_anchor"] = bool(anchor_image_url)
     prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=0)
     try:
         video_id = create_agnes_task(prompt, num_frames, image_url=anchor_image_url)
