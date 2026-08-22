@@ -4,6 +4,7 @@ import json
 import math
 import time
 import base64
+import traceback
 import requests
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -172,6 +173,45 @@ def download_file(url, out_path):
     with open(out_path, "wb") as f:
         f.write(r.content)
     return out_path
+
+
+def record_error(script_id, error_text):
+    """
+    VERIFIER-GATE FIX (2026-08-22): persists the real exception (full
+    traceback) for a script to scripts.last_error/last_error_at, instead of
+    letting it disappear into an Actions log that's hard to get to. This is
+    what makes a failure diagnosable from Supabase alone. Best-effort only -
+    if even this write fails, we print and move on rather than compounding
+    the original failure.
+    """
+    try:
+        resp = requests.patch(
+            f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
+            headers=HEADERS,
+            json={
+                "last_error": error_text[-8000:],
+                "last_error_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+    except Exception as e:
+        print(f"Could not record last_error for script {script_id} (secondary failure, non-fatal): {e}")
+
+
+def clear_error(script_id):
+    """Clears a previously recorded last_error once a script succeeds, so
+    Supabase never shows a stale failure for a script that's now fine."""
+    try:
+        resp = requests.patch(
+            f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
+            headers=HEADERS,
+            json={"last_error": None},
+            timeout=30,
+        )
+        resp.raise_for_status()
+    except Exception as e:
+        print(f"Could not clear last_error for script {script_id} (non-fatal): {e}")
 
 
 ANACHRONISM_GUARD = (
@@ -1442,24 +1482,43 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
 
     if len(video_urls) >= total_shots:
         print("All shots done. Assembling final video...")
-        audio_path = "/tmp/narration_audio_final"
-        audio_path += ".mp3" if script["narration_url"].endswith(".mp3") else ".wav"
-        download_file(script["narration_url"], audio_path)
-        audio_clip = AudioFileClip(audio_path)
-        shot_durations = get_shot_durations(script, shot_list, audio_clip)
-        shot_durations[-1] += TRAIL_SECONDS
+        try:
+            audio_path = "/tmp/narration_audio_final"
+            audio_path += ".mp3" if script["narration_url"].endswith(".mp3") else ".wav"
+            download_file(script["narration_url"], audio_path)
+            audio_clip = AudioFileClip(audio_path)
+            shot_durations = get_shot_durations(script, shot_list, audio_clip)
+            shot_durations[-1] += TRAIL_SECONDS
 
-        output_path = "/tmp/final_video.mp4"
-        output_path, audio_stats = assemble_final_video(script_id, video_urls, audio_path, music_mood, shot_list, shot_durations, output_path, setting_and_characters=setting_and_characters)
+            output_path = "/tmp/final_video.mp4"
+            output_path, audio_stats = assemble_final_video(script_id, video_urls, audio_path, music_mood, shot_list, shot_durations, output_path, setting_and_characters=setting_and_characters)
 
-        video_url, video_chunk_urls = upload_video_chunked(script_id, output_path)
-        if video_url:
-            print(f"Uploaded as a single file: {video_url}")
-        else:
-            print(f"Uploaded as {len(video_chunk_urls)} chunks (single-file would have exceeded 50MB at full quality).")
+            video_url, video_chunk_urls = upload_video_chunked(script_id, output_path)
+            if video_url:
+                print(f"Uploaded as a single file: {video_url}")
+            else:
+                print(f"Uploaded as {len(video_chunk_urls)} chunks (single-file would have exceeded 50MB at full quality).")
 
-        mark_video_generated(script_id, video_url=video_url, video_chunk_urls=video_chunk_urls, audio_stats=audio_stats)
-        print("Done.")
+            mark_video_generated(script_id, video_url=video_url, video_chunk_urls=video_chunk_urls, audio_stats=audio_stats)
+            clear_error(script_id)
+            print("Done.")
+        except Exception as e:
+            # VERIFIER-GATE FIX (2026-08-22): assembly used to be
+            # unprotected - any exception here (bad clip download, ffmpeg
+            # failure, upload timeout, a shot duration far exceeding what
+            # chaining can cover, etc.) propagated all the way up through
+            # process_script and main(), crashing the ENTIRE run before any
+            # other candidate script got a turn. This is the confirmed
+            # cause of 177 straight failed Video Generation runs even
+            # though per-shot clip generation itself was working fine. The
+            # real exception is now recorded to scripts.last_error /
+            # last_error_at so the actual cause is visible directly in
+            # Supabase, the run keeps going, and this script just retries
+            # assembly again next run instead of blocking every other
+            # script in the queue.
+            error_text = traceback.format_exc()
+            print(f"Assembly FAILED for script {script_id} - recording error and moving on: {e}")
+            record_error(script_id, error_text)
 
     return shots_used
 
@@ -1479,7 +1538,20 @@ def main():
                   f"quota ceiling. Remaining candidates get their turn on the next scheduled run.")
             break
 
-        shots_used = process_script(script, shot_limit=remaining_budget)
+        try:
+            shots_used = process_script(script, shot_limit=remaining_budget)
+        except Exception as e:
+            # VERIFIER-GATE FIX (2026-08-22): a crash ANYWHERE inside
+            # process_script (not just assembly) used to kill this whole
+            # run, leaving every other queued script untouched until the
+            # next cron tick. Catching here means one broken script can
+            # never block the rest of the batch again - the real exception
+            # is still recorded to last_error for diagnosis.
+            error_text = traceback.format_exc()
+            print(f"Unexpected error processing script {script['id']} - recording error and moving to next candidate: {e}")
+            record_error(script['id'], error_text)
+            shots_used = 0
+
         if shots_used > 0:
             any_progress = True
             remaining_budget -= shots_used
