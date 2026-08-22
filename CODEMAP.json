@@ -2745,7 +2745,7 @@
       "functions": [
         {
           "name": "get_access_token",
-          "line": 60,
+          "line": 84,
           "args": [],
           "calls": [
             "json",
@@ -2757,7 +2757,7 @@
         },
         {
           "name": "get_authorized_channel",
-          "line": 77,
+          "line": 101,
           "args": [
             "access_token"
           ],
@@ -2771,7 +2771,7 @@
         },
         {
           "name": "get_next_ready_script",
-          "line": 98,
+          "line": 122,
           "args": [],
           "calls": [
             "get",
@@ -2782,7 +2782,7 @@
         },
         {
           "name": "get_topic_title",
-          "line": 109,
+          "line": 133,
           "args": [
             "topic_id"
           ],
@@ -2795,7 +2795,7 @@
         },
         {
           "name": "download_file",
-          "line": 120,
+          "line": 144,
           "args": [
             "url",
             "out_path"
@@ -2809,8 +2809,28 @@
           "docstring": ""
         },
         {
+          "name": "stitch_chunks_to_local_file",
+          "line": 152,
+          "args": [
+            "video_chunk_urls",
+            "out_path"
+          ],
+          "calls": [
+            "VideoFileClip",
+            "append",
+            "close",
+            "concatenate_videoclips",
+            "download_file",
+            "enumerate",
+            "exists",
+            "remove",
+            "write_videofile"
+          ],
+          "docstring": "CHUNK-STITCH FIX (2026-08-22): downloads every chunk in order (the"
+        },
+        {
           "name": "build_description",
-          "line": 128,
+          "line": 193,
           "args": [
             "narration_text"
           ],
@@ -2824,7 +2844,7 @@
         },
         {
           "name": "upload_to_youtube",
-          "line": 154,
+          "line": 219,
           "args": [
             "access_token",
             "video_path",
@@ -2846,7 +2866,7 @@
         },
         {
           "name": "set_thumbnail",
-          "line": 204,
+          "line": 269,
           "args": [
             "access_token",
             "youtube_id",
@@ -2864,7 +2884,7 @@
         },
         {
           "name": "mark_uploaded",
-          "line": 228,
+          "line": 293,
           "args": [
             "script_id",
             "youtube_id"
@@ -2877,7 +2897,7 @@
         },
         {
           "name": "main",
-          "line": 238,
+          "line": 303,
           "args": [],
           "calls": [
             "RuntimeError",
@@ -2888,10 +2908,12 @@
             "get_authorized_channel",
             "get_next_ready_script",
             "get_topic_title",
+            "len",
             "lower",
             "mark_uploaded",
             "print",
             "set_thumbnail",
+            "stitch_chunks_to_local_file",
             "strip",
             "upload_to_youtube"
           ],
