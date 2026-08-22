@@ -31,10 +31,32 @@ at all. Once you confirm the exact current channel title (check
 youtube.com while signed into the account that owns Erased), set
 EXPECTED_YOUTUBE_CHANNEL_TITLE as a repo secret to that exact string to
 turn on the hard block.
+
+CHUNK-STITCH FIX (2026-08-22): video_generation.py's CHUNKED-UPLOAD
+QUALITY FIX (2026-08-20) started splitting large final videos into
+multiple sequential chunk files (video_chunk_urls) instead of shrinking
+bitrate to fit Supabase's 50MB single-file cap, whenever a fixed-quality
+encode doesn't fit in one file - this is what fixed the corrupted/~144p-
+looking 19-minute video Zia flagged. But this file was never updated to
+know about video_chunk_urls - it only ever checked the singular
+video_url, so every 'video_generated' script that got chunked (has
+video_chunk_urls but video_url is null) was silently skipped every run
+since 08-17, with no error, no last_error, nothing - just "Script has no
+video_url yet. Skipping." forever. Confirmed via direct DB query
+(2026-08-22) that 2 real finished videos (ba5d96c8 - 10 chunks, 37993b31
+- 7 chunks) have been stuck in video_generated with zero YouTube upload
+attempts since 08-17 and 08-18 respectively as a direct result of this
+gap. Fix: when video_url is missing but video_chunk_urls is present,
+download every chunk in order and re-stitch them into one local file
+with moviepy (same concatenate_videoclips approach already used
+elsewhere in this pipeline) before uploading - so the upload flow below
+this point is completely unchanged, it just always ends up with one
+local mp4 either way.
 """
 
 import os
 import requests
+from moviepy import VideoFileClip, concatenate_videoclips
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
@@ -55,6 +77,8 @@ TOKEN_URL = "https://oauth2.googleapis.com/token"
 CHANNELS_URL = "https://www.googleapis.com/youtube/v3/channels"
 UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos"
 THUMBNAIL_SET_URL = "https://www.googleapis.com/upload/youtube/v3/thumbnails/set"
+
+FRAME_RATE = 24  # matches video_generation.py's FRAME_RATE, kept in sync for the stitch re-encode
 
 
 def get_access_token():
@@ -122,6 +146,47 @@ def download_file(url, out_path):
     r.raise_for_status()
     with open(out_path, "wb") as f:
         f.write(r.content)
+    return out_path
+
+
+def stitch_chunks_to_local_file(video_chunk_urls, out_path):
+    """
+    CHUNK-STITCH FIX (2026-08-22): downloads every chunk in order (the
+    chunk_urls list is already in the correct sequential order - see
+    upload_video_chunked in video_generation.py, which appends part_001,
+    part_002, ... in a simple for-loop) and concatenates them into one
+    local mp4 with moviepy, matching the encode settings video_generation.py
+    already uses for everything else in this pipeline. Raises on any
+    failure (download or encode) - the caller's existing try/except in
+    main() is responsible for turning that into a recorded, non-fatal
+    error for this script, same as every other failure mode here.
+    """
+    local_chunk_paths = []
+    for i, url in enumerate(video_chunk_urls):
+        chunk_path = f"/tmp/upload_chunk_{i:03d}.mp4"
+        download_file(url, chunk_path)
+        local_chunk_paths.append(chunk_path)
+
+    clips = [VideoFileClip(p) for p in local_chunk_paths]
+    try:
+        combined = concatenate_videoclips(clips, method="compose")
+        combined.write_videofile(
+            out_path,
+            fps=FRAME_RATE,
+            codec="libx265",
+            audio_codec="aac",
+            audio_bitrate="128k",
+            threads=2,
+            logger=None,
+            ffmpeg_params=["-preset", "fast", "-tag:v", "hvc1"],
+        )
+    finally:
+        for c in clips:
+            c.close()
+        for p in local_chunk_paths:
+            if os.path.exists(p):
+                os.remove(p)
+
     return out_path
 
 
@@ -244,8 +309,21 @@ def main():
     script_id = script["id"]
     print(f"Working on script {script_id}")
 
-    if not script.get("video_url"):
-        print("Script has no video_url yet. Skipping.")
+    video_path = "/tmp/upload_video.mp4"
+
+    if script.get("video_url"):
+        download_file(script["video_url"], video_path)
+    elif script.get("video_chunk_urls"):
+        # CHUNK-STITCH FIX (2026-08-22): see file header. Re-stitches the
+        # chunked output back into one file before continuing the upload
+        # flow exactly as before.
+        chunk_urls = script["video_chunk_urls"]
+        print(f"No single video_url - found {len(chunk_urls)} video_chunk_urls instead. "
+              f"Downloading and re-stitching into one file before upload.")
+        stitch_chunks_to_local_file(chunk_urls, video_path)
+        print("Chunks re-stitched successfully into one local file.")
+    else:
+        print("Script has no video_url or video_chunk_urls yet. Skipping.")
         return
 
     access_token = get_access_token()
@@ -266,9 +344,6 @@ def main():
 
     title = get_topic_title(script["topic_id"])
     description = build_description(script.get("narration_text", ""))
-
-    video_path = "/tmp/upload_video.mp4"
-    download_file(script["video_url"], video_path)
 
     youtube_id = upload_to_youtube(access_token, video_path, title, description)
     print(f"Uploaded to YouTube (PUBLIC): https://youtube.com/watch?v={youtube_id}")
