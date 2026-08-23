@@ -85,11 +85,18 @@ CLIP_VERIFY_RETRY_WAIT = 5
 # an episode plus every single video's outro. MAX_CHAIN_SEGMENTS caps how
 # many additional REAL Agnes clips we'll chain (each anchored to the
 # previous clip's own last frame, same mechanism as cross-shot continuity)
-# to cover the overflow with real motion instead. 3 extra segments at
-# ~7s each covers up to ~21s of overflow, far more than any real
-# pause/trail needs. If Agnes fails mid-chain, we still fall back to a
-# freeze-hold for whatever's left rather than crashing the run.
-MAX_CHAIN_SEGMENTS = 3
+# to cover the overflow with real motion instead.
+#
+# CHAIN-BUDGET FIX (2026-08-23): 3 segments (~21s of overflow, ~28s total
+# per shot) was sized for short pauses, but confirmed live on the Bosnia
+# episode (script 40ffc83c, 33 shots / ~19min = ~35s per shot average) -
+# almost every shot in a real full-length episode needs MORE than 28s
+# total, so nearly every shot was hitting the chain-budget ceiling and
+# silently freeze-holding the remainder, exactly matching Zia's report of
+# "multiple freeze frames, narrator keeps speaking." Raised to 6 segments
+# (~42s of overflow, ~49s total per shot) to comfortably cover this
+# format's real average shot length with headroom, not just short pauses.
+MAX_CHAIN_SEGMENTS = 6
 
 # LIGHTING FIELD FIX (2026-08-22): the shot's own "lighting" field
 # (dawn/morning/midday/golden_hour/dusk/night/overcast/firelight/
@@ -782,15 +789,38 @@ def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="
     while remaining > 0.05 and chain_used < MAX_CHAIN_SEGMENTS:
         seg_duration = min(remaining, MAX_CLIP_SECONDS)
         seg_out_path = out_path.replace(".mp4", f"_chain{chain_used + 1}.mp4")
-        try:
-            local_frame_path = _extract_last_frame_local(current_anchor_path)
-            chain_anchor_url = _upload_local_image_for_anchor(
-                script_id or "unknown", f"chain_{os.path.basename(seg_out_path)}", local_frame_path
-            )
-            _generate_one_segment(shot, seg_duration, seg_out_path, setting_and_characters, anchor_image_url=chain_anchor_url)
-        except (ContentPolicyRejection, AgnesOverloadedError, Exception) as e:
-            print(f"Chain-extension segment {chain_used + 1} failed ({e}) - falling back to a freeze-hold "
-                  f"for the remaining {remaining:.1f}s instead of losing the whole shot.")
+
+        # CHAIN-RETRY FIX (2026-08-23): a single transient Agnes hiccup
+        # (momentary overload/rate-limit) used to immediately give up on
+        # the ENTIRE remaining chain and freeze-hold the rest of the shot -
+        # even though AgnesOverloadedError is, by definition, a transient
+        # condition create_agnes_task already retried AGNES_MAX_RETRIES
+        # times internally. One extra attempt at the chain-segment level
+        # (separate from that internal retry) catches the case where the
+        # segment simply landed during a bad moment, without extending
+        # runtime much - a genuine/permanent failure still falls through
+        # to the freeze-hold exactly as before.
+        segment_ok = False
+        last_chain_error = None
+        for chain_attempt in range(2):
+            try:
+                local_frame_path = _extract_last_frame_local(current_anchor_path)
+                chain_anchor_url = _upload_local_image_for_anchor(
+                    script_id or "unknown", f"chain_{os.path.basename(seg_out_path)}", local_frame_path
+                )
+                _generate_one_segment(shot, seg_duration, seg_out_path, setting_and_characters, anchor_image_url=chain_anchor_url)
+                segment_ok = True
+                break
+            except (ContentPolicyRejection, AgnesOverloadedError, Exception) as e:
+                last_chain_error = e
+                if chain_attempt == 0:
+                    print(f"Chain-extension segment {chain_used + 1} failed on first attempt ({e}) - "
+                          f"retrying once before falling back to a freeze-hold.")
+                    time.sleep(10)
+
+        if not segment_ok:
+            print(f"Chain-extension segment {chain_used + 1} failed after retry ({last_chain_error}) - "
+                  f"falling back to a freeze-hold for the remaining {remaining:.1f}s instead of losing the whole shot.")
             break
 
         segment_paths.append(seg_out_path)
