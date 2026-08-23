@@ -151,12 +151,24 @@ CAPTION_BG_PADDING = 16
 # to the new video_chunk_urls column. video_url (singular) is still set
 # ONLY when the episode fit in one file, for backward compatibility with
 # anything downstream still reading that column.
-# NOT YET WIRED: re-stitching these chunks back into one file happens
-# OUTSIDE Supabase (wherever the video next leaves Supabase, e.g. a
-# YouTube upload step) - that stitching step does not exist yet as of
-# this commit and is the deliberate next task, not part of this fix.
 QUALITY_VIDEO_BITRATE_KBPS = 3000   # fixed, duration-independent - healthy 720p HEVC quality
-MAX_CHUNK_MB = 45                   # safety margin under Supabase's hard 50MB cap
+MAX_CHUNK_MB = 45                   # target used to decide how many chunks to aim for up front
+
+# CHUNK-SIZE VERIFICATION FIX (2026-08-23): MAX_CHUNK_MB above is only an
+# up-front ESTIMATE (total file size / target = number of chunks, then
+# split by even time slices) - it assumes every second of the video
+# encodes to roughly the same size, which isn't true. Confirmed live on
+# script 40ffc83c: part_002 already encoded to 48.3MB (over the 45MB
+# target but still under Supabase's real cap, so it slipped through),
+# and part_005 encoded dense enough to land OVER Supabase's real object
+# size limit, which rejects the PUT with a bare 400 and no useful body.
+# HARD_CHUNK_LIMIT_MB is the real ceiling every chunk is now verified
+# against AFTER encoding (not just estimated before) - see
+# _encode_subclip_safe below, which recursively re-splits and re-encodes
+# any segment that comes out over this limit until every real on-disk
+# chunk file is safely under it, regardless of how densely a particular
+# segment happens to compress.
+HARD_CHUNK_LIMIT_MB = 48
 
 
 class ContentPolicyRejection(Exception):
@@ -912,15 +924,64 @@ def estimate_output_size_mb(duration_seconds, video_kbps=QUALITY_VIDEO_BITRATE_K
     return total_bits / 8 / 1024 / 1024
 
 
+def _encode_subclip_safe(clip, start, end, out_path, depth=0):
+    """
+    CHUNK-SIZE VERIFICATION FIX (2026-08-23): encodes clip[start:end] to
+    out_path, then checks the REAL on-disk size against
+    HARD_CHUNK_LIMIT_MB (Supabase's real object size ceiling - confirmed
+    hit live on script 40ffc83c/part_005, which encoded denser than the
+    MAX_CHUNK_MB estimate predicted and got rejected outright with a bare
+    400). If the real file is still too big, the segment is split into
+    two equal halves and each half is recursively encoded on its own -
+    this guarantees every chunk that reaches upload_video_chunk is
+    verified safe, regardless of how densely a particular segment's
+    actual content happens to compress. depth caps recursion as a safety
+    net only (5 levels = the segment would have to still be oversized at
+    1/32nd its original slice, which should never happen in practice) -
+    if that ever triggers, the oversized file is uploaded anyway with a
+    loud warning rather than silently dropping content.
+    """
+    sub = clip.subclipped(start, end)
+    sub.write_videofile(
+        out_path,
+        fps=FRAME_RATE,
+        codec="libx265",
+        audio_codec="aac",
+        audio_bitrate="128k",
+        bitrate=f"{QUALITY_VIDEO_BITRATE_KBPS}k",
+        threads=2,
+        logger=None,
+        ffmpeg_params=["-preset", "fast", "-tag:v", "hvc1"],
+    )
+    size_mb = os.path.getsize(out_path) / (1024 * 1024)
+
+    if size_mb <= HARD_CHUNK_LIMIT_MB or depth >= 5 or (end - start) < 2:
+        if size_mb > HARD_CHUNK_LIMIT_MB:
+            print(f"  WARNING: segment [{start:.1f}s-{end:.1f}s] still {size_mb:.1f}MB after "
+                  f"{depth} re-split attempts (hit the recursion safety cap) - uploading anyway, "
+                  f"this may still fail upstream.")
+        return [out_path]
+
+    print(f"  Segment [{start:.1f}s-{end:.1f}s] encoded to {size_mb:.1f}MB, over the "
+          f"{HARD_CHUNK_LIMIT_MB}MB real limit - re-splitting in half (depth {depth + 1}).")
+    os.remove(out_path)
+    mid = (start + end) / 2
+    left_path = out_path.replace(".mp4", "a.mp4")
+    right_path = out_path.replace(".mp4", "b.mp4")
+    left_results = _encode_subclip_safe(clip, start, mid, left_path, depth + 1)
+    right_results = _encode_subclip_safe(clip, mid, end, right_path, depth + 1)
+    return left_results + right_results
+
+
 def split_video_into_chunks(local_path, max_chunk_mb=MAX_CHUNK_MB):
     """
-    Splits an already-encoded local video file into N sequential chunks,
-    each estimated to land safely under max_chunk_mb, using the file's
-    actual on-disk size (not an estimate) to decide N. Chunks are cut on
-    plain time boundaries (not shot-aligned) - acceptable for now since
-    re-stitching happens downstream before anything is watched; shot-
-    aligned cutting can be added later if clean cut points matter for the
-    eventual stitch step.
+    Splits an already-encoded local video file into N sequential chunks.
+    max_chunk_mb only decides how many EVENLY-TIMED segments to aim for up
+    front (an estimate); every segment is then encoded and verified for
+    real size via _encode_subclip_safe, which recursively re-splits any
+    segment that comes out over HARD_CHUNK_LIMIT_MB after encoding - so
+    the up-front estimate no longer has to be exact, only a reasonable
+    starting point.
     Returns a list of local file paths (chunk_paths), NOT URLs - caller is
     responsible for uploading and cleanup.
     """
@@ -934,31 +995,24 @@ def split_video_into_chunks(local_path, max_chunk_mb=MAX_CHUNK_MB):
     chunk_duration = total_duration / num_chunks
 
     print(f"Final video is {actual_size_mb:.1f}MB, over the {max_chunk_mb}MB per-file chunk target - "
-          f"splitting into {num_chunks} chunks (~{chunk_duration:.1f}s each) instead of shrinking bitrate.")
+          f"splitting into {num_chunks} initial segments (~{chunk_duration:.1f}s each), each verified "
+          f"and re-split as needed to stay under the real {HARD_CHUNK_LIMIT_MB}MB limit.")
 
-    chunk_paths = []
+    all_chunk_paths = []
     for i in range(num_chunks):
         start = i * chunk_duration
         end = min((i + 1) * chunk_duration, total_duration)
-        sub = clip.subclipped(start, end)
-        chunk_path = local_path.replace(".mp4", f"_part{i + 1:02d}.mp4")
-        sub.write_videofile(
-            chunk_path,
-            fps=FRAME_RATE,
-            codec="libx265",
-            audio_codec="aac",
-            audio_bitrate="128k",
-            bitrate=f"{QUALITY_VIDEO_BITRATE_KBPS}k",
-            threads=2,
-            logger=None,
-            ffmpeg_params=["-preset", "fast", "-tag:v", "hvc1"],
-        )
-        chunk_paths.append(chunk_path)
-        chunk_size_mb = os.path.getsize(chunk_path) / (1024 * 1024)
-        print(f"  Chunk {i + 1}/{num_chunks}: {chunk_size_mb:.1f}MB")
+        tmp_path = local_path.replace(".mp4", f"_seg{i + 1:02d}.mp4")
+        safe_paths = _encode_subclip_safe(clip, start, end, tmp_path)
+        all_chunk_paths.extend(safe_paths)
 
     clip.close()
-    return chunk_paths
+
+    for idx, p in enumerate(all_chunk_paths, start=1):
+        size_mb = os.path.getsize(p) / (1024 * 1024)
+        print(f"  Final chunk {idx}/{len(all_chunk_paths)}: {size_mb:.1f}MB ({p})")
+
+    return all_chunk_paths
 
 
 def poll_ace_music_task(task_id, out_path, base_url=None, max_wait=180, interval=8):
@@ -1419,8 +1473,9 @@ def upload_video_chunked(script_id, local_path):
     Checks the real on-disk size of the already-encoded (full-quality)
     output file; if it fits under Supabase's 50MB cap as one file, uploads
     it exactly as before (single video_url, unchanged behavior). If not,
-    splits it into multiple full-quality chunks (split_video_into_chunks)
-    and uploads each separately, returning a list of chunk URLs instead.
+    splits it into multiple full-quality chunks (split_video_into_chunks,
+    now with per-chunk real-size verification as of 2026-08-23) and
+    uploads each separately, returning a list of chunk URLs instead.
     Local chunk files are cleaned up after upload either way.
     Returns (video_url_or_None, video_chunk_urls_list_or_None) - exactly
     one of the two will be non-None.
@@ -1438,9 +1493,8 @@ def upload_video_chunked(script_id, local_path):
         os.remove(chunk_path)
 
     print(f"Uploaded {len(chunk_urls)} chunks for script {script_id}. "
-          f"NOTE: re-stitching into one file is a separate, not-yet-built step - "
-          f"chunk_urls are stored in order and are individually complete, playable "
-          f"video files in the meantime.")
+          f"NOTE: re-stitching into one file happens in youtube_upload.py before the YouTube upload - "
+          f"chunk_urls are stored in order and are individually complete, playable video files in the meantime.")
     return None, chunk_urls
 
 
