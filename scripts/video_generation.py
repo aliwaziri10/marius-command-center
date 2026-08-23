@@ -1084,11 +1084,26 @@ def poll_ace_music_task(task_id, out_path, base_url=None, max_wait=180, interval
     return None
 
 
-def generate_background_music(prompt, duration, out_path):
+def generate_background_music(prompt, duration, out_path, debug=None):
+    """
+    AUDIO-DEBUG FIX (2026-08-23): music_generated has been false on every
+    single episode ever assembled, with no way to see why without GitHub
+    Actions log access (which Zia does not have). `debug`, when passed a
+    dict by the caller, gets the LAST real error string written to it
+    under debug["music_error"] on total failure - this dict is threaded
+    all the way up to mark_video_generated and persisted to the new
+    scripts.audio_debug column, so the real cause becomes queryable
+    directly from Supabase instead of requiring log access at all.
+    Behavior/return value is otherwise unchanged.
+    """
     if not ACE_MUSIC_API_KEY:
-        print("No ACE_MUSIC_API_KEY set - skipping background music.")
+        msg = "No ACE_MUSIC_API_KEY set - skipping background music."
+        print(msg)
+        if debug is not None:
+            debug["music_error"] = msg
         return None
 
+    last_error = None
     for base in ACE_MUSIC_BASES:
         try:
             resp = requests.post(
@@ -1102,25 +1117,35 @@ def generate_background_music(prompt, duration, out_path):
                 timeout=60,
             )
             if resp.status_code >= 400:
-                print(f"ACE MUSIC ERROR ({base}) {resp.status_code}: {resp.text}")
+                last_error = f"ACE MUSIC ERROR ({base}) {resp.status_code}: {resp.text[:500]}"
+                print(last_error)
                 continue
             task_id = resp.json().get("data", {}).get("task_id")
             if not task_id:
-                print(f"ACE Music response had no task_id ({base}): {resp.json()}")
+                last_error = f"ACE Music response had no task_id ({base}): {str(resp.json())[:500]}"
+                print(last_error)
                 continue
             result = poll_ace_music_task(task_id, out_path, base_url=base)
             if result:
                 return result
+            last_error = f"ACE Music task on {base} did not return a usable file (see poll log)."
         except Exception as e:
-            print(f"ACE Music generation raised an exception on {base}, trying next host: {e}")
+            last_error = f"ACE Music generation raised an exception on {base}: {e}"
+            print(f"{last_error} - trying next host.")
 
     print("Every ACE Music host failed - trying free Hugging Face MusicGen fallback.")
-    return generate_background_music_musicgen(prompt, duration, out_path)
+    result = generate_background_music_musicgen(prompt, duration, out_path, debug=debug)
+    if result is None and debug is not None and "music_error" not in debug:
+        debug["music_error"] = last_error or "ACE Music failed on all hosts (no specific error captured)."
+    return result
 
 
-def generate_background_music_musicgen(prompt, duration, out_path):
+def generate_background_music_musicgen(prompt, duration, out_path, debug=None):
     if not HF_TOKEN:
-        print("No HF_TOKEN set - skipping MusicGen fallback, continuing without background music.")
+        msg = "No HF_TOKEN set - skipping MusicGen fallback, continuing without background music."
+        print(msg)
+        if debug is not None:
+            debug["music_error"] = msg
         return None
     try:
         resp = requests.post(
@@ -1144,24 +1169,40 @@ def generate_background_music_musicgen(prompt, duration, out_path):
                 timeout=120,
             )
         if resp.status_code >= 400:
-            print(f"MusicGen fallback failed ({resp.status_code}): {resp.text[:300]}")
+            msg = f"MusicGen fallback failed ({resp.status_code}): {resp.text[:500]}"
+            print(msg)
+            if debug is not None:
+                debug["music_error"] = msg
             return None
         content_type = resp.headers.get("content-type", "")
         if "audio" not in content_type:
-            print(f"MusicGen fallback returned unexpected content-type '{content_type}', skipping.")
+            msg = f"MusicGen fallback returned unexpected content-type '{content_type}' (likely an HTML/JSON error page, not audio)."
+            print(msg)
+            if debug is not None:
+                debug["music_error"] = msg
             return None
         with open(out_path, "wb") as f:
             f.write(resp.content)
         print(f"MusicGen fallback succeeded - background music generated via Hugging Face free tier.")
         return out_path
     except Exception as e:
-        print(f"MusicGen fallback raised an exception, continuing without background music: {e}")
+        msg = f"MusicGen fallback raised an exception: {e}"
+        print(f"{msg}, continuing without background music.")
+        if debug is not None:
+            debug["music_error"] = msg
         return None
 
 
-def search_freesound_sfx(query, out_path):
+def search_freesound_sfx(query, out_path, debug=None):
+    """
+    AUDIO-DEBUG FIX (2026-08-23): same rationale as generate_background_music.
+    On failure, appends a short reason string to debug["sfx_errors"] (capped
+    at 5 entries so a whole-episode SFX outage doesn't bloat the column)
+    instead of only printing it.
+    """
     if not FREESOUND_API_KEY:
-        print("No FREESOUND_API_KEY set - skipping SFX for this cue.")
+        if debug is not None and "sfx_errors" not in debug:
+            debug.setdefault("sfx_errors", []).append("No FREESOUND_API_KEY set.")
         return None
     try:
         resp = requests.get(
@@ -1177,20 +1218,30 @@ def search_freesound_sfx(query, out_path):
             timeout=30,
         )
         if resp.status_code >= 400:
-            print(f"FREESOUND ERROR {resp.status_code}: {resp.text}")
+            msg = f"FREESOUND ERROR {resp.status_code} for '{query}': {resp.text[:300]}"
+            print(msg)
+            if debug is not None and len(debug.get("sfx_errors", [])) < 5:
+                debug.setdefault("sfx_errors", []).append(msg)
             return None
         results = resp.json().get("results", [])
         if not results:
             print(f"No Freesound results for cue: {query}")
+            if debug is not None and len(debug.get("sfx_errors", [])) < 5:
+                debug.setdefault("sfx_errors", []).append(f"No results for cue: {query}")
             return None
         previews = results[0].get("previews", {})
         preview_url = previews.get("preview-hq-mp3") or previews.get("preview-lq-mp3")
         if not preview_url:
+            if debug is not None and len(debug.get("sfx_errors", [])) < 5:
+                debug.setdefault("sfx_errors", []).append(f"Result for '{query}' had no preview URL.")
             return None
         download_file(preview_url, out_path)
         return out_path
     except Exception as e:
-        print(f"Freesound lookup failed for cue '{query}', skipping this SFX: {e}")
+        msg = f"Freesound lookup raised an exception for cue '{query}': {e}"
+        print(f"{msg}, skipping this SFX.")
+        if debug is not None and len(debug.get("sfx_errors", [])) < 5:
+            debug.setdefault("sfx_errors", []).append(msg)
         return None
 
 
@@ -1234,18 +1285,25 @@ def extract_original_clip_audio(video_clips, shot_durations, shot_starts, total_
 def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_starts, total_duration, original_clip_audio_layers=None):
     layers = [AudioFileClip(narration_path).with_volume_scaled(NARRATION_VOLUME)]
     stats = {"music_generated": False, "sfx_cues_total": 0, "sfx_applied_count": 0}
+    # AUDIO-DEBUG FIX (2026-08-23): collects the real failure reasons from
+    # generate_background_music/search_freesound_sfx so they can be
+    # persisted to scripts.audio_debug (see mark_video_generated) and
+    # queried directly from Supabase - no GitHub Actions log access needed.
+    audio_debug = {}
 
     if original_clip_audio_layers:
         layers.extend(original_clip_audio_layers)
 
     if music_mood:
         music_path = "/tmp/background_music.mp3"
-        if generate_background_music(music_mood, total_duration, music_path):
+        if generate_background_music(music_mood, total_duration, music_path, debug=audio_debug):
             music_clip = AudioFileClip(music_path)
             music_clip = fit_audio_to_duration(music_clip, total_duration)
             music_clip = music_clip.with_volume_scaled(MUSIC_VOLUME)
             layers.append(music_clip)
             stats["music_generated"] = True
+    else:
+        audio_debug["music_error"] = "No music_mood set on this script - music generation never attempted."
 
     for i, shot in enumerate(shot_list):
         cue = (shot.get("sfx_cue") or "").strip()
@@ -1253,7 +1311,7 @@ def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_
             continue
         stats["sfx_cues_total"] += 1
         sfx_path = f"/tmp/sfx_{i:03d}.mp3"
-        if search_freesound_sfx(cue, sfx_path):
+        if search_freesound_sfx(cue, sfx_path, debug=audio_debug):
             sfx_clip = AudioFileClip(sfx_path)
             max_len = shot_durations[i]
             if sfx_clip.duration > max_len:
@@ -1261,6 +1319,9 @@ def build_audio_mix(narration_path, music_mood, shot_list, shot_durations, shot_
             sfx_clip = sfx_clip.with_volume_scaled(SFX_VOLUME).with_start(shot_starts[i])
             layers.append(sfx_clip)
             stats["sfx_applied_count"] += 1
+
+    if audio_debug:
+        stats["audio_debug"] = audio_debug
 
     mixed = CompositeAudioClip(layers)
     if mixed.duration and mixed.duration > total_duration:
@@ -1537,6 +1598,11 @@ def mark_video_generated(script_id, video_url=None, video_chunk_urls=None, audio
     if audio_stats is not None:
         update["music_generated"] = audio_stats.get("music_generated", False)
         update["sfx_applied_count"] = audio_stats.get("sfx_applied_count", 0)
+        # AUDIO-DEBUG FIX (2026-08-23): persists the real failure reason(s)
+        # collected in build_audio_mix to scripts.audio_debug, queryable
+        # directly from Supabase - no GitHub Actions log access needed to
+        # diagnose why music/SFX didn't apply on a given episode.
+        update["audio_debug"] = audio_stats.get("audio_debug")
     resp = requests.patch(
         f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
         headers=HEADERS,
