@@ -37,21 +37,24 @@ QUALITY FIX (2026-08-20) started splitting large final videos into
 multiple sequential chunk files (video_chunk_urls) instead of shrinking
 bitrate to fit Supabase's 50MB single-file cap, whenever a fixed-quality
 encode doesn't fit in one file - this is what fixed the corrupted/~144p-
-looking 19-minute video Zia flagged. But this file was never updated to
-know about video_chunk_urls - it only ever checked the singular
-video_url, so every 'video_generated' script that got chunked (has
-video_chunk_urls but video_url is null) was silently skipped every run
-since 08-17, with no error, no last_error, nothing - just "Script has no
-video_url yet. Skipping." forever. Confirmed via direct DB query
-(2026-08-22) that 2 real finished videos (ba5d96c8 - 10 chunks, 37993b31
-- 7 chunks) have been stuck in video_generated with zero YouTube upload
-attempts since 08-17 and 08-18 respectively as a direct result of this
-gap. Fix: when video_url is missing but video_chunk_urls is present,
-download every chunk in order and re-stitch them into one local file
-with moviepy (same concatenate_videoclips approach already used
-elsewhere in this pipeline) before uploading - so the upload flow below
-this point is completely unchanged, it just always ends up with one
-local mp4 either way.
+looking 19-minute video Zia flagged. This file re-stitches chunks back
+into one file before uploading, so the upload flow below this point is
+unchanged either way.
+
+DOUBLE-UPLOAD FIX (2026-08-23): status used to only flip to 'uploaded' at
+the very end of main(), AFTER the thumbnail step. If anything failed or
+timed out between a successful YouTube upload and that final write (a
+thumbnail download/set failure, a network blip, the 30-minute GitHub
+Actions timeout), the DB row stayed at 'video_generated' even though the
+video was already live on YouTube - so the next scheduled run (every 30
+min) picked the SAME script again and uploaded the SAME video a second
+time under a brand-new YouTube ID. This is the confirmed root cause of a
+duplicate "two-part" upload Zia found for the low-quality 19-minute
+episode. Fix: mark_uploaded() is now called immediately after
+upload_to_youtube() succeeds, BEFORE the thumbnail step even starts -
+closing that window completely. A thumbnail failure after this point can
+never cause a re-upload again, since the DB already reflects reality by
+the time it could fail.
 """
 
 import os
@@ -314,9 +317,6 @@ def main():
     if script.get("video_url"):
         download_file(script["video_url"], video_path)
     elif script.get("video_chunk_urls"):
-        # CHUNK-STITCH FIX (2026-08-22): see file header. Re-stitches the
-        # chunked output back into one file before continuing the upload
-        # flow exactly as before.
         chunk_urls = script["video_chunk_urls"]
         print(f"No single video_url - found {len(chunk_urls)} video_chunk_urls instead. "
               f"Downloading and re-stitching into one file before upload.")
@@ -348,6 +348,11 @@ def main():
     youtube_id = upload_to_youtube(access_token, video_path, title, description)
     print(f"Uploaded to YouTube (PUBLIC): https://youtube.com/watch?v={youtube_id}")
 
+    # DOUBLE-UPLOAD FIX (2026-08-23): mark this uploaded IMMEDIATELY, before
+    # the thumbnail step - see file header. Nothing after this line can
+    # ever cause a re-upload of the same video again.
+    mark_uploaded(script_id, youtube_id)
+
     thumbnail_url = script.get("thumbnail_url")
     if thumbnail_url:
         try:
@@ -359,7 +364,6 @@ def main():
     else:
         print("No thumbnail_url on this script - skipping custom thumbnail.")
 
-    mark_uploaded(script_id, youtube_id)
     print("Done.")
 
 
