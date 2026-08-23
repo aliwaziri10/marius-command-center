@@ -2766,7 +2766,7 @@
       "functions": [
         {
           "name": "get_access_token",
-          "line": 84,
+          "line": 87,
           "args": [],
           "calls": [
             "json",
@@ -2778,7 +2778,7 @@
         },
         {
           "name": "get_authorized_channel",
-          "line": 101,
+          "line": 104,
           "args": [
             "access_token"
           ],
@@ -2792,7 +2792,7 @@
         },
         {
           "name": "get_next_ready_script",
-          "line": 122,
+          "line": 125,
           "args": [],
           "calls": [
             "get",
@@ -2803,7 +2803,7 @@
         },
         {
           "name": "get_topic_title",
-          "line": 133,
+          "line": 136,
           "args": [
             "topic_id"
           ],
@@ -2816,7 +2816,7 @@
         },
         {
           "name": "download_file",
-          "line": 144,
+          "line": 147,
           "args": [
             "url",
             "out_path"
@@ -2831,7 +2831,7 @@
         },
         {
           "name": "stitch_chunks_to_local_file",
-          "line": 152,
+          "line": 155,
           "args": [
             "video_chunk_urls",
             "out_path"
@@ -2851,7 +2851,7 @@
         },
         {
           "name": "build_description",
-          "line": 193,
+          "line": 196,
           "args": [
             "narration_text"
           ],
@@ -2865,7 +2865,7 @@
         },
         {
           "name": "upload_to_youtube",
-          "line": 219,
+          "line": 222,
           "args": [
             "access_token",
             "video_path",
@@ -2887,7 +2887,7 @@
         },
         {
           "name": "set_thumbnail",
-          "line": 269,
+          "line": 272,
           "args": [
             "access_token",
             "youtube_id",
@@ -2905,7 +2905,7 @@
         },
         {
           "name": "mark_uploaded",
-          "line": 293,
+          "line": 296,
           "args": [
             "script_id",
             "youtube_id"
@@ -2918,7 +2918,7 @@
         },
         {
           "name": "main",
-          "line": 303,
+          "line": 306,
           "args": [],
           "calls": [
             "RuntimeError",
