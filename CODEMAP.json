@@ -806,7 +806,7 @@
       "functions": [
         {
           "name": "split_narration_into_chunks",
-          "line": 112,
+          "line": 169,
           "args": [
             "narration_text",
             "num_chunks"
@@ -823,7 +823,7 @@
         },
         {
           "name": "normalize_shot",
-          "line": 142,
+          "line": 199,
           "args": [
             "shot",
             "index"
@@ -836,7 +836,7 @@
         },
         {
           "name": "normalize_hook_text",
-          "line": 180,
+          "line": 237,
           "args": [
             "result"
           ],
@@ -851,7 +851,7 @@
         },
         {
           "name": "hook_text_matches_prompt_example",
-          "line": 196,
+          "line": 253,
           "args": [
             "hook_text"
           ],
@@ -865,7 +865,7 @@
         },
         {
           "name": "hook_text_too_long_to_glance",
-          "line": 203,
+          "line": 260,
           "args": [
             "hook_text"
           ],
@@ -877,7 +877,7 @@
         },
         {
           "name": "hook_text_matches_story",
-          "line": 208,
+          "line": 265,
           "args": [
             "hook_text",
             "narration_text"
@@ -893,7 +893,7 @@
         },
         {
           "name": "find_duplicate_shots",
-          "line": 222,
+          "line": 279,
           "args": [
             "normalized_shots"
           ],
@@ -907,7 +907,7 @@
         },
         {
           "name": "find_empty_shots",
-          "line": 234,
+          "line": 291,
           "args": [
             "normalized_shots"
           ],
@@ -919,7 +919,7 @@
         },
         {
           "name": "find_continuation_language_shots",
-          "line": 241,
+          "line": 298,
           "args": [
             "normalized_shots"
           ],
@@ -932,7 +932,7 @@
         },
         {
           "name": "find_loitering_shots",
-          "line": 252,
+          "line": 309,
           "args": [
             "normalized_shots"
           ],
@@ -945,7 +945,7 @@
         },
         {
           "name": "find_missing_onscreen_text_shots",
-          "line": 263,
+          "line": 320,
           "args": [
             "normalized_shots"
           ],
@@ -958,8 +958,34 @@
           "docstring": ""
         },
         {
+          "name": "find_anachronistic_object_shots",
+          "line": 329,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "append",
+            "enumerate",
+            "lower"
+          ],
+          "docstring": "ANACHRONISM KEYWORD GATE (2026-08-24): catches shots whose own"
+        },
+        {
+          "name": "find_duplicate_character_shots",
+          "line": 345,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "append",
+            "enumerate",
+            "lower"
+          ],
+          "docstring": "DUPLICATE-CHARACTER KEYWORD GATE (2026-08-25): see module docstring"
+        },
+        {
           "name": "find_dominant_subject",
-          "line": 272,
+          "line": 358,
           "args": [
             "normalized_shots"
           ],
@@ -973,7 +999,7 @@
         },
         {
           "name": "find_excessive_consecutive_subject",
-          "line": 285,
+          "line": 371,
           "args": [
             "normalized_shots"
           ],
@@ -985,7 +1011,7 @@
         },
         {
           "name": "find_location_change_without_establishing",
-          "line": 300,
+          "line": 386,
           "args": [
             "normalized_shots"
           ],
@@ -998,15 +1024,17 @@
         },
         {
           "name": "validate_and_normalize_shot_response",
-          "line": 317,
+          "line": 403,
           "args": [
             "result",
             "narration_text"
           ],
           "calls": [
             "enumerate",
+            "find_anachronistic_object_shots",
             "find_continuation_language_shots",
             "find_dominant_subject",
+            "find_duplicate_character_shots",
             "find_duplicate_shots",
             "find_empty_shots",
             "find_excessive_consecutive_subject",
@@ -1030,7 +1058,7 @@
         },
         {
           "name": "build_shot_breakdown_chunk_prompt",
-          "line": 646,
+          "line": 779,
           "args": [
             "title",
             "angle",
@@ -1053,7 +1081,7 @@
         },
         {
           "name": "generate_shot_breakdown",
-          "line": 823,
+          "line": 960,
           "args": [
             "title",
             "angle",
@@ -1081,7 +1109,7 @@
         },
         {
           "name": "_simplify",
-          "line": 197,
+          "line": 254,
           "args": [
             "s"
           ],
@@ -1873,7 +1901,7 @@
         },
         {
           "name": "_sanitize_anchor_for_fallback",
-          "line": 308,
+          "line": 329,
           "args": [
             "anchor"
           ],
@@ -1888,7 +1916,7 @@
         },
         {
           "name": "_strip_named_characters_for_group_shot",
-          "line": 365,
+          "line": 390,
           "args": [
             "anchor"
           ],
@@ -1902,7 +1930,7 @@
         },
         {
           "name": "build_agnes_prompt",
-          "line": 375,
+          "line": 400,
           "args": [
             "shot",
             "setting_and_characters",
@@ -1923,7 +1951,7 @@
         },
         {
           "name": "build_character_reference_prompt",
-          "line": 467,
+          "line": 505,
           "args": [
             "setting_and_characters"
           ],
@@ -1935,7 +1963,7 @@
         },
         {
           "name": "generate_character_reference",
-          "line": 478,
+          "line": 517,
           "args": [
             "script"
           ],
@@ -1957,7 +1985,7 @@
         },
         {
           "name": "upload_reference_image",
-          "line": 564,
+          "line": 603,
           "args": [
             "script_id",
             "file_name",
@@ -1973,7 +2001,7 @@
         },
         {
           "name": "extract_last_frame_url",
-          "line": 585,
+          "line": 624,
           "args": [
             "script_id",
             "shot_index",
@@ -1995,7 +2023,7 @@
         },
         {
           "name": "get_continuity_anchor",
-          "line": 615,
+          "line": 654,
           "args": [
             "script",
             "video_urls"
@@ -2012,7 +2040,7 @@
         },
         {
           "name": "create_agnes_task",
-          "line": 643,
+          "line": 682,
           "args": [
             "prompt",
             "num_frames",
@@ -2033,7 +2061,7 @@
         },
         {
           "name": "extract_video_url",
-          "line": 685,
+          "line": 724,
           "args": [
             "data"
           ],
@@ -2048,7 +2076,7 @@
         },
         {
           "name": "poll_agnes_task",
-          "line": 696,
+          "line": 735,
           "args": [
             "video_id",
             "max_wait",
@@ -2069,7 +2097,7 @@
         },
         {
           "name": "_generate_one_segment",
-          "line": 724,
+          "line": 763,
           "args": [
             "shot",
             "segment_duration",
@@ -2092,7 +2120,7 @@
         },
         {
           "name": "_extract_last_frame_local",
-          "line": 750,
+          "line": 789,
           "args": [
             "video_path"
           ],
@@ -2109,7 +2137,7 @@
         },
         {
           "name": "_upload_local_image_for_anchor",
-          "line": 764,
+          "line": 803,
           "args": [
             "script_id",
             "tag",
@@ -2123,7 +2151,7 @@
         },
         {
           "name": "generate_shot_clip",
-          "line": 774,
+          "line": 813,
           "args": [
             "shot",
             "target_duration",
@@ -2155,7 +2183,7 @@
         },
         {
           "name": "fit_clip_to_duration",
-          "line": 849,
+          "line": 895,
           "args": [
             "clip",
             "target"
@@ -2172,7 +2200,7 @@
         },
         {
           "name": "fit_audio_to_duration",
-          "line": 859,
+          "line": 905,
           "args": [
             "audio_clip",
             "target"
@@ -2186,7 +2214,7 @@
         },
         {
           "name": "upload_clip",
-          "line": 867,
+          "line": 913,
           "args": [
             "script_id",
             "index",
@@ -2203,7 +2231,7 @@
         },
         {
           "name": "save_progress",
-          "line": 888,
+          "line": 934,
           "args": [
             "script_id",
             "video_urls",
@@ -2217,7 +2245,7 @@
         },
         {
           "name": "mark_content_flagged",
-          "line": 898,
+          "line": 944,
           "args": [
             "script_id",
             "shot_index",
@@ -2232,7 +2260,7 @@
         },
         {
           "name": "compute_shot_durations",
-          "line": 909,
+          "line": 955,
           "args": [
             "shot_list",
             "total_duration"
@@ -2247,7 +2275,7 @@
         },
         {
           "name": "get_shot_durations",
-          "line": 915,
+          "line": 961,
           "args": [
             "script",
             "shot_list",
@@ -2266,7 +2294,7 @@
         },
         {
           "name": "compute_shot_start_times",
-          "line": 928,
+          "line": 974,
           "args": [
             "shot_durations"
           ],
@@ -2277,7 +2305,7 @@
         },
         {
           "name": "compute_target_bitrate",
-          "line": 937,
+          "line": 983,
           "args": [
             "duration_seconds",
             "audio_kbps"
@@ -2287,7 +2315,7 @@
         },
         {
           "name": "estimate_output_size_mb",
-          "line": 951,
+          "line": 997,
           "args": [
             "duration_seconds",
             "video_kbps",
@@ -2298,7 +2326,7 @@
         },
         {
           "name": "_encode_subclip_safe",
-          "line": 957,
+          "line": 1003,
           "args": [
             "clip",
             "start",
@@ -2319,7 +2347,7 @@
         },
         {
           "name": "split_video_into_chunks",
-          "line": 1006,
+          "line": 1052,
           "args": [
             "local_path",
             "max_chunk_mb"
@@ -2342,7 +2370,7 @@
         },
         {
           "name": "poll_ace_music_task",
-          "line": 1048,
+          "line": 1094,
           "args": [
             "task_id",
             "out_path",
@@ -2365,7 +2393,7 @@
         },
         {
           "name": "generate_background_music",
-          "line": 1087,
+          "line": 1133,
           "args": [
             "prompt",
             "duration",
@@ -2388,7 +2416,7 @@
         },
         {
           "name": "generate_background_music_musicgen",
-          "line": 1143,
+          "line": 1189,
           "args": [
             "prompt",
             "duration",
@@ -2410,26 +2438,32 @@
         },
         {
           "name": "search_freesound_sfx",
-          "line": 1196,
+          "line": 1242,
           "args": [
             "query",
             "out_path",
             "debug"
           ],
           "calls": [
+            "_keyword_fallback_query",
+            "_try_query",
             "append",
             "download_file",
             "get",
+            "join",
             "json",
             "len",
+            "lower",
             "print",
-            "setdefault"
+            "setdefault",
+            "split",
+            "strip"
           ],
           "docstring": "AUDIO-DEBUG FIX (2026-08-23): same rationale as generate_background_music."
         },
         {
           "name": "apply_safety_limiter",
-          "line": 1248,
+          "line": 1328,
           "args": [
             "audio_clip",
             "ceiling"
@@ -2446,7 +2480,7 @@
         },
         {
           "name": "extract_original_clip_audio",
-          "line": 1268,
+          "line": 1348,
           "args": [
             "video_clips",
             "shot_durations",
@@ -2465,7 +2499,7 @@
         },
         {
           "name": "build_audio_mix",
-          "line": 1285,
+          "line": 1365,
           "args": [
             "narration_path",
             "music_mood",
@@ -2497,7 +2531,7 @@
         },
         {
           "name": "_load_caption_font",
-          "line": 1335,
+          "line": 1415,
           "args": [
             "size"
           ],
@@ -2511,7 +2545,7 @@
         },
         {
           "name": "_wrap_caption_text",
-          "line": 1346,
+          "line": 1426,
           "args": [
             "text",
             "font",
@@ -2528,7 +2562,7 @@
         },
         {
           "name": "render_caption_image",
-          "line": 1363,
+          "line": 1443,
           "args": [
             "text",
             "video_width",
@@ -2553,7 +2587,7 @@
         },
         {
           "name": "build_caption_clip",
-          "line": 1409,
+          "line": 1489,
           "args": [
             "text",
             "start",
@@ -2572,7 +2606,7 @@
         },
         {
           "name": "build_caption_clips",
-          "line": 1423,
+          "line": 1503,
           "args": [
             "shot_list",
             "shot_durations",
@@ -2593,7 +2627,7 @@
         },
         {
           "name": "assemble_final_video",
-          "line": 1436,
+          "line": 1516,
           "args": [
             "script_id",
             "video_urls",
@@ -2637,7 +2671,7 @@
         },
         {
           "name": "upload_video",
-          "line": 1512,
+          "line": 1592,
           "args": [
             "script_id",
             "file_path"
@@ -2654,7 +2688,7 @@
         },
         {
           "name": "upload_video_chunk",
-          "line": 1536,
+          "line": 1616,
           "args": [
             "script_id",
             "chunk_index",
@@ -2672,7 +2706,7 @@
         },
         {
           "name": "upload_video_chunked",
-          "line": 1560,
+          "line": 1640,
           "args": [
             "script_id",
             "local_path"
@@ -2691,7 +2725,7 @@
         },
         {
           "name": "mark_video_generated",
-          "line": 1592,
+          "line": 1672,
           "args": [
             "script_id",
             "video_url",
@@ -2707,7 +2741,7 @@
         },
         {
           "name": "process_script",
-          "line": 1615,
+          "line": 1695,
           "args": [
             "script",
             "shot_limit"
@@ -2745,7 +2779,7 @@
         },
         {
           "name": "main",
-          "line": 1759,
+          "line": 1839,
           "args": [],
           "calls": [
             "format_exc",
@@ -2754,6 +2788,32 @@
             "print",
             "process_script",
             "record_error"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_try_query",
+          "line": 1265,
+          "args": [
+            "q"
+          ],
+          "calls": [
+            "get",
+            "json"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_keyword_fallback_query",
+          "line": 1295,
+          "args": [
+            "q"
+          ],
+          "calls": [
+            "join",
+            "lower",
+            "split",
+            "strip"
           ],
           "docstring": ""
         }
