@@ -262,6 +262,27 @@ ANACHRONISM_GUARD = (
     "no modern furniture, no electrical wiring or outlets, no plastic objects"
 )
 
+# ANACHRONISM GUARD REPOSITIONING (2026-08-24): a single negative-instruction
+# block stated ONCE, early in a long combined prompt (anchor + 6 other
+# guard blocks + visual_description + lighting + shot type, all
+# concatenated into one string) is known to lose weight with video
+# generation models the further it sits from the end of the prompt -
+# confirmed against Zia's report of laptops/drones still appearing in
+# period episodes even though this exact guard has been present in every
+# single prompt since 2026-08-02. Repeating a short-form version
+# immediately after visual_description (the same recency-authority logic
+# already used for LIGHTING_PROMPT_MAP cues below) gives it the same
+# "most recent = most authoritative" positioning. This is a mitigation on
+# the generation side; the real primary defense is now the deterministic
+# keyword gate in shot_breakdown_stage.py (find_anachronistic_object_shots)
+# that rejects a shot list at the SOURCE if its own visual_description
+# names a modern object - the negative prompt alone was never reliable as
+# the only line of defense.
+ANACHRONISM_GUARD_SHORT = (
+    "strictly no laptops, no computers, no smartphones, no tablets, no drones, "
+    "no screens or monitors of any kind, no modern technology of any kind"
+)
+
 # VISUAL-STYLE MODERNIZATION (2026-08-15): previously "shot on film, natural
 # film grain" - which fought sepia/washed-out grading but still read as
 # classic analog rather than modern digital cinema. Now describes a
@@ -330,7 +351,11 @@ DISTINCT_INDIVIDUALS_GUARD = (
     "every person visible in this shot is a distinct, unique individual with "
     "a different face, body, and clothing from every other person in the "
     "frame - never repeat or clone one character's likeness onto more than "
-    "one person, even in a crowd, group, or background"
+    "one person, even in a crowd, group, or background. If this shot has a "
+    "named recurring character as its primary subject, that person appears "
+    "EXACTLY ONCE in the frame - never render two, a duplicate, a mirrored "
+    "copy, or a second instance of the same named character anywhere in the "
+    "same shot, including reflections or background figures"
 )
 
 MOTION_CONTINUITY_GUARD = (
@@ -393,6 +418,13 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
     episode-specific content - they cannot be what triggers a content-policy
     rejection, so there's no reason to withhold them even on the ultra-safe
     tier 2 path.
+
+    ANACHRONISM GUARD REPOSITIONING (2026-08-24): ANACHRONISM_GUARD (the
+    long form) still runs early alongside the other guards, but
+    ANACHRONISM_GUARD_SHORT is now ALSO appended immediately after
+    visual_description on every fallback tier, for the same
+    recency-authority reason lighting_cue is placed last. See its own
+    comment above for the full rationale.
     """
     shot_type = (shot.get("shot_type") or "medium").replace("_", " ")
     camera_movement = (shot.get("camera_movement") or "static").replace("_", " ")
@@ -416,6 +448,10 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
         parts.append(PURPOSEFUL_ACTION_GUARD)
         parts.append(OBJECT_PERMANENCE_GUARD)
         parts.append(visual)
+        # ANACHRONISM GUARD REPOSITIONING (2026-08-24): short-form repeat
+        # placed right after visual_description, before lighting, so it's
+        # one of the last things the model reads.
+        parts.append(ANACHRONISM_GUARD_SHORT)
         # Lighting cue placed LAST, after visual_description, so it is the
         # most recent/authoritative instruction and matches the shot's own
         # validated lighting field instead of conflicting with whatever
@@ -432,6 +468,7 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
         parts.append(ORIENTATION_CONSISTENCY_GUARD)
         parts.append(PURPOSEFUL_ACTION_GUARD)
         parts.append(OBJECT_PERMANENCE_GUARD)
+        parts.append(ANACHRONISM_GUARD_SHORT)
         parts.append(lighting_cue)
         parts.append(f"{shot_type} modern high-production cinematic shot")
     else:
@@ -442,6 +479,7 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
             ORIENTATION_CONSISTENCY_GUARD,
             PURPOSEFUL_ACTION_GUARD,
             OBJECT_PERMANENCE_GUARD,
+            ANACHRONISM_GUARD_SHORT,
             lighting_cue,
             f"{shot_type} modern high-production cinematic shot",
         ]
@@ -471,6 +509,7 @@ def build_character_reference_prompt(setting_and_characters):
         "bright natural daylight, high-key lighting, well-exposed, vivid colors",
         QUALITY_GUARD,
         ANACHRONISM_GUARD,
+        ANACHRONISM_GUARD_SHORT,
     ]
     return ", ".join(p for p in parts if p)
 
@@ -800,9 +839,16 @@ def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="
         # segment simply landed during a bad moment, without extending
         # runtime much - a genuine/permanent failure still falls through
         # to the freeze-hold exactly as before.
+        # FREEZE-FRAME REDUCTION FIX (2026-08-25): raised from 2 attempts to
+        # 3, with a shorter backoff between them (10s -> 6s), directly per
+        # Zia's report that freeze-holds still show up on a minority of
+        # shots. A single retry was giving up too early on transient Agnes
+        # hiccups; a third attempt (with a faster retry cadence so it
+        # doesn't meaningfully slow down a run) lets more segments recover
+        # instead of falling through to the freeze-hold fallback below.
         segment_ok = False
         last_chain_error = None
-        for chain_attempt in range(2):
+        for chain_attempt in range(3):
             try:
                 local_frame_path = _extract_last_frame_local(current_anchor_path)
                 chain_anchor_url = _upload_local_image_for_anchor(
@@ -813,10 +859,10 @@ def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="
                 break
             except (ContentPolicyRejection, AgnesOverloadedError, Exception) as e:
                 last_chain_error = e
-                if chain_attempt == 0:
-                    print(f"Chain-extension segment {chain_used + 1} failed on first attempt ({e}) - "
-                          f"retrying once before falling back to a freeze-hold.")
-                    time.sleep(10)
+                if chain_attempt < 2:
+                    print(f"Chain-extension segment {chain_used + 1} failed on attempt "
+                          f"{chain_attempt + 1}/3 ({e}) - retrying before falling back to a freeze-hold.")
+                    time.sleep(6)
 
         if not segment_ok:
             print(f"Chain-extension segment {chain_used + 1} failed after retry ({last_chain_error}) - "
@@ -1199,16 +1245,28 @@ def search_freesound_sfx(query, out_path, debug=None):
     On failure, appends a short reason string to debug["sfx_errors"] (capped
     at 5 entries so a whole-episode SFX outage doesn't bloat the column)
     instead of only printing it.
+
+    SFX QUERY SIMPLIFICATION (2026-08-24): sfx_cue text written by the
+    shot-breakdown LLM is a full descriptive sentence (e.g. "Howling cold
+    wind and distant creaking wooden pilings"), but Freesound's search is
+    tag-based and matches short keyword-style queries far better -
+    confirmed live via audio_debug on script 4fe33993 (Lighthouse Keeper),
+    where all 5 SFX cues returned "No results" verbatim. Before hitting
+    Freesound, the query is now trimmed to its first few significant words
+    (stopwords and filler dropped) as a keyword-style fallback query if the
+    full-sentence query returns nothing, instead of giving up after one
+    literal-sentence search.
     """
     if not FREESOUND_API_KEY:
         if debug is not None and "sfx_errors" not in debug:
             debug.setdefault("sfx_errors", []).append("No FREESOUND_API_KEY set.")
         return None
-    try:
+
+    def _try_query(q):
         resp = requests.get(
             "https://freesound.org/apiv2/search/text/",
             params={
-                "query": query,
+                "query": q,
                 "token": FREESOUND_API_KEY,
                 "fields": "id,previews",
                 "filter": "duration:[0.1 TO 8]",
@@ -1218,23 +1276,45 @@ def search_freesound_sfx(query, out_path, debug=None):
             timeout=30,
         )
         if resp.status_code >= 400:
-            msg = f"FREESOUND ERROR {resp.status_code} for '{query}': {resp.text[:300]}"
-            print(msg)
-            if debug is not None and len(debug.get("sfx_errors", [])) < 5:
-                debug.setdefault("sfx_errors", []).append(msg)
-            return None
+            return None, f"FREESOUND ERROR {resp.status_code} for '{q}': {resp.text[:300]}"
         results = resp.json().get("results", [])
         if not results:
-            print(f"No Freesound results for cue: {query}")
-            if debug is not None and len(debug.get("sfx_errors", [])) < 5:
-                debug.setdefault("sfx_errors", []).append(f"No results for cue: {query}")
-            return None
+            return None, f"No results for cue: {q}"
         previews = results[0].get("previews", {})
         preview_url = previews.get("preview-hq-mp3") or previews.get("preview-lq-mp3")
         if not preview_url:
+            return None, f"Result for '{q}' had no preview URL."
+        return preview_url, None
+
+    _STOPWORDS = {
+        "a", "an", "the", "of", "in", "on", "at", "and", "or", "with",
+        "distant", "background", "faint", "loud", "soft", "sudden", "slight",
+        "some", "into", "from", "as", "is", "are", "being", "nearby",
+    }
+
+    def _keyword_fallback_query(q):
+        words = [w.strip(".,!?;:'\"()").lower() for w in q.split()]
+        meaningful = [w for w in words if w and w not in _STOPWORDS]
+        return " ".join(meaningful[:3]) if meaningful else q
+
+    try:
+        preview_url, err = _try_query(query)
+
+        if not preview_url:
+            fallback_q = _keyword_fallback_query(query)
+            if fallback_q and fallback_q.lower() != query.strip().lower():
+                print(f"Freesound literal-sentence query failed ({err}) - retrying with "
+                      f"keyword fallback query '{fallback_q}'.")
+                preview_url, err2 = _try_query(fallback_q)
+                if not preview_url:
+                    err = f"{err} | keyword fallback '{fallback_q}' also failed: {err2}"
+
+        if not preview_url:
+            print(err)
             if debug is not None and len(debug.get("sfx_errors", [])) < 5:
-                debug.setdefault("sfx_errors", []).append(f"Result for '{query}' had no preview URL.")
+                debug.setdefault("sfx_errors", []).append(err)
             return None
+
         download_file(preview_url, out_path)
         return out_path
     except Exception as e:

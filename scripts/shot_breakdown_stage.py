@@ -20,6 +20,22 @@ paraphrasing, visual drift from the setting anchor, monotonous pacing) that
 slip past keyword/structural checks while still violating their spirit. A
 checker rejection is treated exactly like any other content failure below -
 same retry/wait/attempt-count loop, no new infra.
+
+ANACHRONISM KEYWORD GATE (2026-08-24): the video-generation prompt has
+carried a strong negative-instruction ANACHRONISM_GUARD since 2026-08-02
+(video_generation.py), but Zia reported laptops/drones/modern objects
+still routinely appearing in period episodes (1920s-1990s settings). Root
+cause: nothing upstream of Agnes ever checked whether the WRITER's own
+visual_description text already named a modern object - if the shot list
+itself says "a laptop open on the desk," no amount of negative prompting
+downstream can reliably suppress an object the positive instruction
+explicitly asked for. This mirrors the exact same class of bug the
+onscreen-text keyword gate (ONSCREEN_TEXT_KEYWORDS /
+find_missing_onscreen_text_shots) already exists to catch - a deterministic
+keyword scan on the writer's own output, at generation time, is a much
+harder guarantee than a negative instruction handed to a video model that's
+known to weight "no X" instructions unreliably. See MODERN_OBJECT_KEYWORDS /
+find_anachronistic_object_shots below.
 """
 
 import re
@@ -106,6 +122,47 @@ ONSCREEN_TEXT_KEYWORDS = (
     "newspaper", "letter", "document", "sign", "headline", "inscription",
     "poster", "map", "book", "plaque", "telegram", "postcard", "banner",
     "ledger", "diary", "certificate", "gravestone", "tombstone",
+)
+
+# ANACHRONISM KEYWORD GATE (2026-08-24): unambiguous, era-independent
+# modern-technology terms only - deliberately does NOT include things like
+# "car" or "television" whose appropriateness is era-dependent (a 1990s
+# Sarajevo story can legitimately have cars). These are objects that are
+# never correct in any of this channel's historical episodes, matching
+# ANACHRONISM_GUARD's own explicit list in video_generation.py.
+MODERN_OBJECT_KEYWORDS = (
+    "laptop", "computer screen", "computer monitor", "desktop computer",
+    "smartphone", "smart phone", "cell phone", "cellphone", "mobile phone",
+    "iphone", "tablet computer", "ipad", "drone", "quadcopter",
+    "flat screen", "flatscreen", "led screen", "led display", "lcd screen",
+    "digital display", "digital screen", "touchscreen", "touch screen",
+    "wifi router", "bluetooth", "usb", "solar panel", "security camera",
+    "cctv", "led light strip", "plastic water bottle",
+)
+
+# DUPLICATE-CHARACTER KEYWORD GATE (2026-08-25): Zia reported the same
+# named protagonist rendered TWICE in a single shot (e.g. two of the same
+# nurse visible together) despite DISTINCT_INDIVIDUALS_GUARD already being
+# live in every video_generation.py prompt at the time this episode was
+# written - confirming the negative video-model instruction alone isn't a
+# reliable defense here either, same class of problem as the anachronism
+# gate above. This catches the case where the WRITER's own
+# visual_description explicitly calls for two instances of the same
+# person (a mirror/reflection, a double, a twin, "both her and her") -
+# deliberately narrow/conservative wording only, to avoid false-positives
+# on legitimate multi-person crowd shots that happen to use "two" or
+# "both" for genuinely different people.
+DUPLICATE_CHARACTER_KEYWORDS = (
+    "her own reflection standing", "his own reflection standing",
+    "mirror image of her", "mirror image of him",
+    "twin of her", "twin of him", "her twin", "his twin",
+    "double of her", "double of him", "her double", "his double",
+    "duplicate of her", "duplicate of him",
+    "clone of her", "clone of him",
+    "two versions of her", "two versions of him",
+    "second copy of her", "second copy of him",
+    "identical copies of her", "identical copies of him",
+    "both her and her", "both him and him",
 )
 
 
@@ -269,6 +326,35 @@ def find_missing_onscreen_text_shots(normalized_shots):
     return hits
 
 
+def find_anachronistic_object_shots(normalized_shots):
+    """ANACHRONISM KEYWORD GATE (2026-08-24): catches shots whose own
+    visual_description names an unambiguous modern object, regardless of
+    story era. This is a deterministic pre-generation check, independent
+    of (and much stronger than) the negative ANACHRONISM_GUARD instruction
+    handed to Agnes downstream - see module docstring."""
+    hits = []
+    for i, s in enumerate(normalized_shots):
+        desc = (s["visual_description"] or "").lower()
+        for kw in MODERN_OBJECT_KEYWORDS:
+            if kw in desc:
+                hits.append((i, kw))
+                break
+    return hits
+
+
+def find_duplicate_character_shots(normalized_shots):
+    """DUPLICATE-CHARACTER KEYWORD GATE (2026-08-25): see module docstring
+    and DUPLICATE_CHARACTER_KEYWORDS comment above."""
+    hits = []
+    for i, s in enumerate(normalized_shots):
+        desc = (s["visual_description"] or "").lower()
+        for kw in DUPLICATE_CHARACTER_KEYWORDS:
+            if kw in desc:
+                hits.append((i, kw))
+                break
+    return hits
+
+
 def find_dominant_subject(normalized_shots):
     subject_counts = Counter(
         s["primary_subject"].lower() for s in normalized_shots if s["primary_subject"]
@@ -369,6 +455,31 @@ def validate_and_normalize_shot_response(result, narration_text):
             f"shot list was padded by looping an earlier block of shots instead of "
             f"covering new narration - write more real, distinct shots covering the "
             f"full story instead of repeating any."
+        )
+
+    anachronism_hits = find_anachronistic_object_shots(normalized_shots)
+    if anachronism_hits:
+        worst_i, worst_kw = anachronism_hits[0]
+        return False, (
+            f"{len(anachronism_hits)} shot(s) name a modern object that cannot exist "
+            f"in this period story (first at shot {worst_i}, term {worst_kw!r}) - this "
+            f"is a HARD REJECTION regardless of era. Rewrite every flagged shot's "
+            f"visual_description to use only objects that plausibly existed in this "
+            f"story's actual time period and setting - no laptops, computers, "
+            f"smartphones, tablets, drones, screens/monitors of any kind, or other "
+            f"modern technology, ever."
+        )
+
+    duplicate_character_hits = find_duplicate_character_shots(normalized_shots)
+    if duplicate_character_hits:
+        worst_i, worst_kw = duplicate_character_hits[0]
+        return False, (
+            f"{len(duplicate_character_hits)} shot(s) explicitly call for two instances "
+            f"of the same named character in one frame (first at shot {worst_i}, phrase "
+            f"{worst_kw!r}) - this is a HARD REJECTION. A named recurring character must "
+            f"appear EXACTLY ONCE per shot, never as a reflection, double, twin, or "
+            f"duplicate alongside themselves. Rewrite the flagged shot(s) so only one "
+            f"instance of that character is described."
         )
 
     zoom_count = sum(
@@ -502,11 +613,33 @@ a different part of the narration segment. NEVER repeat an earlier shot
 reach the shot count - a script that repeats any shot more than twice will
 be rejected and regenerated.
 
+PERIOD ACCURACY (HARD RULE - AUTOMATIC REJECTION): this is a real historical
+episode set in a specific time period. NEVER write a visual_description
+that names or implies a modern object - no laptops, computers, smartphones,
+cell phones, tablets, drones, screens or monitors of any kind, modern
+vehicles, or any other technology that did not exist in this story's actual
+era. This applies no matter how old or recent the story's setting is (a
+1920s story and a 1990s story are both "period" - use only objects that
+plausibly existed at that specific time). If a scene needs a character
+reading, writing, communicating, or navigating, use the era-correct
+equivalent (a paper letter, a ledger, a compass, a wall map, a rotary
+telephone, a printed newspaper) instead of a modern device. A shot naming a
+modern object is an automatic rejection of the entire shot list, exactly
+like the on-screen-text rule below - check every single shot against this
+before finishing your response.
+
 Every shot's "visual_description" must stay consistent with the
 "setting_and_characters" anchor given below - same location/era/ethnicity,
 and any recurring person described there must match their fixed appearance
 in every shot they appear in. Do not introduce a different ethnicity,
 region, or unplanned recurring character partway through.
+
+ONE INSTANCE PER CHARACTER PER SHOT (HARD RULE): a named recurring
+character appears EXACTLY ONCE in any given shot - never write a shot
+where the same character appears twice (a reflection, a mirror image, a
+double, a twin, or any other duplicate of themselves in the same frame).
+If a shot needs to show two people, they must be two genuinely different
+people, each described distinctly.
 
 COLOR AND LIGHT (episode-wide "color_palette" anchor given below): every
 shot's mood and lighting choice must feel like it belongs to the same
@@ -788,7 +921,11 @@ poster, map, book, plaque, telegram, postcard, banner, ledger, diary,
 certificate, or gravestone/tombstone - you MUST fill in
 required_onscreen_text with the exact wording, or rewrite that shot so no
 readable text is the focus. A shot with one of those words present and
-required_onscreen_text left empty will be rejected outright. Also confirm
+required_onscreen_text left empty will be rejected outright. ALSO check
+every shot for any modern object (laptop, computer, smartphone, cell
+phone, tablet, drone, screen, monitor, or any other modern technology) -
+a period episode with even one modern object named in visual_description
+will be rejected outright, same as the on-screen-text rule. Also confirm
 every shot has "lighting", "beat_intensity", and "location_tag" filled in,
 and that any location change is opened with a wide/establishing shot.
 
