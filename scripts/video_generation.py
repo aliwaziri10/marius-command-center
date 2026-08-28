@@ -55,7 +55,12 @@ HF_MUSICGEN_URL = "https://api-inference.huggingface.co/models/facebook/musicgen
 
 VIDEO_BUCKET = "videos"
 CLIP_BUCKET = "video_clips"
-WIDTH, HEIGHT = 1280, 720
+# RESOLUTION UPGRADE (2026-08-28): raised from 1280x720 to 1920x1080 -
+# Agnes video v2.0 supports up to 1080p natively (confirmed in their own
+# docs), this pipeline was requesting the 720p tier for every single clip
+# with no technical reason to. Zero cost, zero infra change - pure
+# quality gain at the same API call.
+WIDTH, HEIGHT = 1920, 1080
 FRAME_RATE = 24
 MIN_FRAMES = 49
 MAX_FRAMES = 169
