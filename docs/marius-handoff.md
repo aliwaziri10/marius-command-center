@@ -1,5 +1,5 @@
 # Marius Command Center — Handoff Doc
-Last updated: 2026-08-20
+Last updated: 2026-08-29
 Re-verify against live data — don't trust this doc at face value.
 
 ## READ BEFORE EDITING ANY FILE IN scripts/
@@ -80,19 +80,19 @@ Marius has never had a monochrome guard. Full-motion black & white is
 **Nova-only** (separate repo, separate pipeline). Confirmed live in code
 2026-08-20 — do not carry Nova's B&W direction into Marius work.
 
-## Standing gotchas
-- GitHub App connector ("Claude for GitHub") is permanently **read-only**
-  on this repo (admin/code/metadata read access only).
-- Working write path: Zia has this repo cloned locally on Windows, PAT
-  (repo+workflow scopes) embedded in `git remote set-url origin` — pushes
-  via `git push` from CMD, no connector needed. Token never shared in
-  chat.
-- `InfraFailure` and `DailyQuotaExhausted` both exit quietly (exit code 0)
-  by design when every topic in a batch is blocked — a green run in
-  GitHub Actions does NOT mean a script was produced. Always check live
-  Supabase `scripts.created_at`, never trust run status alone.
-- Two scripts still stuck `content_flagged` (unrelated to any fix above):
-  - `92dec2f9-05e6-4d32-8fa3-6c5e76f97c9b` "The Bakery That Hid 25" —
-    WWII/Nazi imagery flagged
-  - `716623f1-583b-4f6f-a8b8-9dfefe29fcf2` "The Hutu Who Hid Tutsi
-    Families in Rwanda's 1994 Genocide" — shot index 30/72 flagged
+## Abbreviation-split fix — confirmed matches Nova (2026-08-29)
+Both `scripts/narration.py` (Marius) and NovaCommandCenter's
+`.github/scripts/narrate.py` (Alternate Earth) were fetched live from
+GitHub main this session and compared directly. `split_into_segments()`
+and its `_ABBREVIATIONS` set are byte-for-byte identical logic in both
+files (same regex, same abbreviation/initial guard, same fallback). This
+confirms the fix for the "narration stutters / doesn't finish a sentence"
+bug (root cause: naive `.`/`!`/`?` split treating "Dr.", "U.S.", etc. as
+sentence ends) is committed and live on Marius, not just planned.
+
+**Not yet verified by this check:** whether the fix actually eliminates
+the audible mid-sentence pause on a real rendered episode — Marius has
+stopped generating videos until end of September, so no fresh narration
+output exists to listen-test against yet. Treat the code-level fix as
+confirmed; treat the audible-result fix as still open until a real
+post-fix clip can be reviewed.
