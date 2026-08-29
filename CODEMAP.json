@@ -416,19 +416,24 @@
       "functions": [
         {
           "name": "split_into_segments",
-          "line": 63,
+          "line": 82,
           "args": [
             "narration_text"
           ],
           "calls": [
+            "append",
+            "group",
+            "len",
+            "lower",
+            "search",
             "split",
             "strip"
           ],
-          "docstring": "Splits narration into one segment per SENTENCE, so a pause gets"
+          "docstring": "Splits narration into one segment per real SENTENCE, so a pause gets"
         },
         {
           "name": "_max_plausible_duration",
-          "line": 74,
+          "line": 108,
           "args": [
             "text"
           ],
@@ -441,7 +446,7 @@
         },
         {
           "name": "_synthesize_edge",
-          "line": 79,
+          "line": 113,
           "args": [
             "text",
             "out_path"
@@ -454,7 +459,7 @@
         },
         {
           "name": "synthesize_sentence",
-          "line": 84,
+          "line": 118,
           "args": [
             "text",
             "tmp_path"
@@ -473,7 +478,7 @@
         },
         {
           "name": "synthesize_with_pauses",
-          "line": 117,
+          "line": 151,
           "args": [
             "narration_text"
           ],
@@ -490,7 +495,7 @@
         },
         {
           "name": "_assign_shots_to_sentences",
-          "line": 135,
+          "line": 169,
           "args": [
             "sentences",
             "shot_list"
@@ -509,7 +514,7 @@
         },
         {
           "name": "synthesize_per_sentence_with_shot_durations",
-          "line": 183,
+          "line": 217,
           "args": [
             "narration_text",
             "shot_list"
@@ -531,7 +536,7 @@
         },
         {
           "name": "narrate_one_script",
-          "line": 227,
+          "line": 261,
           "args": [
             "supabase",
             "script"
@@ -559,7 +564,7 @@
         },
         {
           "name": "main",
-          "line": 282,
+          "line": 316,
           "args": [],
           "calls": [
             "create_client",
