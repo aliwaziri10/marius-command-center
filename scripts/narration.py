@@ -59,16 +59,50 @@ NARRATION_EXPORT_FORMAT = "mp3"
 NARRATION_FILE_EXTENSION = "mp3"
 NARRATION_CONTENT_TYPE = "audio/mpeg"
 
+# ABBREVIATION-SPLIT FIX (2026-08-29): split_into_segments below split on
+# ANY ".", "!", or "?" followed by whitespace - which wrongly treats
+# abbreviations and initials as full sentence ends. "Dr. Smith explained"
+# was being split into "Dr." and "Smith explained" as if they were two
+# separate sentences, each getting its own TTS call AND the full 1-2s
+# inter-sentence pause inserted between them - audible as the narrator
+# stopping mid-sentence before continuing (Zia's report: narration "does
+# not complete a sentence in one go"). This list covers common
+# abbreviations/titles/initials that precede a period without ending the
+# sentence; if the word right before the period matches one of these (or
+# is a single letter, i.e. an initial), the split is skipped and the
+# sentence keeps building instead of being cut there.
+_ABBREVIATIONS = {
+    "mr", "mrs", "ms", "dr", "prof", "sr", "jr", "st", "no", "vs",
+    "etc", "eg", "ie", "approx", "inc", "ltd", "corp", "co", "u.s",
+    "u.k", "u.n", "u.s.a", "a.m", "p.m", "ph.d", "gov", "sen", "rep",
+    "capt", "gen", "lt", "col", "maj", "ave", "blvd", "dept",
+}
+
 
 def split_into_segments(narration_text):
-    """Splits narration into one segment per SENTENCE, so a pause gets
-    inserted after every sentence (not just at paragraph/blank-line
-    breaks, which most scripts don't have). Sentence boundary = ./!/?
-    followed by whitespace. Falls back to the whole text as a single
-    segment if no sentence-ending punctuation is found at all."""
-    raw_segments = re.split(r"(?<=[.!?])\s+", narration_text.strip())
-    segments = [seg.strip() for seg in raw_segments if seg.strip()]
-    return segments if segments else [narration_text.strip()]
+    """Splits narration into one segment per real SENTENCE, so a pause gets
+    inserted only at genuine sentence boundaries - not after abbreviations,
+    titles, or initials that happen to end in a period. Sentence boundary =
+    ./!/? followed by whitespace, UNLESS the word immediately before that
+    punctuation is a known abbreviation/title or a single letter (an
+    initial like "J."), in which case the split is skipped and the
+    sentence keeps accumulating. Falls back to the whole text as a single
+    segment if no genuine sentence-ending punctuation is found at all."""
+    raw_pieces = re.split(r"(?<=[.!?])\s+", narration_text.strip())
+    segments = []
+    buffer = ""
+    for piece in raw_pieces:
+        buffer = f"{buffer} {piece}".strip() if buffer else piece
+        match = re.search(r"([A-Za-z]+)\.$", buffer)
+        if match:
+            word = match.group(1).lower()
+            if word in _ABBREVIATIONS or len(word) <= 2:
+                continue  # not a real sentence end - keep accumulating
+        segments.append(buffer.strip())
+        buffer = ""
+    if buffer.strip():
+        segments.append(buffer.strip())
+    return [s for s in segments if s] or [narration_text.strip()]
 
 
 def _max_plausible_duration(text):
