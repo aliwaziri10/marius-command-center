@@ -164,24 +164,19 @@ CAPTION_BG_PADDING = 16
 # ONLY when the episode fit in one file, for backward compatibility with
 # anything downstream still reading that column.
 QUALITY_VIDEO_BITRATE_KBPS = 3000   # fixed, duration-independent - healthy 720p HEVC quality
-MAX_CHUNK_MB = 45                   # target used to decide how many chunks to aim for up front
 
-# CHUNK-SIZE VERIFICATION FIX (2026-08-23): MAX_CHUNK_MB above is only an
-# up-front ESTIMATE (total file size / target = number of chunks, then
-# split by even time slices) - it assumes every second of the video
-# encodes to roughly the same size, which isn't true. Confirmed live on
-# script 40ffc83c: part_002 already encoded to 48.3MB (over the 45MB
-# target but still under Supabase's real cap, so it slipped through),
-# and part_005 encoded dense enough to land OVER Supabase's real object
-# size limit, which rejects the PUT with a bare 400 and no useful body.
-# HARD_CHUNK_LIMIT_MB is the real ceiling every chunk is now verified
-# against AFTER encoding (not just estimated before) - see
-# _encode_subclip_safe below, which recursively re-splits and re-encodes
-# any segment that comes out over this limit until every real on-disk
-# chunk file is safely under it, regardless of how densely a particular
-# segment happens to compress.
-HARD_CHUNK_LIMIT_MB = 48
-
+# UPLOAD-CAP RAISE (2026-09-01): Supabase project's global upload file
+# size limit was raised from 500MB to 2GB (Zia, dashboard setting, not
+# code). MAX_CHUNK_MB/HARD_CHUNK_LIMIT_MB were previously sized for the
+# OLD 50MB free-tier object cap (45MB target, 48MB hard verified ceiling)
+# - at QUALITY_VIDEO_BITRATE_KBPS=3000, that meant almost every episode
+# over ~2 minutes got needlessly split into multiple chunks and
+# re-stitched downstream in youtube_upload.py. Raised both to sit safely
+# under the new 2GB cap (1900MB target, 1950MB hard verified ceiling,
+# ~50MB safety margin) so effectively all real episode lengths now upload
+# as a single full-quality file with no chunking/re-stitching at all.
+MAX_CHUNK_MB = 1900                 # target used to decide how many chunks to aim for up front
+HARD_CHUNK_LIMIT_MB = 1950
 
 class ContentPolicyRejection(Exception):
     pass
