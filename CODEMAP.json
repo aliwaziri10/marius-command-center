@@ -1504,30 +1504,27 @@
       "functions": [
         {
           "name": "download_video_frame",
-          "line": 77,
+          "line": 87,
           "args": [
-            "video_url",
+            "video_key",
             "fraction"
           ],
           "calls": [
             "VideoFileClip",
             "close",
             "convert",
+            "download_to_file",
             "fromarray",
-            "get",
             "get_frame",
             "max",
             "min",
-            "open",
-            "raise_for_status",
-            "remove",
-            "write"
+            "remove"
           ],
-          "docstring": "Downloads the finished episode video and grabs a real frame from it"
+          "docstring": "Downloads the finished episode video (video_key is a B2 object key,"
         },
         {
           "name": "resize_to_canvas",
-          "line": 97,
+          "line": 105,
           "args": [
             "img",
             "target_w",
@@ -1543,7 +1540,7 @@
         },
         {
           "name": "derive_hook_text",
-          "line": 112,
+          "line": 120,
           "args": [
             "script",
             "shot_list"
@@ -1559,7 +1556,7 @@
         },
         {
           "name": "split_into_phrase_lines",
-          "line": 130,
+          "line": 138,
           "args": [
             "text"
           ],
@@ -1571,7 +1568,7 @@
         },
         {
           "name": "_line_bbox",
-          "line": 139,
+          "line": 147,
           "args": [
             "draw",
             "text",
@@ -1584,7 +1581,7 @@
         },
         {
           "name": "wrap_text",
-          "line": 145,
+          "line": 153,
           "args": [
             "text",
             "font",
@@ -1601,7 +1598,7 @@
         },
         {
           "name": "fits",
-          "line": 164,
+          "line": 172,
           "args": [
             "lines",
             "font",
@@ -1620,7 +1617,7 @@
         },
         {
           "name": "fit_text_to_frame",
-          "line": 177,
+          "line": 185,
           "args": [
             "hook_text",
             "draw",
@@ -1639,7 +1636,7 @@
         },
         {
           "name": "overlay_hook_text",
-          "line": 201,
+          "line": 209,
           "args": [
             "img",
             "hook_text"
@@ -1662,7 +1659,7 @@
         },
         {
           "name": "push_thumbnail_to_youtube",
-          "line": 240,
+          "line": 248,
           "args": [
             "youtube_video_id",
             "image_bytes"
@@ -1679,7 +1676,7 @@
         },
         {
           "name": "main",
-          "line": 289,
+          "line": 297,
           "args": [],
           "calls": [
             "create_client",
