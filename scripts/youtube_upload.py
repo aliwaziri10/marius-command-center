@@ -60,6 +60,7 @@ the time it could fail.
 import os
 import requests
 from moviepy import VideoFileClip, concatenate_videoclips
+import storage_b2
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
@@ -163,6 +164,11 @@ def stitch_chunks_to_local_file(video_chunk_urls, out_path):
     failure (download or encode) - the caller's existing try/except in
     main() is responsible for turning that into a recorded, non-fatal
     error for this script, same as every other failure mode here.
+
+    LEGACY (2026-09-02): this function only runs for pre-migration rows
+    that already have video_chunk_urls populated (real Supabase Storage
+    URLs) - see the call site in main(). No script created after the B2
+    migration will ever reach this path.
     """
     local_chunk_paths = []
     for i, url in enumerate(video_chunk_urls):
@@ -315,11 +321,23 @@ def main():
     video_path = "/tmp/upload_video.mp4"
 
     if script.get("video_url"):
-        download_file(script["video_url"], video_path)
+        # STORAGE MIGRATION (2026-09-02): video_url is now a B2 object key
+        # (not a Supabase Storage public URL) for any script generated
+        # after this migration - download directly via storage_b2. A
+        # pre-migration row would have a real https:// Supabase URL here
+        # instead; those already finished (status flips to 'uploaded'
+        # immediately after a successful upload, see DOUBLE-UPLOAD FIX
+        # above) so this branch will only ever see B2 keys going forward.
+        storage_b2.download_to_file(script["video_url"], video_path)
     elif script.get("video_chunk_urls"):
+        # LEGACY PATH (pre-2026-09-02 rows only): video_chunk_urls was how
+        # large videos were handled before the B2 migration removed
+        # chunking entirely (see video_generation.py). No script created
+        # after this migration will ever have this field populated - kept
+        # only so any already-existing chunked row can still complete.
         chunk_urls = script["video_chunk_urls"]
-        print(f"No single video_url - found {len(chunk_urls)} video_chunk_urls instead. "
-              f"Downloading and re-stitching into one file before upload.")
+        print(f"No single video_url - found {len(chunk_urls)} video_chunk_urls instead "
+              f"(pre-migration legacy row). Downloading and re-stitching into one file before upload.")
         stitch_chunks_to_local_file(chunk_urls, video_path)
         print("Chunks re-stitched successfully into one local file.")
     else:
