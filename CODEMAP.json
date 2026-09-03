@@ -1819,7 +1819,7 @@
       "functions": [
         {
           "name": "fetch_scripts",
-          "line": 58,
+          "line": 74,
           "args": [
             "status",
             "limit",
@@ -1834,7 +1834,7 @@
         },
         {
           "name": "check_url_alive",
-          "line": 69,
+          "line": 85,
           "args": [
             "url",
             "min_bytes"
@@ -1847,8 +1847,20 @@
           "docstring": "HEAD request - confirms the URL is actually live and (optionally)"
         },
         {
+          "name": "check_b2_key_alive",
+          "line": 106,
+          "args": [
+            "object_key",
+            "min_bytes"
+          ],
+          "calls": [
+            "object_size"
+          ],
+          "docstring": "ADDED (2026-09-02): the B2-key equivalent of check_url_alive, for"
+        },
+        {
           "name": "verify_shot_breakdown_script",
-          "line": 88,
+          "line": 119,
           "args": [
             "script"
           ],
@@ -1867,12 +1879,13 @@
         },
         {
           "name": "verify_video_generated_script",
-          "line": 141,
+          "line": 172,
           "args": [
             "script"
           ],
           "calls": [
             "append",
+            "check_b2_key_alive",
             "check_url_alive",
             "enumerate",
             "get",
@@ -1883,7 +1896,7 @@
         },
         {
           "name": "check_stalled_scripts",
-          "line": 171,
+          "line": 210,
           "args": [],
           "calls": [
             "append",
@@ -1895,7 +1908,7 @@
         },
         {
           "name": "run_verification",
-          "line": 186,
+          "line": 225,
           "args": [
             "stage"
           ],
@@ -1915,7 +1928,7 @@
         },
         {
           "name": "main",
-          "line": 215,
+          "line": 254,
           "args": [],
           "calls": [
             "ArgumentParser",
