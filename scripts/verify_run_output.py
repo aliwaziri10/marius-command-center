@@ -6,12 +6,12 @@ instead of trusting the stage script's own "exit 0". Run as the last step
 of a workflow, after the stage script itself.
 
 This pipeline has no local file artifact that survives a run (video files
-are uploaded to Supabase storage and deleted from /tmp immediately), so
+are uploaded to storage and deleted from /tmp immediately), so
 "file-based" here means: this script's own logic and output are simple and
-self-contained (one file, stdlib + requests, prints JSON, no new infra) -
-but what it checks is the real state in Supabase, since that's what
-"worked" actually means for this pipeline. A verifier that only checked
-local files would verify nothing real.
+self-contained (one file, stdlib + requests + storage_b2, prints JSON, no
+new infra) - but what it checks is the real state in Supabase/B2, since
+that's what "worked" actually means for this pipeline. A verifier that
+only checked local files would verify nothing real.
 
 Usage:
     python scripts/verify_run_output.py --stage script_writing
@@ -22,6 +22,21 @@ hold up - this is what makes the run fail loud. Each workflow already has
 an "Open issue on failure" step gated on `if: failure()`, which fires off
 of ANY failed step in the job, so no change is needed there: this script
 failing is enough to trigger it.
+
+STORAGE MIGRATION FIX (2026-09-02): verify_video_generated_script()
+previously called check_url_alive() (a plain requests.head()) on
+scripts.video_url, which worked when video_url was a real Supabase
+Storage https:// URL. Since the B2 migration, video_url is a bare B2
+object key (e.g. "abc123.mp4") - an HTTP HEAD on that raises
+requests.exceptions.MissingSchema immediately, which would have marked
+every single freshly-migrated video as "not verified" on every run,
+failing this step and opening a false failure issue even when everything
+actually worked. Fixed by checking B2 keys via storage_b2.object_size()
+(a real B2 API head_object call) instead of an HTTP request.
+video_chunk_urls is untouched - those are always real https:// Supabase
+Storage URLs from before the migration (no script created after the
+migration will ever have chunk_urls populated - see video_generation.py),
+so check_url_alive() remains correct for that field specifically.
 """
 import argparse
 import json
@@ -30,6 +45,7 @@ import sys
 from datetime import datetime, timezone
 
 import requests
+import storage_b2
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
@@ -69,7 +85,9 @@ def fetch_scripts(status, limit=CHECK_SAMPLE_SIZE, order="created_at.desc"):
 def check_url_alive(url, min_bytes=None):
     """HEAD request - confirms the URL is actually live and (optionally)
     non-trivially sized, not just a string sitting in a Supabase column
-    that nothing has verified since it was written."""
+    that nothing has verified since it was written. Only used for real
+    https:// URLs (legacy video_chunk_urls) - see check_b2_key_alive for
+    video_url, which is a bare B2 object key, not a URL."""
     try:
         r = requests.head(url, timeout=HTTP_TIMEOUT, allow_redirects=True)
     except requests.RequestException as e:
@@ -82,6 +100,19 @@ def check_url_alive(url, min_bytes=None):
             return False, "no Content-Length header - cannot confirm size"
         if int(size) < min_bytes:
             return False, f"only {int(size)} bytes (min {min_bytes})"
+    return True, None
+
+
+def check_b2_key_alive(object_key, min_bytes=None):
+    """ADDED (2026-09-02): the B2-key equivalent of check_url_alive, for
+    scripts.video_url now that it holds a bare object key instead of a
+    URL. Uses storage_b2.object_size() (a real B2 head_object call) rather
+    than an HTTP request."""
+    size = storage_b2.object_size(object_key)
+    if size is None:
+        return False, "object not found in B2 (or could not be checked)"
+    if min_bytes is not None and size < min_bytes:
+        return False, f"only {size} bytes (min {min_bytes})"
     return True, None
 
 
@@ -140,9 +171,17 @@ def verify_shot_breakdown_script(script):
 
 def verify_video_generated_script(script):
     """A script marked video_generated must have a video that's actually
-    live and non-trivial - not just a URL string a request happened to
-    return 200 for once, and not just an upload call that returned 2xx
-    without the bytes actually being real."""
+    live and non-trivial - not just a string in a column that nothing has
+    verified since it was written, and not just an upload call that
+    returned success without the bytes actually being real.
+
+    STORAGE MIGRATION FIX (2026-09-02): video_url is now a bare B2 object
+    key (checked via check_b2_key_alive/storage_b2), not an https:// URL.
+    video_chunk_urls is untouched - it's always a real Supabase Storage
+    URL list from before the migration (checked via the original
+    check_url_alive), since no script created after the migration will
+    ever have this field populated.
+    """
     problems = []
     video_url = script.get("video_url")
     chunk_urls = script.get("video_chunk_urls")
@@ -152,9 +191,9 @@ def verify_video_generated_script(script):
         return problems
 
     if video_url:
-        ok, reason = check_url_alive(video_url, min_bytes=MIN_VIDEO_BYTES)
+        ok, reason = check_b2_key_alive(video_url, min_bytes=MIN_VIDEO_BYTES)
         if not ok:
-            problems.append(f"video_url not verified: {reason}")
+            problems.append(f"video_url (B2 key) not verified: {reason}")
 
     if chunk_urls:
         if not isinstance(chunk_urls, list) or len(chunk_urls) == 0:
