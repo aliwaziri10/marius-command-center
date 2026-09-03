@@ -1117,7 +1117,7 @@
         },
         {
           "name": "build_shot_breakdown_chunk_prompt",
-          "line": 798,
+          "line": 816,
           "args": [
             "title",
             "angle",
@@ -1140,7 +1140,7 @@
         },
         {
           "name": "generate_shot_breakdown",
-          "line": 979,
+          "line": 997,
           "args": [
             "title",
             "angle",
