@@ -1245,6 +1245,19 @@
             "head_object"
           ],
           "docstring": "Used by process_script's per-run clip re-verification step, in"
+        },
+        {
+          "name": "object_size",
+          "line": 117,
+          "args": [
+            "object_key"
+          ],
+          "calls": [
+            "_get_client",
+            "get",
+            "head_object"
+          ],
+          "docstring": "ADDED (2026-09-02): returns the real byte size of object_key in B2,"
         }
       ],
       "env_vars": [
