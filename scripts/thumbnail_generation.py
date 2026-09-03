@@ -27,6 +27,15 @@ LIVE-VIDEO PUSH: if the script this runs on is already 'uploaded' (has a
 youtube_video_id), the freshly generated thumbnail is also pushed directly
 to the live YouTube video via thumbnails.set, not just saved to Supabase -
 see push_thumbnail_to_youtube().
+
+STORAGE MIGRATION FIX (2026-09-04): download_video_frame() previously
+called requests.get(video_url) expecting a real https:// Supabase Storage
+URL. Since the 2026-09-02 B2 migration, the scripts.video_url column holds
+a bare B2 object key (e.g. "abc123.mp4") instead - a plain HTTP GET on
+that raises requests.exceptions.MissingSchema immediately, which is why
+every Thumbnail Generation run has been failing since the migration. Now
+downloads via storage_b2.download_to_file(), the same helper
+youtube_upload.py already uses for this exact situation.
 """
 
 import os
@@ -38,6 +47,7 @@ from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 from moviepy import VideoFileClip
 from supabase import create_client
+import storage_b2
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SECRET_KEY = os.environ["SUPABASE_SECRET_KEY"]
@@ -74,17 +84,15 @@ MAX_TEXT_BLOCK_HEIGHT = int(IMAGE_HEIGHT * 0.20)  # was 0.42 - text now takes
                                                    # nearly half
 
 
-def download_video_frame(video_url, fraction=FRAME_FRACTION):
-    """Downloads the finished episode video and grabs a real frame from it
-    to use as the thumbnail background - the same approach YouTube
+def download_video_frame(video_key, fraction=FRAME_FRACTION):
+    """Downloads the finished episode video (video_key is a B2 object key,
+    not a URL - see STORAGE MIGRATION FIX above) and grabs a real frame
+    from it to use as the thumbnail background - the same approach YouTube
     Studio's auto-suggested thumbnails use. Looks far more coherent than a
     separately AI-generated background with no relation to the actual
     footage."""
     tmp_path = "/tmp/thumb_source.mp4"
-    r = requests.get(video_url, timeout=120)
-    r.raise_for_status()
-    with open(tmp_path, "wb") as f:
-        f.write(r.content)
+    storage_b2.download_to_file(video_key, tmp_path)
 
     clip = VideoFileClip(tmp_path)
     t = max(0.0, min(clip.duration * fraction, clip.duration - 0.1))
