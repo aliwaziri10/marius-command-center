@@ -1,9 +1,13 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 18,
+  "file_count": 19,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
+    "B2_APPLICATION_KEY",
+    "B2_BUCKET_NAME",
+    "B2_ENDPOINT_URL",
+    "B2_KEY_ID",
     "EXPECTED_YOUTUBE_CHANNEL_TITLE",
     "FREELLM_API_KEY",
     "FREELLM_API_URL",
@@ -1159,6 +1163,95 @@
       "env_vars": [
         "SUPABASE_SECRET_KEY",
         "SUPABASE_URL"
+      ],
+      "tables": []
+    },
+    {
+      "path": "scripts/storage_b2.py",
+      "functions": [
+        {
+          "name": "_get_client",
+          "line": 51,
+          "args": [],
+          "calls": [
+            "Config",
+            "client"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "upload_bytes",
+          "line": 64,
+          "args": [
+            "object_key",
+            "file_bytes",
+            "content_type"
+          ],
+          "calls": [
+            "_get_client",
+            "put_object"
+          ],
+          "docstring": "Uploads bytes to B2 under object_key. Returns object_key unchanged"
+        },
+        {
+          "name": "upload_file",
+          "line": 77,
+          "args": [
+            "object_key",
+            "local_path",
+            "content_type"
+          ],
+          "calls": [
+            "open",
+            "read",
+            "upload_bytes"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "presigned_url",
+          "line": 82,
+          "args": [
+            "object_key",
+            "expires_in"
+          ],
+          "calls": [
+            "_get_client",
+            "generate_presigned_url"
+          ],
+          "docstring": "Generates a fresh, short-lived presigned GET URL for object_key."
+        },
+        {
+          "name": "download_to_file",
+          "line": 95,
+          "args": [
+            "object_key",
+            "local_path"
+          ],
+          "calls": [
+            "_get_client",
+            "download_file"
+          ],
+          "docstring": "Downloads object_key directly to local_path via the B2 API (no"
+        },
+        {
+          "name": "object_exists",
+          "line": 104,
+          "args": [
+            "object_key"
+          ],
+          "calls": [
+            "_get_client",
+            "head_object"
+          ],
+          "docstring": "Used by process_script's per-run clip re-verification step, in"
+        }
+      ],
+      "env_vars": [
+        "B2_APPLICATION_KEY",
+        "B2_BUCKET_NAME",
+        "B2_ENDPOINT_URL",
+        "B2_KEY_ID"
       ],
       "tables": []
     },
