@@ -112,3 +112,23 @@ def object_exists(object_key):
         return True
     except Exception:
         return False
+
+
+def object_size(object_key):
+    """ADDED (2026-09-02): returns the real byte size of object_key in B2,
+    or None if it doesn't exist / can't be checked. Added specifically for
+    verify_run_output.py, whose verify_video_generated_script() previously
+    called requests.head() on scripts.video_url expecting a real https://
+    URL with a Content-Length header - but video_url is now a bare B2
+    object key (e.g. "abc123.mp4"), not a URL, so a plain HTTP HEAD on it
+    would raise requests.exceptions.MissingSchema immediately and mark
+    every single freshly-migrated video as "not verified" on every run.
+    This gives the verifier a real size figure via the B2 API itself
+    (head_object's ContentLength), the direct equivalent of what the old
+    Content-Length HTTP header check was trying to confirm."""
+    client = _get_client()
+    try:
+        resp = client.head_object(Bucket=B2_BUCKET_NAME, Key=object_key)
+        return resp.get("ContentLength")
+    except Exception:
+        return None
