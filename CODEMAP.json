@@ -1930,7 +1930,7 @@
       "functions": [
         {
           "name": "round_to_valid_frames",
-          "line": 214,
+          "line": 209,
           "args": [
             "num_frames"
           ],
@@ -1942,7 +1942,7 @@
         },
         {
           "name": "get_ready_scripts",
-          "line": 226,
+          "line": 221,
           "args": [
             "limit"
           ],
@@ -1955,7 +1955,7 @@
         },
         {
           "name": "download_file",
-          "line": 236,
+          "line": 231,
           "args": [
             "url",
             "out_path"
@@ -1970,7 +1970,7 @@
         },
         {
           "name": "record_error",
-          "line": 244,
+          "line": 239,
           "args": [
             "script_id",
             "error_text"
@@ -1986,7 +1986,7 @@
         },
         {
           "name": "clear_error",
-          "line": 268,
+          "line": 263,
           "args": [
             "script_id"
           ],
@@ -1999,7 +1999,7 @@
         },
         {
           "name": "_sanitize_anchor_for_fallback",
-          "line": 354,
+          "line": 349,
           "args": [
             "anchor"
           ],
@@ -2014,7 +2014,7 @@
         },
         {
           "name": "_strip_named_characters_for_group_shot",
-          "line": 415,
+          "line": 410,
           "args": [
             "anchor"
           ],
@@ -2028,7 +2028,7 @@
         },
         {
           "name": "build_agnes_prompt",
-          "line": 425,
+          "line": 420,
           "args": [
             "shot",
             "setting_and_characters",
@@ -2049,7 +2049,7 @@
         },
         {
           "name": "build_character_reference_prompt",
-          "line": 530,
+          "line": 525,
           "args": [
             "setting_and_characters"
           ],
@@ -2061,7 +2061,7 @@
         },
         {
           "name": "generate_character_reference",
-          "line": 542,
+          "line": 537,
           "args": [
             "script"
           ],
@@ -2083,23 +2083,21 @@
         },
         {
           "name": "upload_reference_image",
-          "line": 628,
+          "line": 623,
           "args": [
             "script_id",
             "file_name",
             "local_path"
           ],
           "calls": [
-            "open",
             "print",
-            "put",
-            "read"
+            "upload_file"
           ],
-          "docstring": ""
+          "docstring": "Returns the B2 object KEY (not a URL) - see storage_b2.py docstring"
         },
         {
           "name": "extract_last_frame_url",
-          "line": 649,
+          "line": 636,
           "args": [
             "script_id",
             "shot_index",
@@ -2121,13 +2119,13 @@
         },
         {
           "name": "get_continuity_anchor",
-          "line": 679,
+          "line": 666,
           "args": [
             "script",
             "video_urls"
           ],
           "calls": [
-            "download_file",
+            "download_to_file",
             "extract_last_frame_url",
             "generate_character_reference",
             "len",
@@ -2138,7 +2136,7 @@
         },
         {
           "name": "create_agnes_task",
-          "line": 707,
+          "line": 698,
           "args": [
             "prompt",
             "num_frames",
@@ -2160,7 +2158,7 @@
         },
         {
           "name": "extract_video_url",
-          "line": 758,
+          "line": 749,
           "args": [
             "data"
           ],
@@ -2175,7 +2173,7 @@
         },
         {
           "name": "poll_agnes_task",
-          "line": 769,
+          "line": 760,
           "args": [
             "video_id",
             "max_wait",
@@ -2196,7 +2194,7 @@
         },
         {
           "name": "_generate_one_segment",
-          "line": 797,
+          "line": 788,
           "args": [
             "shot",
             "segment_duration",
@@ -2219,7 +2217,7 @@
         },
         {
           "name": "_extract_last_frame_local",
-          "line": 823,
+          "line": 814,
           "args": [
             "video_path"
           ],
@@ -2236,21 +2234,22 @@
         },
         {
           "name": "_upload_local_image_for_anchor",
-          "line": 837,
+          "line": 828,
           "args": [
             "script_id",
             "tag",
             "png_path"
           ],
           "calls": [
+            "presigned_url",
             "remove",
             "upload_reference_image"
           ],
-          "docstring": "Chain-extension anchors must be passed to Agnes as a URL (same as"
+          "docstring": "Chain-extension anchors must be passed to Agnes as a real fetchable"
         },
         {
           "name": "generate_shot_clip",
-          "line": 847,
+          "line": 841,
           "args": [
             "shot",
             "target_duration",
@@ -2282,7 +2281,7 @@
         },
         {
           "name": "fit_clip_to_duration",
-          "line": 929,
+          "line": 923,
           "args": [
             "clip",
             "target"
@@ -2299,7 +2298,7 @@
         },
         {
           "name": "fit_audio_to_duration",
-          "line": 939,
+          "line": 933,
           "args": [
             "audio_clip",
             "target"
@@ -2313,24 +2312,20 @@
         },
         {
           "name": "upload_clip",
-          "line": 947,
+          "line": 941,
           "args": [
             "script_id",
             "index",
             "file_path"
           ],
           "calls": [
-            "open",
-            "print",
-            "put",
-            "raise_for_status",
-            "read"
+            "upload_file"
           ],
-          "docstring": ""
+          "docstring": "Returns the B2 object KEY (not a URL) - see storage_b2.py"
         },
         {
           "name": "save_progress",
-          "line": 968,
+          "line": 948,
           "args": [
             "script_id",
             "video_urls",
@@ -2344,7 +2339,7 @@
         },
         {
           "name": "mark_content_flagged",
-          "line": 978,
+          "line": 958,
           "args": [
             "script_id",
             "shot_index",
@@ -2359,7 +2354,7 @@
         },
         {
           "name": "mark_video_stalled",
-          "line": 989,
+          "line": 969,
           "args": [
             "script_id",
             "shot_index",
@@ -2375,7 +2370,7 @@
         },
         {
           "name": "compute_shot_durations",
-          "line": 1014,
+          "line": 994,
           "args": [
             "shot_list",
             "total_duration"
@@ -2390,7 +2385,7 @@
         },
         {
           "name": "get_shot_durations",
-          "line": 1020,
+          "line": 1000,
           "args": [
             "script",
             "shot_list",
@@ -2409,7 +2404,7 @@
         },
         {
           "name": "compute_shot_start_times",
-          "line": 1033,
+          "line": 1013,
           "args": [
             "shot_durations"
           ],
@@ -2420,7 +2415,7 @@
         },
         {
           "name": "compute_target_bitrate",
-          "line": 1042,
+          "line": 1022,
           "args": [
             "duration_seconds",
             "audio_kbps"
@@ -2430,7 +2425,7 @@
         },
         {
           "name": "estimate_output_size_mb",
-          "line": 1056,
+          "line": 1033,
           "args": [
             "duration_seconds",
             "video_kbps",
@@ -2440,52 +2435,8 @@
           "docstring": ""
         },
         {
-          "name": "_encode_subclip_safe",
-          "line": 1062,
-          "args": [
-            "clip",
-            "start",
-            "end",
-            "out_path",
-            "depth"
-          ],
-          "calls": [
-            "_encode_subclip_safe",
-            "getsize",
-            "print",
-            "remove",
-            "replace",
-            "subclipped",
-            "write_videofile"
-          ],
-          "docstring": "CHUNK-SIZE VERIFICATION FIX (2026-08-23): encodes clip[start:end] to"
-        },
-        {
-          "name": "split_video_into_chunks",
-          "line": 1111,
-          "args": [
-            "local_path",
-            "max_chunk_mb"
-          ],
-          "calls": [
-            "VideoFileClip",
-            "_encode_subclip_safe",
-            "ceil",
-            "close",
-            "enumerate",
-            "extend",
-            "getsize",
-            "len",
-            "min",
-            "print",
-            "range",
-            "replace"
-          ],
-          "docstring": "Splits an already-encoded local video file into N sequential chunks."
-        },
-        {
           "name": "poll_ace_music_task",
-          "line": 1153,
+          "line": 1039,
           "args": [
             "task_id",
             "out_path",
@@ -2508,7 +2459,7 @@
         },
         {
           "name": "generate_background_music",
-          "line": 1192,
+          "line": 1078,
           "args": [
             "prompt",
             "duration",
@@ -2531,7 +2482,7 @@
         },
         {
           "name": "generate_background_music_musicgen",
-          "line": 1248,
+          "line": 1134,
           "args": [
             "prompt",
             "duration",
@@ -2553,7 +2504,7 @@
         },
         {
           "name": "search_freesound_sfx",
-          "line": 1301,
+          "line": 1187,
           "args": [
             "query",
             "out_path",
@@ -2578,7 +2529,7 @@
         },
         {
           "name": "apply_safety_limiter",
-          "line": 1387,
+          "line": 1273,
           "args": [
             "audio_clip",
             "ceiling"
@@ -2595,7 +2546,7 @@
         },
         {
           "name": "extract_original_clip_audio",
-          "line": 1407,
+          "line": 1293,
           "args": [
             "video_clips",
             "shot_durations",
@@ -2614,7 +2565,7 @@
         },
         {
           "name": "build_audio_mix",
-          "line": 1424,
+          "line": 1310,
           "args": [
             "narration_path",
             "music_mood",
@@ -2646,7 +2597,7 @@
         },
         {
           "name": "_load_caption_font",
-          "line": 1474,
+          "line": 1360,
           "args": [
             "size"
           ],
@@ -2660,7 +2611,7 @@
         },
         {
           "name": "_wrap_caption_text",
-          "line": 1485,
+          "line": 1371,
           "args": [
             "text",
             "font",
@@ -2677,7 +2628,7 @@
         },
         {
           "name": "render_caption_image",
-          "line": 1502,
+          "line": 1388,
           "args": [
             "text",
             "video_width",
@@ -2702,7 +2653,7 @@
         },
         {
           "name": "build_caption_clip",
-          "line": 1548,
+          "line": 1434,
           "args": [
             "text",
             "start",
@@ -2721,7 +2672,7 @@
         },
         {
           "name": "build_caption_clips",
-          "line": 1562,
+          "line": 1448,
           "args": [
             "shot_list",
             "shot_durations",
@@ -2742,7 +2693,7 @@
         },
         {
           "name": "assemble_final_video",
-          "line": 1575,
+          "line": 1461,
           "args": [
             "script_id",
             "video_urls",
@@ -2768,7 +2719,7 @@
             "compute_shot_start_times",
             "compute_target_bitrate",
             "concatenate_videoclips",
-            "download_file",
+            "download_to_file",
             "enumerate",
             "extract_original_clip_audio",
             "fit_clip_to_duration",
@@ -2786,61 +2737,21 @@
         },
         {
           "name": "upload_video",
-          "line": 1651,
+          "line": 1537,
           "args": [
             "script_id",
             "file_path"
           ],
           "calls": [
             "getsize",
-            "open",
             "print",
-            "put",
-            "raise_for_status",
-            "read"
+            "upload_file"
           ],
-          "docstring": ""
-        },
-        {
-          "name": "upload_video_chunk",
-          "line": 1675,
-          "args": [
-            "script_id",
-            "chunk_index",
-            "file_path"
-          ],
-          "calls": [
-            "getsize",
-            "open",
-            "print",
-            "put",
-            "raise_for_status",
-            "read"
-          ],
-          "docstring": ""
-        },
-        {
-          "name": "upload_video_chunked",
-          "line": 1699,
-          "args": [
-            "script_id",
-            "local_path"
-          ],
-          "calls": [
-            "append",
-            "enumerate",
-            "len",
-            "print",
-            "remove",
-            "split_video_into_chunks",
-            "upload_video",
-            "upload_video_chunk"
-          ],
-          "docstring": "CHUNKED-UPLOAD QUALITY FIX (2026-08-20): replaces a single upload_video"
+          "docstring": "Returns the B2 object KEY (not a URL) - stored in scripts.video_url."
         },
         {
           "name": "mark_video_generated",
-          "line": 1731,
+          "line": 1555,
           "args": [
             "script_id",
             "video_url",
@@ -2856,7 +2767,7 @@
         },
         {
           "name": "process_script",
-          "line": 1754,
+          "line": 1578,
           "args": [
             "script",
             "shot_limit"
@@ -2873,7 +2784,6 @@
             "generate_shot_clip",
             "get",
             "get_shot_durations",
-            "head",
             "isinstance",
             "len",
             "loads",
@@ -2881,6 +2791,7 @@
             "mark_video_generated",
             "mark_video_stalled",
             "min",
+            "object_exists",
             "print",
             "range",
             "record_error",
@@ -2889,13 +2800,13 @@
             "sleep",
             "str",
             "upload_clip",
-            "upload_video_chunked"
+            "upload_video"
           ],
           "docstring": ""
         },
         {
           "name": "main",
-          "line": 1906,
+          "line": 1732,
           "args": [],
           "calls": [
             "format_exc",
@@ -2909,7 +2820,7 @@
         },
         {
           "name": "_try_query",
-          "line": 1324,
+          "line": 1210,
           "args": [
             "q"
           ],
@@ -2921,7 +2832,7 @@
         },
         {
           "name": "_keyword_fallback_query",
-          "line": 1354,
+          "line": 1240,
           "args": [
             "q"
           ],
