@@ -8,6 +8,7 @@
     "B2_BUCKET_NAME",
     "B2_ENDPOINT_URL",
     "B2_KEY_ID",
+    "DRY_RUN",
     "EXPECTED_YOUTUBE_CHANNEL_TITLE",
     "FREELLM_API_KEY",
     "FREELLM_API_URL",
@@ -171,8 +172,51 @@
     },
     {
       "path": "scripts/cleanup_dead_storage.py",
-      "functions": [],
-      "env_vars": [],
+      "functions": [
+        {
+          "name": "list_all_objects",
+          "line": 48,
+          "args": [
+            "supabase",
+            "bucket"
+          ],
+          "calls": [
+            "append",
+            "from_",
+            "get",
+            "len",
+            "list",
+            "pop"
+          ],
+          "docstring": "Recursively lists every object in a bucket, including inside"
+        },
+        {
+          "name": "main",
+          "line": 79,
+          "args": [],
+          "calls": [
+            "any",
+            "append",
+            "create_client",
+            "execute",
+            "from_",
+            "len",
+            "list_all_objects",
+            "neq",
+            "print",
+            "range",
+            "remove",
+            "select",
+            "table"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "DRY_RUN",
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
       "tables": []
     },
     {
