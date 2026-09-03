@@ -698,10 +698,28 @@ NOT mean "just standing/sitting there with nothing to do." Every shot with a
 person in frame must anchor them in a specific, concrete, already-in-progress
 task or intent - not a static end-state with no purpose. Instead of "already
 standing near the field," write "already kneeling in the field, both hands
-gathering the harvest." Do not use words or phrases like standing around,
-standing there, standing idly, or waiting around.
+gripping the plow mid-furrow." Every shot must answer: what is this person
+doing, and why, at this exact frozen moment. Never use phrasing like
+"standing around," "standing there," "waiting there," "sitting there doing
+nothing," or "looking around" with no stated task or focus.
 
-LOCATION CHANGES OPEN WIDE: whenever the story's setting genuinely changes
+OBJECT INTEGRITY: every object named in a shot must remain that same
+object for the whole shot - never describe an action mid-transformation.
+Favor "already holding," "already placed," "already resting on" phrasing
+over active verbs like "lifts," "pours," "hands over," which invite the
+video model to try to render (and lose track of) motion it can't sustain.
+
+CUTAWAY DISCIPLINE: the same character must not appear as the
+primary_subject of more than 3 consecutive shots. Frequently cut to B-roll
+- landscapes, buildings, documents, objects, hands, tools, crowds, weather,
+architecture. Whenever the same character reappears after a cutaway, change
+the camera angle, framing, and body orientation, but keep their fixed
+physical description IDENTICAL to what's stated in "setting_and_characters"
+every single time.
+
+LOCATION CHANGES MUST RE-ESTABLISH (HARD RULE): fill "location_tag" with a
+short consistent name for where the shot physically takes place (e.g.
+"village square", "riverbank", "soldier's tent"). Whenever the story moves
 to a new location, the FIRST shot in that new location must use shot_type
 "wide" or "establishing" before cutting closer - never open a new location
 on a medium or close_up shot. If a shot doesn't have a clearly defined
