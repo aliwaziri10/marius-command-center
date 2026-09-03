@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 19,
+  "file_count": 20,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -167,6 +167,12 @@
       "env_vars": [
         "X"
       ],
+      "tables": []
+    },
+    {
+      "path": "scripts/cleanup_dead_storage.py",
+      "functions": [],
+      "env_vars": [],
       "tables": []
     },
     {
