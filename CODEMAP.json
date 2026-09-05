@@ -646,7 +646,7 @@
       "functions": [
         {
           "name": "narration_has_engagement_cta",
-          "line": 44,
+          "line": 50,
           "args": [
             "narration_text"
           ],
@@ -658,7 +658,7 @@
         },
         {
           "name": "build_narration_prompt",
-          "line": 51,
+          "line": 57,
           "args": [
             "title",
             "angle"
@@ -668,7 +668,7 @@
         },
         {
           "name": "build_narration_continuation_prompt",
-          "line": 132,
+          "line": 182,
           "args": [
             "title",
             "angle",
@@ -680,7 +680,7 @@
         },
         {
           "name": "generate_narration",
-          "line": 163,
+          "line": 216,
           "args": [
             "title",
             "angle"
