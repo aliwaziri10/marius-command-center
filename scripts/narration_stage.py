@@ -9,11 +9,20 @@ change. See script_writing.py's module docstring for full history.
 WRITER/CHECKER SPLIT (2026-08-20, Loop Skill 2): after a draft clears the
 existing deterministic checks (word count, CTA present), it's now also
 graded by a fresh, independent LLM call (quality_checker.grade_narration)
-against the channel's house rules before being accepted - catches quality
-issues (weak hook, repetitive "gasping", generic CTA, truncated arc) that
-pass the mechanical checks but violate the spirit of the rules the writer
-was given. A checker rejection is treated exactly like any other content
-failure below - same retry/wait/attempt-count loop, no new infra.
+against the channel's house rules before being accepted.
+
+NARRATOR VOICE + ENERGY PASS (2026-09-06): Zia reported the narration
+reads as "dead" and monotone despite good video quality - root cause was
+that this prompt only ever specified hook structure, length, CTA
+requirement, and gasp-variation, with NOTHING addressing sentence rhythm,
+punctuation-as-performance, narrator identity, or energy modulation across
+the runtime (unlike Nova's script_writing_agent.py, which has all of
+this). Added: NARRATOR IDENTITY, CINEMATOGRAPHER'S ENERGY (vary intensity
+scene to scene rather than uniform high energy), sentence-rhythm and
+punctuation-as-performance rules, emotional arc swings, and a worked
+example - ported and adapted from Nova's proven prompt. quality_checker.py's
+grade_narration rubric gained a matching 6th rule (ENERGY AND RHYTHM) the
+same day so this is actually enforced, not just requested.
 """
 
 import time
@@ -28,9 +37,6 @@ NARRATION_TARGET_WORDS = 1600
 CONTENT_RETRY_WAIT_SECONDS = 25
 MAX_INFRA_ATTEMPTS = 4
 
-# BURST-RISK FIX (2026-08-15 evening, still applies under Gemini): every
-# other retry path in this file waits between calls except the narration
-# continuation loop, which fired back-to-back with zero delay.
 CONTINUATION_CALL_DELAY_SECONDS = 10
 
 CTA_KEYWORDS = (
@@ -49,9 +55,10 @@ def narration_has_engagement_cta(narration_text):
 
 
 def build_narration_prompt(title, angle):
-    return f"""You are the head writer for "Erased," a YouTube documentary
-channel telling real, historically documented true stories of ordinary people
-caught in extraordinary historical moments, whose names history left out.
+    return f"""You are the head writer and voice for "Erased," a YouTube
+documentary channel telling real, historically documented true stories of
+ordinary people caught in extraordinary historical moments, whose names
+history left out.
 
 Episode topic: {title}
 Angle: {angle}
@@ -60,15 +67,59 @@ Your ONLY job in this response is to write the full narration script. Do not
 write anything else - no shot list, no JSON metadata, nothing but the
 narration itself, wrapped in the JSON format specified at the bottom.
 
+NARRATOR IDENTITY (consistent across every script): you are someone who has
+personally traced this exact person's paper trail - sharp, a little wry,
+genuinely obsessive about the one overlooked detail that changes how the
+whole story reads. You do not perform generic wonder at "history" in the
+abstract; you get excited about ONE specific fact, document, or decision and
+make the viewer feel like they're being let in on it. Never revert to a
+flat, interchangeable documentary-narrator voice that could belong to any
+channel.
+
+CINEMATOGRAPHER'S ENERGY - VARY THE INTENSITY, DO NOT WRITE EVERYTHING AT
+MAXIMUM PITCH: a good director does not shoot every scene as a crash-zoom
+climax, and a good narrator does not deliver every line at the same
+breathless intensity. Constant high energy reads as flat and exhausting,
+exactly like constant zoom-ins look chaotic on screen. Deliberately vary
+the register scene to scene: quiet, observational, almost still delivery
+for setup and reflection; tighter and more urgent only at genuine turning
+points; a settled, weighted pace for the emotional core. The loud moments
+only land because most of the script isn't loud.
+
+SOUND HUMAN, NOT ROBOTIC OR ENCYCLOPEDIC:
+- Vary sentence length constantly - short, punchy sentences for tension;
+  longer flowing ones for immersion. A run of same-length sentences is
+  what makes narration sound like a machine reading a report.
+- PUNCTUATION IS PERFORMANCE (the narrator engine reads punctuation as
+  timing, not just grammar): use an em-dash for a thought that cuts itself
+  off or pivots - like this. Use an ellipsis for a genuine hesitation or
+  dread beat... before landing the next line. Use short fragments on their
+  own for impact. Use it deliberately on every beat that needs a breath,
+  a pause, or a jolt - not as decoration.
+- Use rhetorical questions and warm direct address to the viewer as the
+  narrator's own voice ("here's the thing...", "and this is the part
+  nobody talks about..."). Do NOT use the second-person "you are
+  standing in...", "you find yourself...", "picture yourself in [place]"
+  device - this is an overused AI-narration tell.
+- Favor one specific sensory or emotional detail over an abstract summary
+  every time - a real sound, a real object, a real few words someone said,
+  beats a general description.
+
+EMOTIONAL ARC (this is a human story, not a list of facts): swing between
+tension/dread and a counterweight beat of resolve, dignity, or dark humor -
+never sit in one register for the whole runtime. Constant dread reads as
+monotone and viewers check out; give them something to hold onto, not just
+something to fear.
+
 OPENING HOOK - this is the most important part of the script. The first 8
 seconds of narration determine whether the viewer stays or leaves, so follow
 this exact structure for the opening lines:
 
 1. STAKE (first 1-2 sentences): State the single most dramatic, concrete fact
    of the story immediately. Do NOT say "today we'll look at" or "this is
-   the story of" or introduce the channel/topic first. Lead with the fact itself,
-   as if the viewer already knows what's at risk. Use a real, specific number,
-   name, or consequence from the story - not a vague tease.
+   the story of" or introduce the channel/topic first. Lead with the fact
+   itself, as if the viewer already knows what's at risk. Use a real,
+   specific number, name, or consequence from the story - not a vague tease.
    Bad: "Today we're going to talk about a forgotten hero of history."
    Good: "140,000 men dug the trenches of the Western Front - and history
    erased every one of their names."
@@ -85,41 +136,40 @@ go straight into the stake.
 
 LENGTH IS A HARD REQUIREMENT: write a complete 10-12 minute narration script
 of AT LEAST {MIN_NARRATION_WORDS} words - target {NARRATION_TARGET_WORDS}
-words. This is not a suggestion or a rough guide - a narration under
-{MIN_NARRATION_WORDS} words will be rejected outright and you will be asked
-to continue writing from where you stopped. Do not stop early. Do not
-summarize the rest of the story to wrap up quickly. Build a full narrative
-arc: setup and stakes, rising complications, the core dramatic turn, the
-emotional climax, and a reflective closing line - give each of these real
-space, not a sentence or two each. If you don't know enough documented detail
-about this specific story to reach the target, expand on the real historical
-context, setting, sensory detail, and the emotional experience of the people
-involved - do not pad with repetition or filler, and do not write a short
-script assuming it will be extended later.
+words. This is not a suggestion - a narration under {MIN_NARRATION_WORDS}
+words will be rejected outright and you will be asked to continue writing
+from where you stopped. Build a full narrative arc with real space for each
+beat: setup and stakes, rising complications, the core dramatic turn, the
+emotional climax, and a reflective closing line. If you don't know enough
+documented detail to reach the target, expand on real historical context,
+setting, and the emotional experience of the people involved - never pad
+with repetition or filler.
 
 VARY EMOTIONAL BEATS - DO NOT DEFAULT TO GASPING: when describing a
 character's reaction to shock, fear, or surprise, do not reach for "gasped"
-or "gasping" as the default reaction verb. Real people react to tension in
-many different physical and emotional ways - a held breath, a stiffened
-posture, a dropped object, silence, a whispered word, trembling hands, a
-racing pulse, frozen stillness, a sharp intake through the nose, clenched
-fists. Choose the reaction that fits this specific moment and this specific
-person, and vary it across the script - the same reaction beat should not
-repeat more than once or twice in a single episode.
+as the default. Real people react in many ways - a held breath, a stiffened
+posture, a dropped object, silence, a whispered word, trembling hands,
+clenched fists. Vary it across the script - no single reaction beat should
+repeat more than once or twice.
 
 CALL TO ACTION - THIS IS REQUIRED, NOT OPTIONAL: immediately after the
-emotional climax of the story and before the final reflective closing line,
-you MUST write one natural, in-voice sentence encouraging the viewer to
-like, subscribe, and share their own thoughts in the comments so more of
-these erased stories get told. Every single script must include this - a
-script with no call to action will be rejected and regenerated. It must
-NOT be a generic "smash that like button" line - write it in the tone and
-voice of this specific episode, using imagery or phrasing that echoes the
-story just told, and vary the wording from episode to episode. It is part
-of the narration itself, not a separate field. Use natural language that
-clearly asks the viewer to like/share/subscribe and to respond in the
-comments (for example, weaving in words like "comment," "share," or
-"subscribe" naturally) so the ask is unambiguous, not just implied.
+emotional climax and before the final reflective closing line, write one
+natural, in-voice sentence encouraging the viewer to like, subscribe, and
+share their thoughts in the comments. It must NOT be a generic "smash that
+like button" line - write it in the tone and voice of this specific episode,
+echoing imagery from the story just told, and vary the wording every time.
+It is part of the narration itself. Use natural language that clearly asks
+the viewer to like/share/subscribe and respond in the comments.
+
+WORKED EXAMPLE (study the register, do not copy the line):
+GOOD - varied rhythm, sensory detail, quiet then tight:
+"The letter took six weeks to arrive. Six weeks — that's how long his mother
+didn't know. And when it finally came, she read it standing in the doorway,
+because she couldn't make herself sit down first."
+BAD (flat, same-length sentences, no performance):
+"The letter took six weeks to arrive, which meant his mother did not know
+about the situation for that period of time, and when it arrived she read
+it while standing in the doorway of her house."
 
 Return ONLY valid JSON, no other text, no markdown fences, in this exact
 format:
@@ -145,12 +195,15 @@ target is at least {MIN_NARRATION_WORDS}, ideally {NARRATION_TARGET_WORDS}):
 
 Continue writing EXACTLY where this leaves off. Do not repeat or rephrase
 anything already written above. Do not restart the story or re-introduce it.
-Pick up mid-narrative and keep building: more rising complications, sensory
-and historical detail, the dramatic turn, the emotional climax, and (if not
-already present above) end with the required call-to-action sentence
-(naturally asking the viewer to like/subscribe/comment, in the voice of this
-story) followed by a reflective closing line. Write enough new material to
-bring the total well past {MIN_NARRATION_WORDS} words.
+Keep the SAME varied sentence rhythm, punctuation-as-performance style, and
+energy modulation as the text above - do not flatten into a summary tone or
+a uniform pace just because you're continuing a draft. Pick up mid-narrative
+and keep building: more rising complications, sensory and historical detail,
+the dramatic turn, the emotional climax, and (if not already present above)
+end with the required call-to-action sentence (naturally asking the viewer
+to like/subscribe/comment, in the voice of this story) followed by a
+reflective closing line. Write enough new material to bring the total well
+past {MIN_NARRATION_WORDS} words.
 
 Return ONLY valid JSON, no other text, no markdown fences, in this exact
 format:
@@ -176,9 +229,6 @@ def generate_narration(title, angle):
         try:
             raw = call_llm(build_narration_prompt(title, angle))
         except DailyQuotaExhausted:
-            # FIX (2026-08-15, later): must NOT be swallowed by the generic
-            # RuntimeError/infra-retry handling below - propagate straight
-            # up so main() can abort the whole run instead of retrying.
             raise
         except RuntimeError as e:
             infra_attempt += 1
@@ -208,7 +258,6 @@ def generate_narration(title, angle):
                 time.sleep(CONTENT_RETRY_WAIT_SECONDS)
             continue
 
-        # Continuation loop: extend a short draft instead of discarding it.
         continuation_rounds = 0
         while (
             len(narration.split()) < MIN_NARRATION_WORDS
@@ -247,8 +296,6 @@ def generate_narration(title, angle):
                 time.sleep(CONTENT_RETRY_WAIT_SECONDS)
             continue
 
-        # WRITER/CHECKER SPLIT (2026-08-20, Loop Skill 2): fresh independent
-        # grading call against the house rules above, before acceptance.
         passed, grade_reason = grade_narration(title, angle, narration)
         if not passed:
             last_reason = f"checker rejected narration - {grade_reason}"
