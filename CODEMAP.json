@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 20,
+  "file_count": 21,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -167,6 +167,85 @@
       ],
       "env_vars": [
         "X"
+      ],
+      "tables": []
+    },
+    {
+      "path": "scripts/agnes_client.py",
+      "functions": [
+        {
+          "name": "round_to_valid_frames",
+          "line": 77,
+          "args": [
+            "num_frames"
+          ],
+          "calls": [
+            "ceil",
+            "max"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "create_agnes_task",
+          "line": 89,
+          "args": [
+            "prompt",
+            "num_frames",
+            "image_url"
+          ],
+          "calls": [
+            "AgnesBadRequestError",
+            "AgnesOverloadedError",
+            "ContentPolicyRejection",
+            "get",
+            "json",
+            "post",
+            "print",
+            "raise_for_status",
+            "range",
+            "sleep"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "extract_video_url",
+          "line": 140,
+          "args": [
+            "data"
+          ],
+          "calls": [
+            "endswith",
+            "get",
+            "isinstance",
+            "startswith",
+            "values"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "poll_agnes_task",
+          "line": 151,
+          "args": [
+            "video_id",
+            "max_wait",
+            "interval"
+          ],
+          "calls": [
+            "AgnesOverloadedError",
+            "ContentPolicyRejection",
+            "RuntimeError",
+            "extract_video_url",
+            "get",
+            "json",
+            "print",
+            "raise_for_status",
+            "sleep"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "AGNES_API_KEY"
       ],
       "tables": []
     },
