@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 21,
+  "file_count": 22,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -297,6 +297,212 @@
         "SUPABASE_URL"
       ],
       "tables": []
+    },
+    {
+      "path": "scripts/clip_generation.py",
+      "functions": [
+        {
+          "name": "download_file",
+          "line": 72,
+          "args": [
+            "url",
+            "out_path"
+          ],
+          "calls": [
+            "get",
+            "open",
+            "raise_for_status",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "upload_reference_image",
+          "line": 80,
+          "args": [
+            "script_id",
+            "file_name",
+            "local_path"
+          ],
+          "calls": [
+            "print",
+            "upload_file"
+          ],
+          "docstring": "Returns the B2 object KEY (not a URL) - see storage_b2.py docstring"
+        },
+        {
+          "name": "generate_character_reference",
+          "line": 93,
+          "args": [
+            "script"
+          ],
+          "calls": [
+            "build_character_reference_prompt",
+            "get",
+            "isinstance",
+            "json",
+            "patch",
+            "post",
+            "print",
+            "raise_for_status",
+            "range",
+            "sleep",
+            "str",
+            "strip"
+          ],
+          "docstring": "Generates ONE reference image per script (via agnes-image-2.1-flash),"
+        },
+        {
+          "name": "extract_last_frame_url",
+          "line": 179,
+          "args": [
+            "script_id",
+            "shot_index",
+            "local_video_path"
+          ],
+          "calls": [
+            "VideoFileClip",
+            "close",
+            "fromarray",
+            "get_frame",
+            "max",
+            "print",
+            "remove",
+            "replace",
+            "save",
+            "upload_reference_image"
+          ],
+          "docstring": "Pulls the final frame of a just-generated (or already-downloaded) shot"
+        },
+        {
+          "name": "get_continuity_anchor",
+          "line": 208,
+          "args": [
+            "script",
+            "video_urls"
+          ],
+          "calls": [
+            "download_to_file",
+            "extract_last_frame_url",
+            "generate_character_reference",
+            "len",
+            "print",
+            "remove"
+          ],
+          "docstring": "Reconstructs the correct anchor image for the NEXT shot to generate:"
+        },
+        {
+          "name": "_generate_one_segment",
+          "line": 239,
+          "args": [
+            "shot",
+            "segment_duration",
+            "out_path",
+            "setting_and_characters",
+            "anchor_image_url"
+          ],
+          "calls": [
+            "build_agnes_prompt",
+            "create_agnes_task",
+            "download_file",
+            "int",
+            "max",
+            "min",
+            "poll_agnes_task",
+            "print",
+            "round_to_valid_frames"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_extract_last_frame_local",
+          "line": 265,
+          "args": [
+            "video_path"
+          ],
+          "calls": [
+            "VideoFileClip",
+            "close",
+            "fromarray",
+            "get_frame",
+            "max",
+            "replace",
+            "save"
+          ],
+          "docstring": "Extracts the last frame of a local clip file and uploads it nowhere -"
+        },
+        {
+          "name": "_upload_local_image_for_anchor",
+          "line": 279,
+          "args": [
+            "script_id",
+            "tag",
+            "png_path"
+          ],
+          "calls": [
+            "presigned_url",
+            "remove",
+            "upload_reference_image"
+          ],
+          "docstring": "Chain-extension anchors must be passed to Agnes as a real fetchable"
+        },
+        {
+          "name": "generate_shot_clip",
+          "line": 292,
+          "args": [
+            "shot",
+            "target_duration",
+            "out_path",
+            "setting_and_characters",
+            "anchor_image_url",
+            "script_id"
+          ],
+          "calls": [
+            "VideoFileClip",
+            "_extract_last_frame_local",
+            "_generate_one_segment",
+            "_upload_local_image_for_anchor",
+            "append",
+            "basename",
+            "close",
+            "concatenate_videoclips",
+            "exists",
+            "fit_clip_to_duration",
+            "min",
+            "print",
+            "range",
+            "remove",
+            "replace",
+            "sleep",
+            "write_videofile"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "fit_clip_to_duration",
+          "line": 374,
+          "args": [
+            "clip",
+            "target"
+          ],
+          "calls": [
+            "concatenate_videoclips",
+            "max",
+            "subclipped",
+            "to_ImageClip",
+            "with_duration",
+            "with_fps"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": [
+        "scripts"
+      ]
     },
     {
       "path": "scripts/health_check.py",
