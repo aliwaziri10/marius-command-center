@@ -732,7 +732,7 @@
         },
         {
           "name": "grade_narration",
-          "line": 122,
+          "line": 131,
           "args": [
             "title",
             "angle",
@@ -746,7 +746,7 @@
         },
         {
           "name": "grade_shot_breakdown",
-          "line": 187,
+          "line": 196,
           "args": [
             "title",
             "angle",
