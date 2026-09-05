@@ -96,6 +96,15 @@ Grade against these specific rules:
    rising complications, dramatic turn, emotional climax, reflective
    closing) - not a truncated or summarized ending, and not padded with
    repetitive filler to hit a word count.
+6. ENERGY AND RHYTHM: sentence length must vary
+   noticeably throughout - a run of same-length, same-cadence sentences
+   fails. Punctuation (em-dashes, ellipses, fragments) must be used as
+   real pacing/performance, not purely grammatically. The delivery must
+   NOT sit at the same intensity for the whole runtime - flag a script
+   that reads as uniformly "high energy" or breathless start to finish
+   with no quieter, more observational stretches; real narration varies
+   its register scene to scene, the way a cinematographer varies shot
+   energy rather than shooting every scene as a climax.
 
 Episode topic: {title}
 Angle: {angle}
@@ -110,12 +119,12 @@ format (reasoning MUST come before the verdict - think it through before
 you decide):
 
 {{
-  "reasoning": "Walk through each of the 5 rules above against the actual text, citing what you found for each one.",
+  "reasoning": "Walk through each of the 6 rules above against the actual text, citing what you found for each one.",
   "issues": ["Short specific issue 1", "Short specific issue 2"],
   "passed": true
 }}
 
-Set "passed" to false if ANY of the 5 rules are violated. "issues" should
+Set "passed" to false if ANY of the 6 rules are violated. "issues" should
 be empty if passed is true."""
 
 
