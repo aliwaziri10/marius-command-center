@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 22,
+  "file_count": 23,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -246,6 +246,419 @@
       ],
       "env_vars": [
         "AGNES_API_KEY"
+      ],
+      "tables": []
+    },
+    {
+      "path": "scripts/assembly_stage.py",
+      "functions": [
+        {
+          "name": "download_file",
+          "line": 99,
+          "args": [
+            "url",
+            "out_path"
+          ],
+          "calls": [
+            "get",
+            "open",
+            "raise_for_status",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "compute_shot_start_times",
+          "line": 107,
+          "args": [
+            "shot_durations"
+          ],
+          "calls": [
+            "append"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "compute_target_bitrate",
+          "line": 116,
+          "args": [
+            "duration_seconds",
+            "audio_kbps"
+          ],
+          "calls": [],
+          "docstring": ""
+        },
+        {
+          "name": "estimate_output_size_mb",
+          "line": 127,
+          "args": [
+            "duration_seconds",
+            "video_kbps",
+            "audio_kbps"
+          ],
+          "calls": [],
+          "docstring": ""
+        },
+        {
+          "name": "fit_audio_to_duration",
+          "line": 133,
+          "args": [
+            "audio_clip",
+            "target"
+          ],
+          "calls": [
+            "concatenate_audioclips",
+            "int",
+            "subclipped"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "poll_ace_music_task",
+          "line": 141,
+          "args": [
+            "task_id",
+            "out_path",
+            "base_url",
+            "max_wait",
+            "interval"
+          ],
+          "calls": [
+            "get",
+            "json",
+            "loads",
+            "open",
+            "post",
+            "print",
+            "raise_for_status",
+            "sleep",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "generate_background_music",
+          "line": 181,
+          "args": [
+            "prompt",
+            "duration",
+            "out_path",
+            "debug"
+          ],
+          "calls": [
+            "generate_background_music_musicgen",
+            "get",
+            "int",
+            "json",
+            "max",
+            "min",
+            "poll_ace_music_task",
+            "post",
+            "print",
+            "str"
+          ],
+          "docstring": "AUDIO-DEBUG FIX (2026-08-23): music_generated has been false on every"
+        },
+        {
+          "name": "generate_background_music_musicgen",
+          "line": 237,
+          "args": [
+            "prompt",
+            "duration",
+            "out_path",
+            "debug"
+          ],
+          "calls": [
+            "get",
+            "int",
+            "json",
+            "min",
+            "open",
+            "post",
+            "print",
+            "sleep",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "search_freesound_sfx",
+          "line": 290,
+          "args": [
+            "query",
+            "out_path",
+            "debug"
+          ],
+          "calls": [
+            "_keyword_fallback_query",
+            "_try_query",
+            "append",
+            "download_file",
+            "get",
+            "join",
+            "json",
+            "len",
+            "lower",
+            "print",
+            "setdefault",
+            "split",
+            "strip"
+          ],
+          "docstring": "AUDIO-DEBUG FIX (2026-08-23): same rationale as generate_background_music."
+        },
+        {
+          "name": "apply_safety_limiter",
+          "line": 376,
+          "args": [
+            "audio_clip",
+            "ceiling"
+          ],
+          "calls": [
+            "abs",
+            "float",
+            "max",
+            "print",
+            "to_soundarray",
+            "with_volume_scaled"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "extract_original_clip_audio",
+          "line": 396,
+          "args": [
+            "video_clips",
+            "shot_durations",
+            "shot_starts",
+            "total_duration"
+          ],
+          "calls": [
+            "append",
+            "enumerate",
+            "print",
+            "subclipped",
+            "with_start",
+            "with_volume_scaled"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_audio_mix",
+          "line": 413,
+          "args": [
+            "narration_path",
+            "music_mood",
+            "shot_list",
+            "shot_durations",
+            "shot_starts",
+            "total_duration",
+            "original_clip_audio_layers"
+          ],
+          "calls": [
+            "AudioFileClip",
+            "CompositeAudioClip",
+            "append",
+            "apply_safety_limiter",
+            "enumerate",
+            "extend",
+            "fit_audio_to_duration",
+            "generate_background_music",
+            "get",
+            "len",
+            "print",
+            "search_freesound_sfx",
+            "strip",
+            "subclipped",
+            "with_start",
+            "with_volume_scaled"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_load_caption_font",
+          "line": 463,
+          "args": [
+            "size"
+          ],
+          "calls": [
+            "exists",
+            "load_default",
+            "print",
+            "truetype"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_wrap_caption_text",
+          "line": 474,
+          "args": [
+            "text",
+            "font",
+            "max_width",
+            "draw"
+          ],
+          "calls": [
+            "append",
+            "split",
+            "strip",
+            "textbbox"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "render_caption_image",
+          "line": 491,
+          "args": [
+            "text",
+            "video_width",
+            "video_height"
+          ],
+          "calls": [
+            "Draw",
+            "_load_caption_font",
+            "_wrap_caption_text",
+            "append",
+            "int",
+            "len",
+            "max",
+            "new",
+            "rounded_rectangle",
+            "strip",
+            "text",
+            "textbbox",
+            "zip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_caption_clip",
+          "line": 537,
+          "args": [
+            "text",
+            "start",
+            "duration",
+            "video_width",
+            "video_height"
+          ],
+          "calls": [
+            "ImageClip",
+            "array",
+            "print",
+            "render_caption_image",
+            "with_start"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_caption_clips",
+          "line": 551,
+          "args": [
+            "shot_list",
+            "shot_durations",
+            "shot_starts",
+            "video_width",
+            "video_height"
+          ],
+          "calls": [
+            "append",
+            "build_caption_clip",
+            "enumerate",
+            "get",
+            "len",
+            "print",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "assemble_final_video",
+          "line": 564,
+          "args": [
+            "script_id",
+            "video_urls",
+            "narration_path",
+            "music_mood",
+            "shot_list",
+            "shot_durations",
+            "output_path",
+            "setting_and_characters"
+          ],
+          "calls": [
+            "AudioFadeIn",
+            "AudioFadeOut",
+            "FadeIn",
+            "FadeOut",
+            "VideoFileClip",
+            "_extract_last_frame_local",
+            "_generate_one_segment",
+            "_upload_local_image_for_anchor",
+            "append",
+            "basename",
+            "build_audio_mix",
+            "compute_shot_start_times",
+            "compute_target_bitrate",
+            "concatenate_videoclips",
+            "download_to_file",
+            "enumerate",
+            "extract_original_clip_audio",
+            "fit_clip_to_duration",
+            "len",
+            "min",
+            "print",
+            "replace",
+            "resized",
+            "sum",
+            "with_audio",
+            "with_effects",
+            "write_videofile"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "upload_video",
+          "line": 643,
+          "args": [
+            "script_id",
+            "file_path"
+          ],
+          "calls": [
+            "getsize",
+            "print",
+            "upload_file"
+          ],
+          "docstring": "Returns the B2 object KEY (not a URL) - stored in scripts.video_url."
+        },
+        {
+          "name": "_try_query",
+          "line": 313,
+          "args": [
+            "q"
+          ],
+          "calls": [
+            "get",
+            "json"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_keyword_fallback_query",
+          "line": 343,
+          "args": [
+            "q"
+          ],
+          "calls": [
+            "join",
+            "lower",
+            "split",
+            "strip"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "ACE_MUSIC_API_KEY",
+        "FREESOUND_API_KEY",
+        "HF_TOKEN"
       ],
       "tables": []
     },
