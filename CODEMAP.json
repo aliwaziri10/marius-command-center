@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 23,
+  "file_count": 24,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -1401,6 +1401,75 @@
             "strip"
           ],
           "docstring": "Stage 1: produce a narration that already clears the word-count and"
+        }
+      ],
+      "env_vars": [],
+      "tables": []
+    },
+    {
+      "path": "scripts/prompt_builder.py",
+      "functions": [
+        {
+          "name": "_sanitize_anchor_for_fallback",
+          "line": 143,
+          "args": [
+            "anchor"
+          ],
+          "calls": [
+            "any",
+            "join",
+            "lower",
+            "split",
+            "strip"
+          ],
+          "docstring": "Drops clauses/sentences containing ethnicity- or atrocity-related"
+        },
+        {
+          "name": "_strip_named_characters_for_group_shot",
+          "line": 166,
+          "args": [
+            "anchor"
+          ],
+          "calls": [
+            "join",
+            "lower",
+            "split",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_agnes_prompt",
+          "line": 177,
+          "args": [
+            "shot",
+            "setting_and_characters",
+            "fallback_level"
+          ],
+          "calls": [
+            "_sanitize_anchor_for_fallback",
+            "_strip_named_characters_for_group_shot",
+            "any",
+            "append",
+            "get",
+            "join",
+            "lower",
+            "replace",
+            "strip"
+          ],
+          "docstring": "fallback_level 0 (primary): full anchor + full visual_description."
+        },
+        {
+          "name": "build_character_reference_prompt",
+          "line": 263,
+          "args": [
+            "setting_and_characters"
+          ],
+          "calls": [
+            "join",
+            "strip"
+          ],
+          "docstring": ""
         }
       ],
       "env_vars": [],
