@@ -75,6 +75,23 @@ QUALITY_GUARD = (
     "no candy-coated or glazed look, photographically real, not illustrated, not animated, not stylized"
 )
 
+# NEGATIVE PROMPT (2026-09-08): Agnes's API supports a real negative_prompt
+# field (separate from the positive prompt) that this pipeline never used -
+# every anti-waxy/anti-plastic instruction above lived only inside the
+# positive prompt as "not waxy, not plastic" phrasing, which video models
+# are known to apply unreliably (attending to the noun without reliably
+# honoring the negation). This is a second, structurally stronger path for
+# the exact same constraint, sent alongside (not instead of) QUALITY_GUARD.
+# Kept skin/rendering-quality focused, since that's the specific regression
+# Zia reported (waxy/plastic/smooth skin on both Nova and Marius, worse
+# than videos generated ~20 videos back).
+NEGATIVE_PROMPT = (
+    "waxy skin, plastic skin, glossy skin, airbrushed skin, overly smooth skin, "
+    "doll-like skin, mannequin skin, beauty filter, CGI look, 3D render look, "
+    "synthetic AI look, candy-coated look, glazed skin, blurry face, deformed face, "
+    "flat lighting, overexposed, underexposed, low detail, low quality, watermark, text overlay"
+)
+
 DISTINCT_INDIVIDUALS_GUARD = (
     "every person visible in this shot is a distinct, unique individual with "
     "a different face, body, and clothing from every other person in the "
