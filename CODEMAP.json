@@ -1633,7 +1633,7 @@
       "functions": [
         {
           "name": "split_narration_into_chunks",
-          "line": 182,
+          "line": 194,
           "args": [
             "narration_text",
             "num_chunks"
@@ -1650,7 +1650,7 @@
         },
         {
           "name": "normalize_shot",
-          "line": 212,
+          "line": 224,
           "args": [
             "shot",
             "index"
@@ -1663,7 +1663,7 @@
         },
         {
           "name": "normalize_hook_text",
-          "line": 260,
+          "line": 272,
           "args": [
             "result"
           ],
@@ -1678,7 +1678,7 @@
         },
         {
           "name": "hook_text_matches_prompt_example",
-          "line": 276,
+          "line": 288,
           "args": [
             "hook_text"
           ],
@@ -1692,7 +1692,7 @@
         },
         {
           "name": "hook_text_too_long_to_glance",
-          "line": 283,
+          "line": 295,
           "args": [
             "hook_text"
           ],
@@ -1704,7 +1704,7 @@
         },
         {
           "name": "hook_text_matches_story",
-          "line": 288,
+          "line": 300,
           "args": [
             "hook_text",
             "narration_text"
@@ -1720,7 +1720,7 @@
         },
         {
           "name": "find_duplicate_shots",
-          "line": 302,
+          "line": 314,
           "args": [
             "normalized_shots"
           ],
@@ -1734,7 +1734,7 @@
         },
         {
           "name": "find_empty_shots",
-          "line": 314,
+          "line": 326,
           "args": [
             "normalized_shots"
           ],
@@ -1746,7 +1746,7 @@
         },
         {
           "name": "find_continuation_language_shots",
-          "line": 321,
+          "line": 333,
           "args": [
             "normalized_shots"
           ],
@@ -1759,7 +1759,7 @@
         },
         {
           "name": "find_loitering_shots",
-          "line": 332,
+          "line": 344,
           "args": [
             "normalized_shots"
           ],
@@ -1772,7 +1772,7 @@
         },
         {
           "name": "find_missing_onscreen_text_shots",
-          "line": 343,
+          "line": 355,
           "args": [
             "normalized_shots"
           ],
@@ -1786,7 +1786,7 @@
         },
         {
           "name": "find_anachronistic_object_shots",
-          "line": 352,
+          "line": 364,
           "args": [
             "normalized_shots"
           ],
@@ -1799,7 +1799,7 @@
         },
         {
           "name": "find_duplicate_character_shots",
-          "line": 368,
+          "line": 380,
           "args": [
             "normalized_shots"
           ],
@@ -1812,7 +1812,7 @@
         },
         {
           "name": "find_dominant_subject",
-          "line": 381,
+          "line": 393,
           "args": [
             "normalized_shots"
           ],
@@ -1826,7 +1826,7 @@
         },
         {
           "name": "find_excessive_consecutive_subject",
-          "line": 394,
+          "line": 406,
           "args": [
             "normalized_shots"
           ],
@@ -1838,7 +1838,7 @@
         },
         {
           "name": "find_location_change_without_establishing",
-          "line": 409,
+          "line": 421,
           "args": [
             "normalized_shots"
           ],
@@ -1851,7 +1851,7 @@
         },
         {
           "name": "validate_and_normalize_shot_response",
-          "line": 426,
+          "line": 438,
           "args": [
             "result",
             "narration_text"
@@ -1885,7 +1885,7 @@
         },
         {
           "name": "build_shot_breakdown_chunk_prompt",
-          "line": 816,
+          "line": 841,
           "args": [
             "title",
             "angle",
@@ -1908,7 +1908,7 @@
         },
         {
           "name": "generate_shot_breakdown",
-          "line": 997,
+          "line": 1022,
           "args": [
             "title",
             "angle",
@@ -1936,7 +1936,7 @@
         },
         {
           "name": "_simplify",
-          "line": 277,
+          "line": 289,
           "args": [
             "s"
           ],
