@@ -1412,7 +1412,7 @@
       "functions": [
         {
           "name": "_sanitize_anchor_for_fallback",
-          "line": 143,
+          "line": 160,
           "args": [
             "anchor"
           ],
@@ -1427,7 +1427,7 @@
         },
         {
           "name": "_strip_named_characters_for_group_shot",
-          "line": 166,
+          "line": 183,
           "args": [
             "anchor"
           ],
@@ -1441,7 +1441,7 @@
         },
         {
           "name": "build_agnes_prompt",
-          "line": 177,
+          "line": 194,
           "args": [
             "shot",
             "setting_and_characters",
@@ -1462,7 +1462,7 @@
         },
         {
           "name": "build_character_reference_prompt",
-          "line": 263,
+          "line": 280,
           "args": [
             "setting_and_characters"
           ],
