@@ -191,7 +191,8 @@
           "args": [
             "prompt",
             "num_frames",
-            "image_url"
+            "image_url",
+            "negative_prompt"
           ],
           "calls": [
             "AgnesBadRequestError",
@@ -205,11 +206,11 @@
             "range",
             "sleep"
           ],
-          "docstring": ""
+          "docstring": "NEGATIVE_PROMPT SUPPORT (2026-09-08): Agnes's own docs confirm a"
         },
         {
           "name": "extract_video_url",
-          "line": 140,
+          "line": 157,
           "args": [
             "data"
           ],
@@ -224,7 +225,7 @@
         },
         {
           "name": "poll_agnes_task",
-          "line": 151,
+          "line": 168,
           "args": [
             "video_id",
             "max_wait",
