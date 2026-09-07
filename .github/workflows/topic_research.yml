@@ -6,8 +6,8 @@ on:
   # script_writing.py for the same GEMINI_API_KEY quota, contributing to
   # 429 rate-limit failures. Re-enable the schedule below once the backlog
   # is meaningfully drawn down.
-  # schedule:
-  #   - cron: "0 */6 * * *"
+  schedule:
+  - cron: '0 */6 * * *'
   workflow_dispatch:
 
 permissions:
