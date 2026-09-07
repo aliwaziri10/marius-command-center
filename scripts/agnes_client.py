@@ -86,7 +86,22 @@ def round_to_valid_frames(num_frames):
     return 8 * n + 1
 
 
-def create_agnes_task(prompt, num_frames, image_url=None):
+def create_agnes_task(prompt, num_frames, image_url=None, negative_prompt=None):
+    """
+    NEGATIVE_PROMPT SUPPORT (2026-09-08): Agnes's own docs confirm a
+    negative_prompt field on this endpoint that this pipeline never sent -
+    every anti-waxy/anti-plastic-skin instruction was previously carried
+    only inside the positive prompt (QUALITY_GUARD in prompt_builder.py).
+    Positive "not waxy, not plastic" phrasing is known-unreliable on video
+    models (the model can attend to the nouns "waxy"/"plastic" without
+    reliably applying the negation). Passing the same guard text through
+    the API's real negative_prompt channel as well gives the constraint a
+    second, structurally stronger path to actually suppress the effect,
+    on top of (not instead of) the existing positive QUALITY_GUARD text.
+    Optional and backward compatible - omitted entirely from the payload
+    when the caller doesn't pass one, so this never breaks the character-
+    reference image call path or any other caller that doesn't use it.
+    """
     last_error_text = None
 
     for attempt in range(AGNES_MAX_RETRIES):
@@ -100,6 +115,8 @@ def create_agnes_task(prompt, num_frames, image_url=None):
         }
         if image_url:
             payload["image"] = image_url
+        if negative_prompt:
+            payload["negative_prompt"] = negative_prompt
 
         resp = requests.post(
             f"{AGNES_BASE}/videos",
