@@ -37,7 +37,7 @@ from agnes_client import (
     create_agnes_task,
     poll_agnes_task,
 )
-from prompt_builder import build_agnes_prompt, build_character_reference_prompt
+from prompt_builder import build_agnes_prompt, build_character_reference_prompt, NEGATIVE_PROMPT
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
@@ -244,18 +244,18 @@ def _generate_one_segment(shot, segment_duration, out_path, setting_and_characte
 
     prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=0)
     try:
-        video_id = create_agnes_task(prompt, num_frames, image_url=anchor_image_url)
+        video_id = create_agnes_task(prompt, num_frames, image_url=anchor_image_url, negative_prompt=NEGATIVE_PROMPT)
     except ContentPolicyRejection:
         print("Content policy rejection on primary prompt - retrying with sanitized-anchor fallback "
               "(tier 1, image anchor also dropped this attempt)...")
         try:
             fallback_prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=1)
-            video_id = create_agnes_task(fallback_prompt, num_frames, image_url=None)
+            video_id = create_agnes_task(fallback_prompt, num_frames, image_url=None, negative_prompt=NEGATIVE_PROMPT)
         except ContentPolicyRejection:
             print("Sanitized-anchor fallback ALSO rejected - retrying once more with a fully generic, "
                   "anchor-free prompt AND no image anchor (tier 2, last resort before giving up on this shot)...")
             ultra_prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=2)
-            video_id = create_agnes_task(ultra_prompt, num_frames, image_url=None)
+            video_id = create_agnes_task(ultra_prompt, num_frames, image_url=None, negative_prompt=NEGATIVE_PROMPT)
 
     video_url = poll_agnes_task(video_id)
     download_file(video_url, out_path)
