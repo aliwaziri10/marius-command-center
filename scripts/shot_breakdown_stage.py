@@ -36,6 +36,14 @@ keyword scan on the writer's own output, at generation time, is a much
 harder guarantee than a negative instruction handed to a video model that's
 known to weight "no X" instructions unreliably. See MODERN_OBJECT_KEYWORDS /
 find_anachronistic_object_shots below.
+
+DOCUMENTARY-STYLE TIGHTENING (2026-09-08): Zia reported the protagonist
+still appears in too many scenes for a documentary feel (wants heavier
+emphasis on setting/context/B-roll, not a person-in-every-shot movie
+storyboard). MAX_SUBJECT_SHOT_RATIO lowered 0.30->0.20 and
+MAX_CONSECUTIVE_SAME_SUBJECT lowered 3->2, forcing more frequent cutaways
+to pure B-roll (landscapes, documents, objects, crowds, other people)
+between appearances of any single named subject.
 """
 
 import re
@@ -108,8 +116,12 @@ ZOOM_FAMILY_MOVEMENTS = {"push_in", "crash_zoom", "zoom_in", "snap_zoom", "dolly
 MAX_ZOOM_SHOT_RATIO = 0.32
 MAX_CONSECUTIVE_ZOOM_SHOTS = 2
 
-MAX_CONSECUTIVE_SAME_SUBJECT = 3
-MAX_SUBJECT_SHOT_RATIO = 0.30
+# DOCUMENTARY-STYLE TIGHTENING (2026-09-08): lowered from 3/0.30 - see
+# module docstring. Forces cutaways to B-roll more often, so no single
+# named subject dominates the episode's screentime the way a movie
+# storyboard (vs a real documentary edit) would.
+MAX_CONSECUTIVE_SAME_SUBJECT = 2
+MAX_SUBJECT_SHOT_RATIO = 0.20
 
 CONTINUATION_BANNED_PHRASES = (
     "continues to", "continues ", "then walks", "then runs", "then turns",
@@ -693,6 +705,19 @@ describing what's happening RIGHT NOW in the shot - instead describe the
 subject already in position: "standing beside the open door," "already
 seated at the table," "holding the letter, already unfolded."
 
+REAL DOCUMENTARY BALANCE - THE STORY IS NOT JUST THE PROTAGONIST (HARD
+RULE): a real documentary spends most of its screen time on context, not
+on one person's face - archival-style footage of the wider event, the
+physical setting, objects, documents, crowds, other people mentioned in
+the story, landscapes, aftermath, evidence. No single named character
+(primary_subject) may be the subject of more than {MAX_CONSECUTIVE_SAME_SUBJECT}
+consecutive shots, or more than {MAX_SUBJECT_SHOT_RATIO:.0%} of the total
+shots in this episode. Treat pure B-roll (primary_subject left as "") as
+the default, not the exception - actively look for narration beats that
+describe an event, place, object, or outcome rather than a person's
+reaction, and shoot those as B-roll instead of cutting back to the same
+face.
+
 PURPOSEFUL STILLNESS, NOT LOITERING (HARD RULE): "already in position" does
 NOT mean "just standing/sitting there with nothing to do." Every shot with a
 person in frame must anchor them in a specific, concrete, already-in-progress
@@ -710,12 +735,12 @@ over active verbs like "lifts," "pours," "hands over," which invite the
 video model to try to render (and lose track of) motion it can't sustain.
 
 CUTAWAY DISCIPLINE: the same character must not appear as the
-primary_subject of more than 3 consecutive shots. Frequently cut to B-roll
-- landscapes, buildings, documents, objects, hands, tools, crowds, weather,
-architecture. Whenever the same character reappears after a cutaway, change
-the camera angle, framing, and body orientation, but keep their fixed
-physical description IDENTICAL to what's stated in "setting_and_characters"
-every single time.
+primary_subject of more than {MAX_CONSECUTIVE_SAME_SUBJECT} consecutive
+shots. Frequently cut to B-roll - landscapes, buildings, documents,
+objects, hands, tools, crowds, weather, architecture. Whenever the same
+character reappears after a cutaway, change the camera angle, framing,
+and body orientation, but keep their fixed physical description IDENTICAL
+to what's stated in "setting_and_characters" every single time.
 
 LOCATION CHANGES MUST RE-ESTABLISH (HARD RULE): fill "location_tag" with a
 short consistent name for where the shot physically takes place (e.g.
