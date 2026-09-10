@@ -15,6 +15,14 @@ GEMINI_API_KEY already used by script_writing.py) is now the sole
 provider - also a stronger, more consistent writer for this kind of
 creative/narrative generation task than whatever model OpenRouter's
 auto-router happens to route to.
+
+MODEL FIX (2026-09-10): GEMINI_MODEL was still "gemini-3.5-flash" here,
+the same deprecated name that broke script_writing.py on 2026-08-07
+("no longer available to new users"). script_writing.py (via
+llm_client.py) was switched to "gemini-3.5-flash-lite" at the time, but
+this file was never updated - every topic_research run since has almost
+certainly been failing on the same dead model name. Fixed to match
+llm_client.py's GEMINI_MODEL.
 """
 
 import os
@@ -35,7 +43,7 @@ HEADERS = {
 NUM_NEW_TOPICS = 3
 MAX_RETRIES = 2
 
-GEMINI_MODEL = "gemini-3.5-flash"
+GEMINI_MODEL = "gemini-3.5-flash-lite"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_KEY}"
 
 
