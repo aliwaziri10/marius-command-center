@@ -18,6 +18,20 @@ is a fresh rewrite matching the originally-described intent (cap sharp
 foreground figures, push crowds to out-of-focus background) - the exact
 wording of whatever was drafted in the earlier session was never
 actually captured, so this is not guaranteed byte-identical to that.
+
+MORPHING/REALISM GUARD ADDED (2026-09-10): Zia reported wanting more
+realistic output specifically calling out morphing artifacts, plus
+crowds that stand idle instead of doing something purposeful. Research
+into real-world AI video prompting practice (Luma, Higgsfield, CapCut
+guides) confirms: (1) explicit negative-prompt exclusion of morphing/
+warping/distortion measurably reduces occurrence, it isn't just
+positive-prompt phrasing to rely on, and (2) overloaded/complex shots
+(multiple simultaneous actions, large crowds) are the single biggest
+driver of morphing - which is exactly what CROWD_ANATOMY_SAFETY_GUARD
+and the shot_breakdown "one complete action per shot" rule already
+independently defend against. MORPHING_GUARD below adds the missing
+explicit negative_prompt terms; CROWD_PURPOSEFUL_ACTION_GUARD extends
+PURPOSEFUL_ACTION_GUARD with crowd-specific language.
 """
 
 import re
@@ -85,11 +99,20 @@ QUALITY_GUARD = (
 # Kept skin/rendering-quality focused, since that's the specific regression
 # Zia reported (waxy/plastic/smooth skin on both Nova and Marius, worse
 # than videos generated ~20 videos back).
+#
+# MORPHING TERMS ADDED (2026-09-10): Zia reported morphing artifacts
+# specifically. Multiple independent AI-video-prompting guides confirm
+# explicit negative_prompt exclusion of morphing/warping/distortion is a
+# real, separate lever from the positive-prompt QUALITY_GUARD text above -
+# it isn't redundant with it. Added alongside (not instead of) the
+# existing skin-quality terms.
 NEGATIVE_PROMPT = (
     "waxy skin, plastic skin, glossy skin, airbrushed skin, overly smooth skin, "
     "doll-like skin, mannequin skin, beauty filter, CGI look, 3D render look, "
     "synthetic AI look, candy-coated look, glazed skin, blurry face, deformed face, "
-    "flat lighting, overexposed, underexposed, low detail, low quality, watermark, text overlay"
+    "flat lighting, overexposed, underexposed, low detail, low quality, watermark, text overlay, "
+    "morphing, warping, melting, distortion, shape-shifting, flickering, unstable geometry, "
+    "limbs merging, faces blending together, object deformation, physics violations"
 )
 
 DISTINCT_INDIVIDUALS_GUARD = (
@@ -138,6 +161,24 @@ PURPOSEFUL_ACTION_GUARD = (
     "tied to the scene - no one stands frozen, idle, or posed like a statue "
     "with nothing to do; if a person has no active role in this moment, they "
     "are not included in the frame"
+)
+
+# CROWD PURPOSEFUL ACTION (2026-09-10): PURPOSEFUL_ACTION_GUARD above
+# already covers individuals, but Zia specifically flagged crowds/groups
+# standing idle as its own recurring problem. This is a separate,
+# crowd-specific reinforcement rather than a rewrite of the existing
+# guard, since crowds need explicit "collectively doing something" framing
+# that singular-person phrasing doesn't naturally cover.
+CROWD_PURPOSEFUL_ACTION_GUARD = (
+    "if this shot contains a crowd or group of onlookers/bystanders, they "
+    "are never a static backdrop of people standing and staring - each "
+    "cluster within the crowd is engaged in a concrete, plausible activity "
+    "for this scene (walking with purpose, working, gesturing to each other, "
+    "reacting physically, carrying something, moving through the space) - "
+    "a crowd with nothing to do should not be in the shot at all unless the "
+    "story specifically requires bystanders witnessing an event, in which "
+    "case their reactions are active (turning, pointing, recoiling, leaning "
+    "in) rather than a motionless row of onlookers"
 )
 
 OBJECT_PERMANENCE_GUARD = (
@@ -231,6 +272,7 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
         parts.append(ANACHRONISM_GUARD)
         parts.append(DISTINCT_INDIVIDUALS_GUARD)
         parts.append(CROWD_ANATOMY_SAFETY_GUARD)
+        parts.append(CROWD_PURPOSEFUL_ACTION_GUARD)
         parts.append(ORIENTATION_CONSISTENCY_GUARD)
         parts.append(PURPOSEFUL_ACTION_GUARD)
         parts.append(OBJECT_PERMANENCE_GUARD)
@@ -248,6 +290,7 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
         parts.append(QUALITY_GUARD)
         parts.append(ANACHRONISM_GUARD)
         parts.append(CROWD_ANATOMY_SAFETY_GUARD)
+        parts.append(CROWD_PURPOSEFUL_ACTION_GUARD)
         parts.append(ORIENTATION_CONSISTENCY_GUARD)
         parts.append(PURPOSEFUL_ACTION_GUARD)
         parts.append(OBJECT_PERMANENCE_GUARD)
@@ -260,6 +303,7 @@ def build_agnes_prompt(shot, setting_and_characters="", fallback_level=0):
             QUALITY_GUARD,
             ANACHRONISM_GUARD,
             CROWD_ANATOMY_SAFETY_GUARD,
+            CROWD_PURPOSEFUL_ACTION_GUARD,
             ORIENTATION_CONSISTENCY_GUARD,
             PURPOSEFUL_ACTION_GUARD,
             OBJECT_PERMANENCE_GUARD,
