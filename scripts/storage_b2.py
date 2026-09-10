@@ -132,3 +132,20 @@ def object_size(object_key):
         return resp.get("ContentLength")
     except Exception:
         return None
+
+
+def delete_object(object_key):
+    """ADDED (2026-09-10): deletes object_key from B2. Used for post-
+    upload cleanup - once a video is confirmed live on YouTube, its
+    source file no longer needs to sit in B2 storage. Safe to call on a
+    key that's already gone (B2's delete_object is idempotent - no error
+    on a missing key). Returns True if the call completed, False if it
+    raised (logged, never fatal - a failed cleanup should never affect
+    upload status, which is already recorded by the time this runs)."""
+    client = _get_client()
+    try:
+        client.delete_object(Bucket=B2_BUCKET_NAME, Key=object_key)
+        return True
+    except Exception as e:
+        print(f"B2 cleanup failed for {object_key!r} (non-fatal): {e}")
+        return False
