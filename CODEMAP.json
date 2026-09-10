@@ -2076,6 +2076,19 @@
             "head_object"
           ],
           "docstring": "ADDED (2026-09-02): returns the real byte size of object_key in B2,"
+        },
+        {
+          "name": "delete_object",
+          "line": 137,
+          "args": [
+            "object_key"
+          ],
+          "calls": [
+            "_get_client",
+            "delete_object",
+            "print"
+          ],
+          "docstring": "ADDED (2026-09-10): deletes object_key from B2. Used for post-"
         }
       ],
       "env_vars": [
