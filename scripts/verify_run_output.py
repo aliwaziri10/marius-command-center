@@ -37,6 +37,18 @@ video_chunk_urls is untouched - those are always real https:// Supabase
 Storage URLs from before the migration (no script created after the
 migration will ever have chunk_urls populated - see video_generation.py),
 so check_url_alive() remains correct for that field specifically.
+
+LAZY IMPORT FIX (2026-09-10): storage_b2 used to be imported at module
+level, which reads B2_ENDPOINT_URL/B2_KEY_ID/B2_APPLICATION_KEY from the
+environment at import time (see storage_b2.py). The script_writing stage's
+code path never touches storage_b2 at all - only the video_generation
+stage does, via check_b2_key_alive(). But because the import was
+unconditional and eager, running `--stage script_writing` in a workflow
+step whose env block only sets SUPABASE_URL/SUPABASE_SECRET_KEY (and not
+the B2 vars) crashed with a KeyError on B2_ENDPOINT_URL before a single
+line of this script's actual logic ran. Fixed by moving the import inside
+check_b2_key_alive(), so it's only loaded - and only requires B2 env vars
+- when the video_generation stage actually calls it.
 """
 import argparse
 import json
@@ -45,7 +57,6 @@ import sys
 from datetime import datetime, timezone
 
 import requests
-import storage_b2
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
@@ -107,7 +118,12 @@ def check_b2_key_alive(object_key, min_bytes=None):
     """ADDED (2026-09-02): the B2-key equivalent of check_url_alive, for
     scripts.video_url now that it holds a bare object key instead of a
     URL. Uses storage_b2.object_size() (a real B2 head_object call) rather
-    than an HTTP request."""
+    than an HTTP request.
+
+    LAZY IMPORT (2026-09-10): storage_b2 is imported here, not at module
+    level, so the script_writing stage (which never calls this function)
+    doesn't need B2_ENDPOINT_URL/B2_KEY_ID/B2_APPLICATION_KEY set."""
+    import storage_b2
     size = storage_b2.object_size(object_key)
     if size is None:
         return False, "object not found in B2 (or could not be checked)"
