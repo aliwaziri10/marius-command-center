@@ -2667,7 +2667,7 @@
       "functions": [
         {
           "name": "fetch_scripts",
-          "line": 74,
+          "line": 85,
           "args": [
             "status",
             "limit",
@@ -2682,7 +2682,7 @@
         },
         {
           "name": "check_url_alive",
-          "line": 85,
+          "line": 96,
           "args": [
             "url",
             "min_bytes"
@@ -2696,7 +2696,7 @@
         },
         {
           "name": "check_b2_key_alive",
-          "line": 106,
+          "line": 117,
           "args": [
             "object_key",
             "min_bytes"
@@ -2708,7 +2708,7 @@
         },
         {
           "name": "verify_shot_breakdown_script",
-          "line": 119,
+          "line": 135,
           "args": [
             "script"
           ],
@@ -2727,7 +2727,7 @@
         },
         {
           "name": "verify_video_generated_script",
-          "line": 172,
+          "line": 188,
           "args": [
             "script"
           ],
@@ -2744,7 +2744,7 @@
         },
         {
           "name": "check_stalled_scripts",
-          "line": 210,
+          "line": 226,
           "args": [],
           "calls": [
             "append",
@@ -2756,7 +2756,7 @@
         },
         {
           "name": "run_verification",
-          "line": 225,
+          "line": 241,
           "args": [
             "stage"
           ],
@@ -2776,7 +2776,7 @@
         },
         {
           "name": "main",
-          "line": 254,
+          "line": 270,
           "args": [],
           "calls": [
             "ArgumentParser",
