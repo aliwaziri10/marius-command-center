@@ -13,6 +13,14 @@ through clip_generation, save progress, and once all shots are done, run
 assembly_stage and mark the script complete. No prompt-building, no Agnes
 HTTP details, no ffmpeg/moviepy mixing logic live here anymore - see the
 relevant module for those.
+
+CONTINUITY RE-ENABLED (2026-09-10): get_continuity_anchor/
+extract_last_frame_url had been dormant since 2026-08-18 (defined in
+clip_generation.py but never called from this loop). Re-wired back in:
+each script run now starts from a real anchor (either the last
+previously-completed shot's last frame, or the character reference image
+if this is the first shot), and updates that anchor after every new shot
+so the next one is generated with visual continuity instead of blind.
 """
 
 import os
@@ -24,7 +32,7 @@ from moviepy import AudioFileClip
 
 import storage_b2
 from agnes_client import ContentPolicyRejection, AgnesOverloadedError, AgnesBadRequestError
-from clip_generation import generate_shot_clip
+from clip_generation import generate_shot_clip, get_continuity_anchor, extract_last_frame_url
 from assembly_stage import assemble_final_video, upload_video
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
@@ -264,7 +272,13 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
         batch_end = min(next_index + shot_limit, total_shots)
         print(f"Resuming from shot {next_index + 1}/{total_shots} ({len(video_urls)} already done) - generating up to shot {batch_end} this run (budget this call: {shot_limit})")
 
-        anchor_image_url = None
+        # CONTINUITY RE-ENABLED (2026-09-10): starting anchor is either the
+        # last already-completed shot's last frame (resumed run) or the
+        # script's character reference image (first shot of this script) -
+        # get_continuity_anchor handles both cases and generates the
+        # character reference on demand if it doesn't exist yet.
+        anchor_image_url = get_continuity_anchor(script, video_urls)
+        print(f"Continuity anchor for this run: {'set' if anchor_image_url else 'none (starting blind)'}")
 
         for i in range(next_index, batch_end):
             shot = shot_list[i]
@@ -303,6 +317,17 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
             save_progress(script_id, video_urls, i + 1)
             shots_used += 1
             print(f"Saved progress: {i + 1}/{total_shots} shots done")
+
+            # CONTINUITY RE-ENABLED (2026-09-10): carry this shot's own
+            # last frame forward as the anchor for the NEXT shot, so
+            # character/setting stays visually consistent across the whole
+            # episode instead of every shot being generated blind. Fails
+            # soft (keeps the previous anchor) if extraction/upload fails -
+            # same fail-soft pattern as the rest of this pipeline's
+            # continuity/quality features.
+            new_anchor = extract_last_frame_url(script_id, i, raw_path)
+            if new_anchor:
+                anchor_image_url = new_anchor
 
             os.remove(raw_path)
             time.sleep(4)
