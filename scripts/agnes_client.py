@@ -86,7 +86,7 @@ def round_to_valid_frames(num_frames):
     return 8 * n + 1
 
 
-def create_agnes_task(prompt, num_frames, image_url=None, negative_prompt=None):
+def create_agnes_task(prompt, num_frames, image_url=None, negative_prompt=None, seed=None):
     """
     NEGATIVE_PROMPT SUPPORT (2026-09-08): Agnes's own docs confirm a
     negative_prompt field on this endpoint that this pipeline never sent -
@@ -101,6 +101,17 @@ def create_agnes_task(prompt, num_frames, image_url=None, negative_prompt=None):
     Optional and backward compatible - omitted entirely from the payload
     when the caller doesn't pass one, so this never breaks the character-
     reference image call path or any other caller that doesn't use it.
+
+    SEED SUPPORT (2026-09-10): Agnes's own docs confirm a seed field on
+    this endpoint that this pipeline never sent. Optional and backward
+    compatible - omitted entirely from the payload when the caller
+    doesn't pass one. Deterministic seeds let a shot regenerate with the
+    same visual result on a resumed/retried run instead of a fresh random
+    roll every time; clip_generation.py derives one per shot from
+    (script_id, shot_index) so re-running an interrupted run doesn't
+    produce visually inconsistent reruns of shots that already looked
+    right, while a genuine content-policy/chain retry deliberately uses a
+    different seed so it isn't just repeating the same failure.
     """
     last_error_text = None
 
@@ -117,6 +128,8 @@ def create_agnes_task(prompt, num_frames, image_url=None, negative_prompt=None):
             payload["image"] = image_url
         if negative_prompt:
             payload["negative_prompt"] = negative_prompt
+        if seed is not None:
+            payload["seed"] = seed
 
         resp = requests.post(
             f"{AGNES_BASE}/videos",
