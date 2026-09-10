@@ -55,6 +55,16 @@ upload_to_youtube() succeeds, BEFORE the thumbnail step even starts -
 closing that window completely. A thumbnail failure after this point can
 never cause a re-upload again, since the DB already reflects reality by
 the time it could fail.
+
+STORAGE CLEANUP (2026-09-10): once a video is confirmed live on YouTube
+(mark_uploaded has succeeded), its source file no longer needs to sit in
+B2. delete_source_from_storage() removes it right after mark_uploaded -
+same placement logic as the double-upload fix above: only ever runs
+AFTER the DB already reflects the successful upload, so a cleanup failure
+can never affect upload correctness. Only handles the B2 video_url case
+(current/live path) - the legacy video_chunk_urls path is pre-migration
+Supabase Storage rows only, already migrated off the active pipeline, not
+worth adding extra cleanup logic for.
 """
 
 import os
@@ -309,6 +319,19 @@ def mark_uploaded(script_id, youtube_id):
     resp.raise_for_status()
 
 
+def delete_source_from_storage(script):
+    """STORAGE CLEANUP (2026-09-10): removes the uploaded video's source
+    file from B2, now that it's confirmed live on YouTube (only ever
+    called after mark_uploaded succeeds). Only handles the current B2
+    video_url path - see file header. Never raises; storage_b2.delete_object
+    already swallows and logs its own errors."""
+    video_key = script.get("video_url")
+    if not video_key:
+        return
+    storage_b2.delete_object(video_key)
+    print(f"Deleted source video from B2 storage: {video_key}")
+
+
 def main():
     script = get_next_ready_script()
     if not script:
@@ -370,6 +393,15 @@ def main():
     # the thumbnail step - see file header. Nothing after this line can
     # ever cause a re-upload of the same video again.
     mark_uploaded(script_id, youtube_id)
+
+    # STORAGE CLEANUP (2026-09-10): source file no longer needed once
+    # upload is confirmed. Placed right after mark_uploaded for the same
+    # safety reason as the double-upload fix - status already reflects
+    # reality by the time this could fail.
+    try:
+        delete_source_from_storage(script)
+    except Exception as e:
+        print(f"Storage cleanup failed (non-fatal, video already live): {e}")
 
     thumbnail_url = script.get("thumbnail_url")
     if thumbnail_url:
