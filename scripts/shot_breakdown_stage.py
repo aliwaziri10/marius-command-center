@@ -44,6 +44,16 @@ storyboard). MAX_SUBJECT_SHOT_RATIO lowered 0.30->0.20 and
 MAX_CONSECUTIVE_SAME_SUBJECT lowered 3->2, forcing more frequent cutaways
 to pure B-roll (landscapes, documents, objects, crowds, other people)
 between appearances of any single named subject.
+
+IDLE-CROWD KEYWORD GATE (2026-09-10): Zia separately reported crowds/
+groups standing around doing nothing as its own recurring realism problem
+(distinct from the general LOITERING_BANNED_PHRASES check, which is
+worded around a single person). Same class of fix as every other keyword
+gate in this file - a deterministic check on the writer's own output is a
+harder guarantee than a downstream negative instruction alone. See
+IDLE_CROWD_BANNED_PHRASES / find_idle_crowd_shots below, plus the matching
+crowd-specific negative_prompt terms added to prompt_builder.py the same
+session.
 """
 
 import re
@@ -141,6 +151,20 @@ LOITERING_BANNED_PHRASES = (
     "just standing", "simply standing", "standing quietly with no",
     "waiting there", "waiting around", "sitting there doing nothing",
     "looking around aimlessly", "with nothing in particular",
+)
+
+# IDLE-CROWD KEYWORD GATE (2026-09-10): see module docstring. Deliberately
+# separate from LOITERING_BANNED_PHRASES - that list is worded around a
+# single person ("standing there"), while these phrases specifically
+# target a crowd/group described as a static, purposeless backdrop.
+IDLE_CROWD_BANNED_PHRASES = (
+    "crowd stands", "crowd standing", "crowd stood", "crowd gathered watching",
+    "crowd looks on", "crowd looking on", "crowd watches silently",
+    "onlookers stand", "onlookers standing", "onlookers watch silently",
+    "bystanders stand", "bystanders standing", "bystanders watch silently",
+    "people standing around", "people stand around", "people milling about",
+    "villagers stand", "villagers standing", "crowd of people standing",
+    "group of people standing", "spectators standing", "spectators stand",
 )
 
 ONSCREEN_TEXT_KEYWORDS = (
@@ -346,6 +370,18 @@ def find_loitering_shots(normalized_shots):
     for i, s in enumerate(normalized_shots):
         desc = (s["visual_description"] or "").lower()
         for phrase in LOITERING_BANNED_PHRASES:
+            if phrase in desc:
+                hits.append((i, phrase))
+                break
+    return hits
+
+
+def find_idle_crowd_shots(normalized_shots):
+    """IDLE-CROWD KEYWORD GATE (2026-09-10): see module docstring."""
+    hits = []
+    for i, s in enumerate(normalized_shots):
+        desc = (s["visual_description"] or "").lower()
+        for phrase in IDLE_CROWD_BANNED_PHRASES:
             if phrase in desc:
                 hits.append((i, phrase))
                 break
@@ -569,6 +605,19 @@ def validate_and_normalize_shot_response(result, narration_text):
             f"loitering on screen, not a purposeful, stable moment."
         )
 
+    idle_crowd_hits = find_idle_crowd_shots(normalized_shots)
+    if idle_crowd_hits:
+        worst_i, worst_phrase = idle_crowd_hits[0]
+        return False, (
+            f"{len(idle_crowd_hits)} shot(s) describe a crowd/group standing or "
+            f"watching with no active task (first at shot {worst_i}, phrase "
+            f"{worst_phrase!r}) - a crowd is never a static backdrop. Either give "
+            f"each cluster within the crowd a concrete, plausible activity "
+            f"(working, moving with purpose, reacting physically, gesturing) or "
+            f"remove the crowd from the shot entirely if it isn't narratively "
+            f"necessary."
+        )
+
     missing_text_hits = find_missing_onscreen_text_shots(normalized_shots)
     if missing_text_hits:
         return False, (
@@ -703,7 +752,12 @@ already set down). Do not use words like walking, running, turning,
 opening, reaching, continues, then, next, still, or begins to when
 describing what's happening RIGHT NOW in the shot - instead describe the
 subject already in position: "standing beside the open door," "already
-seated at the table," "holding the letter, already unfolded."
+seated at the table," "holding the letter, already unfolded." If the
+underlying real-world action genuinely needs more than one shot to cover
+(e.g. someone crossing a room), the shot that picks it back up must use a
+different shot_type, camera_movement, AND framing_angle than the shot
+before it - never the exact same camera setup, since holding an identical
+setup across a cut reads as a jump cut, not a scene change.
 
 REAL DOCUMENTARY BALANCE - THE STORY IS NOT JUST THE PROTAGONIST (HARD
 RULE): a real documentary spends most of its screen time on context, not
@@ -727,6 +781,20 @@ gripping the plow mid-furrow." Every shot must answer: what is this person
 doing, and why, at this exact frozen moment. Never use phrasing like
 "standing around," "standing there," "waiting there," "sitting there doing
 nothing," or "looking around" with no stated task or focus.
+
+CROWDS MUST BE DOING SOMETHING, NOT WATCHING FROM A STANDSTILL (HARD RULE):
+this applies just as strictly to a crowd or group as it does to a single
+person above. Do not write a crowd/group of onlookers, bystanders,
+villagers, or spectators as a static wall of people standing and staring -
+never "the crowd stands watching" or "onlookers gather, watching silently."
+Only include a crowd in a shot when the story genuinely needs one, and when
+you do, give it a real, plausible collective activity for this exact
+moment (working, moving through the space with purpose, reacting physically
+to what's happening, gesturing to each other) - or, if the story needs
+bystanders witnessing an event, make their reaction active (turning toward
+it, pointing, recoiling, leaning in) rather than a motionless row of
+onlookers. A shot with an unnecessary or idle crowd is weaker than the same
+shot with no crowd at all - when in doubt, leave the crowd out.
 
 OBJECT INTEGRITY: every object named in a shot must remain that same
 object for the whole shot - never describe an action mid-transformation.
@@ -987,9 +1055,12 @@ required_onscreen_text left empty will be rejected outright. ALSO check
 every shot for any modern object (laptop, computer, smartphone, cell
 phone, tablet, drone, screen, monitor, or any other modern technology) -
 a period episode with even one modern object named in visual_description
-will be rejected outright, same as the on-screen-text rule. Also confirm
-every shot has "lighting", "beat_intensity", and "location_tag" filled in,
-and that any location change is opened with a wide/establishing shot.
+will be rejected outright, same as the on-screen-text rule. ALSO check
+every crowd/group shot for idle phrasing ("crowd stands," "onlookers
+watching," "villagers standing around") - give the crowd a real activity
+or remove it. Also confirm every shot has "lighting", "beat_intensity",
+and "location_tag" filled in, and that any location change is opened with
+a wide/establishing shot.
 
 Return ONLY valid JSON, no other text, no markdown fences, in this exact
 format:
