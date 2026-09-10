@@ -14,6 +14,7 @@ prompt_builder.py rather than owning either.
 
 import os
 import time
+import hashlib
 import requests
 from PIL import Image
 from moviepy import VideoFileClip, concatenate_videoclips
@@ -69,6 +70,25 @@ HEADERS = {
 MAX_CHAIN_SEGMENTS = 6
 
 
+def _derive_seed(script_id, shot_index, variant=0):
+    """
+    SEED SUPPORT (2026-09-10): Agnes's own docs confirm a seed field this
+    pipeline never sent. Deterministic per-(script, shot, variant) seed so
+    the SAME shot on a resumed run reproduces the SAME visual result
+    instead of a fresh random roll every time - important since a run can
+    be interrupted mid-shot by an overload/timeout and picked up again
+    later. variant lets chain-extension retries deliberately get a
+    DIFFERENT seed than the attempt that just failed, so a retry isn't
+    just repeating the exact same failing generation. Returns None if
+    script_id or shot_index is missing, so callers that don't have both
+    (e.g. the character-reference image call) simply omit seed as before.
+    """
+    if script_id is None or shot_index is None:
+        return None
+    digest = hashlib.md5(f"{script_id}:{shot_index}:{variant}".encode()).hexdigest()
+    return int(digest[:8], 16)
+
+
 def download_file(url, out_path):
     r = requests.get(url, timeout=120)
     r.raise_for_status()
@@ -102,10 +122,9 @@ def generate_character_reference(script):
     the pipeline still works without it, just without the consistency
     boost.
 
-    DORMANT since 2026-08-18 (see CONTINUITY-CHAIN REMOVED in
-    video_generation.py's original file header) - no longer called from
-    process_script's per-shot loop. Left defined in case cross-shot
-    chaining is wanted back for a future single-protagonist format.
+    RE-ENABLED 2026-09-10 - called from video_generation.py's per-shot
+    loop again via get_continuity_anchor (had been dormant since
+    2026-08-18).
     """
     script_id = script["id"]
     existing = script.get("character_reference_url")
@@ -186,9 +205,8 @@ def extract_last_frame_url(script_id, shot_index, local_video_path):
     music/SFX/captions elsewhere in this pipeline - continuity is a
     quality improvement, not something that should ever crash a run.
 
-    DORMANT since 2026-08-18 - no longer called from process_script's
-    per-shot loop. Left defined in case cross-shot chaining is wanted
-    back for a future single-protagonist format.
+    RE-ENABLED 2026-09-10 - called from video_generation.py's per-shot
+    loop again (had been dormant since 2026-08-18).
     """
     try:
         clip = VideoFileClip(local_video_path)
@@ -214,9 +232,8 @@ def get_continuity_anchor(script, video_urls):
     - otherwise falls back to the script's character reference image
       (generating it if it doesn't exist yet)
 
-    DORMANT since 2026-08-18 - no longer called from process_script's
-    per-shot loop. Left defined in case cross-shot chaining is wanted
-    back for a future single-protagonist format.
+    RE-ENABLED 2026-09-10 - called from video_generation.py's per-shot
+    loop again (had been dormant since 2026-08-18).
 
     STORAGE MIGRATION (2026-09-02): video_urls entries are now B2 object
     keys, not URLs (see storage_b2.py) - uses storage_b2.download_to_file
@@ -236,7 +253,7 @@ def get_continuity_anchor(script, video_urls):
     return generate_character_reference(script)
 
 
-def _generate_one_segment(shot, segment_duration, out_path, setting_and_characters="", anchor_image_url=None):
+def _generate_one_segment(shot, segment_duration, out_path, setting_and_characters="", anchor_image_url=None, seed=None):
     raw_frames = int(segment_duration * FRAME_RATE)
     raw_frames = max(MIN_FRAMES, min(MAX_FRAMES, raw_frames))
     num_frames = round_to_valid_frames(raw_frames)
@@ -244,18 +261,18 @@ def _generate_one_segment(shot, segment_duration, out_path, setting_and_characte
 
     prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=0)
     try:
-        video_id = create_agnes_task(prompt, num_frames, image_url=anchor_image_url, negative_prompt=NEGATIVE_PROMPT)
+        video_id = create_agnes_task(prompt, num_frames, image_url=anchor_image_url, negative_prompt=NEGATIVE_PROMPT, seed=seed)
     except ContentPolicyRejection:
         print("Content policy rejection on primary prompt - retrying with sanitized-anchor fallback "
               "(tier 1, image anchor also dropped this attempt)...")
         try:
             fallback_prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=1)
-            video_id = create_agnes_task(fallback_prompt, num_frames, image_url=None, negative_prompt=NEGATIVE_PROMPT)
+            video_id = create_agnes_task(fallback_prompt, num_frames, image_url=None, negative_prompt=NEGATIVE_PROMPT, seed=seed)
         except ContentPolicyRejection:
             print("Sanitized-anchor fallback ALSO rejected - retrying once more with a fully generic, "
                   "anchor-free prompt AND no image anchor (tier 2, last resort before giving up on this shot)...")
             ultra_prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=2)
-            video_id = create_agnes_task(ultra_prompt, num_frames, image_url=None, negative_prompt=NEGATIVE_PROMPT)
+            video_id = create_agnes_task(ultra_prompt, num_frames, image_url=None, negative_prompt=NEGATIVE_PROMPT, seed=seed)
 
     video_url = poll_agnes_task(video_id)
     download_file(video_url, out_path)
@@ -289,9 +306,10 @@ def _upload_local_image_for_anchor(script_id, tag, png_path):
     return storage_b2.presigned_url(key)
 
 
-def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="", anchor_image_url=None, script_id=None):
+def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="", anchor_image_url=None, script_id=None, shot_index=None):
     capped_duration = min(target_duration, MAX_CLIP_SECONDS)
-    _generate_one_segment(shot, capped_duration, out_path, setting_and_characters, anchor_image_url=anchor_image_url)
+    main_seed = _derive_seed(script_id, shot_index, variant=0)
+    _generate_one_segment(shot, capped_duration, out_path, setting_and_characters, anchor_image_url=anchor_image_url, seed=main_seed)
 
     if target_duration <= MAX_CLIP_SECONDS:
         return out_path
@@ -333,7 +351,14 @@ def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="
                 chain_anchor_url = _upload_local_image_for_anchor(
                     script_id or "unknown", f"chain_{os.path.basename(seg_out_path)}", local_frame_path
                 )
-                _generate_one_segment(shot, seg_duration, seg_out_path, setting_and_characters, anchor_image_url=chain_anchor_url)
+                # SEED SUPPORT (2026-09-10): variant combines the chain
+                # segment number with the retry attempt number, so a
+                # chain-retry after a failed attempt deliberately gets a
+                # DIFFERENT seed than the one that just failed, instead of
+                # repeating the identical generation and likely the
+                # identical failure.
+                chain_seed = _derive_seed(script_id, shot_index, variant=f"chain{chain_used + 1}-{chain_attempt}")
+                _generate_one_segment(shot, seg_duration, seg_out_path, setting_and_characters, anchor_image_url=chain_anchor_url, seed=chain_seed)
                 segment_ok = True
                 break
             except (ContentPolicyRejection, AgnesOverloadedError, Exception) as e:
