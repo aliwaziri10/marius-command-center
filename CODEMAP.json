@@ -2804,7 +2804,7 @@
       "functions": [
         {
           "name": "get_ready_scripts",
-          "line": 56,
+          "line": 61,
           "args": [
             "limit"
           ],
@@ -2817,7 +2817,7 @@
         },
         {
           "name": "download_file",
-          "line": 66,
+          "line": 71,
           "args": [
             "url",
             "out_path"
@@ -2832,7 +2832,7 @@
         },
         {
           "name": "record_error",
-          "line": 74,
+          "line": 79,
           "args": [
             "script_id",
             "error_text"
@@ -2848,7 +2848,7 @@
         },
         {
           "name": "clear_error",
-          "line": 98,
+          "line": 103,
           "args": [
             "script_id"
           ],
@@ -2861,7 +2861,7 @@
         },
         {
           "name": "compute_shot_durations",
-          "line": 113,
+          "line": 118,
           "args": [
             "shot_list",
             "total_duration"
@@ -2876,7 +2876,7 @@
         },
         {
           "name": "get_shot_durations",
-          "line": 119,
+          "line": 124,
           "args": [
             "script",
             "shot_list",
@@ -2895,7 +2895,7 @@
         },
         {
           "name": "upload_clip",
-          "line": 132,
+          "line": 137,
           "args": [
             "script_id",
             "index",
@@ -2908,7 +2908,7 @@
         },
         {
           "name": "save_progress",
-          "line": 139,
+          "line": 144,
           "args": [
             "script_id",
             "video_urls",
@@ -2922,7 +2922,7 @@
         },
         {
           "name": "mark_content_flagged",
-          "line": 149,
+          "line": 154,
           "args": [
             "script_id",
             "shot_index",
@@ -2937,7 +2937,7 @@
         },
         {
           "name": "mark_video_stalled",
-          "line": 160,
+          "line": 165,
           "args": [
             "script_id",
             "shot_index",
@@ -2953,7 +2953,7 @@
         },
         {
           "name": "mark_video_generated",
-          "line": 185,
+          "line": 190,
           "args": [
             "script_id",
             "video_url",
@@ -2969,7 +2969,7 @@
         },
         {
           "name": "process_script",
-          "line": 208,
+          "line": 213,
           "args": [
             "script",
             "shot_limit"
@@ -3010,7 +3010,7 @@
         },
         {
           "name": "main",
-          "line": 379,
+          "line": 384,
           "args": [],
           "calls": [
             "format_exc",
