@@ -717,8 +717,24 @@
       "path": "scripts/clip_generation.py",
       "functions": [
         {
+          "name": "_derive_seed",
+          "line": 73,
+          "args": [
+            "script_id",
+            "shot_index",
+            "variant"
+          ],
+          "calls": [
+            "encode",
+            "hexdigest",
+            "int",
+            "md5"
+          ],
+          "docstring": "SEED SUPPORT (2026-09-10): Agnes's own docs confirm a seed field this"
+        },
+        {
           "name": "download_file",
-          "line": 72,
+          "line": 92,
           "args": [
             "url",
             "out_path"
@@ -733,7 +749,7 @@
         },
         {
           "name": "upload_reference_image",
-          "line": 80,
+          "line": 100,
           "args": [
             "script_id",
             "file_name",
@@ -747,7 +763,7 @@
         },
         {
           "name": "generate_character_reference",
-          "line": 93,
+          "line": 113,
           "args": [
             "script"
           ],
@@ -769,7 +785,7 @@
         },
         {
           "name": "extract_last_frame_url",
-          "line": 179,
+          "line": 198,
           "args": [
             "script_id",
             "shot_index",
@@ -791,7 +807,7 @@
         },
         {
           "name": "get_continuity_anchor",
-          "line": 208,
+          "line": 226,
           "args": [
             "script",
             "video_urls"
@@ -808,13 +824,14 @@
         },
         {
           "name": "_generate_one_segment",
-          "line": 239,
+          "line": 256,
           "args": [
             "shot",
             "segment_duration",
             "out_path",
             "setting_and_characters",
-            "anchor_image_url"
+            "anchor_image_url",
+            "seed"
           ],
           "calls": [
             "build_agnes_prompt",
@@ -831,7 +848,7 @@
         },
         {
           "name": "_extract_last_frame_local",
-          "line": 265,
+          "line": 282,
           "args": [
             "video_path"
           ],
@@ -848,7 +865,7 @@
         },
         {
           "name": "_upload_local_image_for_anchor",
-          "line": 279,
+          "line": 296,
           "args": [
             "script_id",
             "tag",
@@ -863,17 +880,19 @@
         },
         {
           "name": "generate_shot_clip",
-          "line": 292,
+          "line": 309,
           "args": [
             "shot",
             "target_duration",
             "out_path",
             "setting_and_characters",
             "anchor_image_url",
-            "script_id"
+            "script_id",
+            "shot_index"
           ],
           "calls": [
             "VideoFileClip",
+            "_derive_seed",
             "_extract_last_frame_local",
             "_generate_one_segment",
             "_upload_local_image_for_anchor",
@@ -895,7 +914,7 @@
         },
         {
           "name": "fit_clip_to_duration",
-          "line": 374,
+          "line": 399,
           "args": [
             "clip",
             "target"
