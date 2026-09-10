@@ -1653,7 +1653,7 @@
       "functions": [
         {
           "name": "split_narration_into_chunks",
-          "line": 194,
+          "line": 218,
           "args": [
             "narration_text",
             "num_chunks"
@@ -1670,7 +1670,7 @@
         },
         {
           "name": "normalize_shot",
-          "line": 224,
+          "line": 248,
           "args": [
             "shot",
             "index"
@@ -1683,7 +1683,7 @@
         },
         {
           "name": "normalize_hook_text",
-          "line": 272,
+          "line": 296,
           "args": [
             "result"
           ],
@@ -1698,7 +1698,7 @@
         },
         {
           "name": "hook_text_matches_prompt_example",
-          "line": 288,
+          "line": 312,
           "args": [
             "hook_text"
           ],
@@ -1712,7 +1712,7 @@
         },
         {
           "name": "hook_text_too_long_to_glance",
-          "line": 295,
+          "line": 319,
           "args": [
             "hook_text"
           ],
@@ -1724,7 +1724,7 @@
         },
         {
           "name": "hook_text_matches_story",
-          "line": 300,
+          "line": 324,
           "args": [
             "hook_text",
             "narration_text"
@@ -1740,7 +1740,7 @@
         },
         {
           "name": "find_duplicate_shots",
-          "line": 314,
+          "line": 338,
           "args": [
             "normalized_shots"
           ],
@@ -1754,7 +1754,7 @@
         },
         {
           "name": "find_empty_shots",
-          "line": 326,
+          "line": 350,
           "args": [
             "normalized_shots"
           ],
@@ -1766,7 +1766,7 @@
         },
         {
           "name": "find_continuation_language_shots",
-          "line": 333,
+          "line": 357,
           "args": [
             "normalized_shots"
           ],
@@ -1779,7 +1779,7 @@
         },
         {
           "name": "find_loitering_shots",
-          "line": 344,
+          "line": 368,
           "args": [
             "normalized_shots"
           ],
@@ -1791,8 +1791,21 @@
           "docstring": ""
         },
         {
+          "name": "find_idle_crowd_shots",
+          "line": 379,
+          "args": [
+            "normalized_shots"
+          ],
+          "calls": [
+            "append",
+            "enumerate",
+            "lower"
+          ],
+          "docstring": "IDLE-CROWD KEYWORD GATE (2026-09-10): see module docstring."
+        },
+        {
           "name": "find_missing_onscreen_text_shots",
-          "line": 355,
+          "line": 391,
           "args": [
             "normalized_shots"
           ],
@@ -1806,7 +1819,7 @@
         },
         {
           "name": "find_anachronistic_object_shots",
-          "line": 364,
+          "line": 400,
           "args": [
             "normalized_shots"
           ],
@@ -1819,7 +1832,7 @@
         },
         {
           "name": "find_duplicate_character_shots",
-          "line": 380,
+          "line": 416,
           "args": [
             "normalized_shots"
           ],
@@ -1832,7 +1845,7 @@
         },
         {
           "name": "find_dominant_subject",
-          "line": 393,
+          "line": 429,
           "args": [
             "normalized_shots"
           ],
@@ -1846,7 +1859,7 @@
         },
         {
           "name": "find_excessive_consecutive_subject",
-          "line": 406,
+          "line": 442,
           "args": [
             "normalized_shots"
           ],
@@ -1858,7 +1871,7 @@
         },
         {
           "name": "find_location_change_without_establishing",
-          "line": 421,
+          "line": 457,
           "args": [
             "normalized_shots"
           ],
@@ -1871,7 +1884,7 @@
         },
         {
           "name": "validate_and_normalize_shot_response",
-          "line": 438,
+          "line": 474,
           "args": [
             "result",
             "narration_text"
@@ -1885,6 +1898,7 @@
             "find_duplicate_shots",
             "find_empty_shots",
             "find_excessive_consecutive_subject",
+            "find_idle_crowd_shots",
             "find_location_change_without_establishing",
             "find_loitering_shots",
             "find_missing_onscreen_text_shots",
@@ -1905,7 +1919,7 @@
         },
         {
           "name": "build_shot_breakdown_chunk_prompt",
-          "line": 841,
+          "line": 909,
           "args": [
             "title",
             "angle",
@@ -1928,7 +1942,7 @@
         },
         {
           "name": "generate_shot_breakdown",
-          "line": 1022,
+          "line": 1093,
           "args": [
             "title",
             "angle",
@@ -1956,7 +1970,7 @@
         },
         {
           "name": "_simplify",
-          "line": 289,
+          "line": 313,
           "args": [
             "s"
           ],
