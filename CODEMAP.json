@@ -192,7 +192,8 @@
             "prompt",
             "num_frames",
             "image_url",
-            "negative_prompt"
+            "negative_prompt",
+            "seed"
           ],
           "calls": [
             "AgnesBadRequestError",
@@ -210,7 +211,7 @@
         },
         {
           "name": "extract_video_url",
-          "line": 157,
+          "line": 170,
           "args": [
             "data"
           ],
@@ -225,7 +226,7 @@
         },
         {
           "name": "poll_agnes_task",
-          "line": 168,
+          "line": 181,
           "args": [
             "video_id",
             "max_wait",
