@@ -21,6 +21,11 @@ each script run now starts from a real anchor (either the last
 previously-completed shot's last frame, or the character reference image
 if this is the first shot), and updates that anchor after every new shot
 so the next one is generated with visual continuity instead of blind.
+
+SEED SUPPORT (2026-09-10): generate_shot_clip now also receives
+shot_index, which clip_generation.py uses to derive a deterministic
+per-shot Agnes seed (see _derive_seed there) - a resumed/retried shot
+reproduces the same visual result instead of a fresh random roll.
 """
 
 import os
@@ -285,7 +290,7 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
             raw_path = f"/tmp/shot_{i:03d}.mp4"
             print(f"Generating shot {i+1}/{total_shots} (~{shot_durations[i]:.1f}s)...")
             try:
-                generate_shot_clip(shot, shot_durations[i], raw_path, setting_and_characters, anchor_image_url=anchor_image_url, script_id=script_id)
+                generate_shot_clip(shot, shot_durations[i], raw_path, setting_and_characters, anchor_image_url=anchor_image_url, script_id=script_id, shot_index=i)
             except ContentPolicyRejection as e:
                 mark_content_flagged(script_id, i, str(e))
                 print(f"Rejected visual_description: {shot.get('visual_description', '')!r}")
