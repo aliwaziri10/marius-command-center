@@ -3014,7 +3014,7 @@
       "functions": [
         {
           "name": "get_access_token",
-          "line": 88,
+          "line": 98,
           "args": [],
           "calls": [
             "json",
@@ -3026,7 +3026,7 @@
         },
         {
           "name": "get_authorized_channel",
-          "line": 105,
+          "line": 115,
           "args": [
             "access_token"
           ],
@@ -3040,7 +3040,7 @@
         },
         {
           "name": "get_next_ready_script",
-          "line": 126,
+          "line": 136,
           "args": [],
           "calls": [
             "get",
@@ -3051,7 +3051,7 @@
         },
         {
           "name": "get_topic_title",
-          "line": 137,
+          "line": 147,
           "args": [
             "topic_id"
           ],
@@ -3064,7 +3064,7 @@
         },
         {
           "name": "download_file",
-          "line": 148,
+          "line": 158,
           "args": [
             "url",
             "out_path"
@@ -3079,7 +3079,7 @@
         },
         {
           "name": "stitch_chunks_to_local_file",
-          "line": 156,
+          "line": 166,
           "args": [
             "video_chunk_urls",
             "out_path"
@@ -3099,7 +3099,7 @@
         },
         {
           "name": "build_description",
-          "line": 202,
+          "line": 212,
           "args": [
             "narration_text"
           ],
@@ -3113,7 +3113,7 @@
         },
         {
           "name": "upload_to_youtube",
-          "line": 228,
+          "line": 238,
           "args": [
             "access_token",
             "video_path",
@@ -3135,7 +3135,7 @@
         },
         {
           "name": "set_thumbnail",
-          "line": 278,
+          "line": 288,
           "args": [
             "access_token",
             "youtube_id",
@@ -3153,7 +3153,7 @@
         },
         {
           "name": "mark_uploaded",
-          "line": 302,
+          "line": 312,
           "args": [
             "script_id",
             "youtube_id"
@@ -3165,12 +3165,26 @@
           "docstring": ""
         },
         {
+          "name": "delete_source_from_storage",
+          "line": 322,
+          "args": [
+            "script"
+          ],
+          "calls": [
+            "delete_object",
+            "get",
+            "print"
+          ],
+          "docstring": "STORAGE CLEANUP (2026-09-10): removes the uploaded video's source"
+        },
+        {
           "name": "main",
-          "line": 312,
+          "line": 335,
           "args": [],
           "calls": [
             "RuntimeError",
             "build_description",
+            "delete_source_from_storage",
             "download_file",
             "download_to_file",
             "get",
