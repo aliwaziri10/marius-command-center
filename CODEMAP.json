@@ -2917,20 +2917,19 @@
       "functions": [
         {
           "name": "get_ready_scripts",
-          "line": 61,
+          "line": 67,
           "args": [
             "limit"
           ],
           "calls": [
-            "get",
             "json",
-            "raise_for_status"
+            "retryable_request"
           ],
           "docstring": ""
         },
         {
           "name": "download_file",
-          "line": 71,
+          "line": 77,
           "args": [
             "url",
             "out_path"
@@ -2945,36 +2944,34 @@
         },
         {
           "name": "record_error",
-          "line": 79,
+          "line": 86,
           "args": [
             "script_id",
             "error_text"
           ],
           "calls": [
             "gmtime",
-            "patch",
             "print",
-            "raise_for_status",
+            "retryable_request",
             "strftime"
           ],
           "docstring": "VERIFIER-GATE FIX (2026-08-22): persists the real exception (full"
         },
         {
           "name": "clear_error",
-          "line": 103,
+          "line": 110,
           "args": [
             "script_id"
           ],
           "calls": [
-            "patch",
             "print",
-            "raise_for_status"
+            "retryable_request"
           ],
           "docstring": "Clears a previously recorded last_error once a script succeeds, so"
         },
         {
           "name": "compute_shot_durations",
-          "line": 118,
+          "line": 125,
           "args": [
             "shot_list",
             "total_duration"
@@ -2989,7 +2986,7 @@
         },
         {
           "name": "get_shot_durations",
-          "line": 124,
+          "line": 131,
           "args": [
             "script",
             "shot_list",
@@ -3008,7 +3005,7 @@
         },
         {
           "name": "upload_clip",
-          "line": 137,
+          "line": 144,
           "args": [
             "script_id",
             "index",
@@ -3021,52 +3018,49 @@
         },
         {
           "name": "save_progress",
-          "line": 144,
+          "line": 151,
           "args": [
             "script_id",
             "video_urls",
             "next_index"
           ],
           "calls": [
-            "patch",
-            "raise_for_status"
+            "retryable_request"
           ],
           "docstring": ""
         },
         {
           "name": "mark_content_flagged",
-          "line": 154,
+          "line": 161,
           "args": [
             "script_id",
             "shot_index",
             "reason"
           ],
           "calls": [
-            "patch",
             "print",
-            "raise_for_status"
+            "retryable_request"
           ],
           "docstring": ""
         },
         {
           "name": "mark_video_stalled",
-          "line": 165,
+          "line": 172,
           "args": [
             "script_id",
             "shot_index",
             "reason"
           ],
           "calls": [
-            "patch",
             "print",
-            "raise_for_status",
-            "record_error"
+            "record_error",
+            "retryable_request"
           ],
           "docstring": "STALL FIX (2026-09-02): companion to mark_content_flagged, but for a"
         },
         {
           "name": "mark_video_generated",
-          "line": 190,
+          "line": 197,
           "args": [
             "script_id",
             "video_url",
@@ -3075,14 +3069,13 @@
           ],
           "calls": [
             "get",
-            "patch",
-            "raise_for_status"
+            "retryable_request"
           ],
           "docstring": ""
         },
         {
           "name": "process_script",
-          "line": 213,
+          "line": 220,
           "args": [
             "script",
             "shot_limit"
@@ -3123,7 +3116,7 @@
         },
         {
           "name": "main",
-          "line": 384,
+          "line": 391,
           "args": [],
           "calls": [
             "format_exc",
@@ -3136,10 +3129,7 @@
           "docstring": ""
         }
       ],
-      "env_vars": [
-        "SUPABASE_SECRET_KEY",
-        "SUPABASE_URL"
-      ],
+      "env_vars": [],
       "tables": [
         "scripts"
       ]
