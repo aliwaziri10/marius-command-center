@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 24,
+  "file_count": 25,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -937,6 +937,72 @@
       "tables": [
         "scripts"
       ]
+    },
+    {
+      "path": "scripts/health_agent.py",
+      "functions": [
+        {
+          "name": "sb_get",
+          "line": 33,
+          "args": [
+            "path"
+          ],
+          "calls": [
+            "get",
+            "json",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "check_stuck_topics",
+          "line": 39,
+          "args": [],
+          "calls": [
+            "sb_get"
+          ],
+          "docstring": "Topics sitting in generation_failed - these will NEVER retry on their"
+        },
+        {
+          "name": "check_stuck_scripts",
+          "line": 48,
+          "args": [],
+          "calls": [
+            "sb_get"
+          ],
+          "docstring": "Scripts with last_error set - something failed downstream of"
+        },
+        {
+          "name": "check_recent_output",
+          "line": 55,
+          "args": [],
+          "calls": [
+            "sb_get"
+          ],
+          "docstring": "How long since the last script/video was actually produced -"
+        },
+        {
+          "name": "main",
+          "line": 66,
+          "args": [],
+          "calls": [
+            "check_recent_output",
+            "check_stuck_scripts",
+            "check_stuck_topics",
+            "dumps",
+            "isoformat",
+            "len",
+            "now",
+            "print"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": []
     },
     {
       "path": "scripts/health_check.py",
