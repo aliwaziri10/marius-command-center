@@ -31,6 +31,23 @@ which repair (if any) actually fixed it, or the raw text if none did -
 turning the next occurrence into real evidence instead of another guess.
 Do not treat the trailing-comma theory as confirmed until that log output
 is reviewed.
+
+UNQUOTED-KEY REPAIR FIX (2026-09-11) - CONFIRMED, not a hypothesis: a live
+run's diagnostic logging (added above) finally captured the real raw
+failing text, and it was NOT a trailing comma. Gemini was emitting bare/
+unquoted object keys for one specific field, e.g.:
+    "lens_effect": "none",
+    sfx_cue: "distant harbor foghorn and low wind howling over concrete",
+`sfx_cue` (and potentially any other key) appearing without quotes breaks
+standard JSON parsing with exactly the "Expecting property name enclosed
+in double quotes" error seen in the logs - at small offsets, matching the
+observed 691-4484 char range (wherever that key first appears), not near
+the end of the candidate. None of the four existing repair attempts
+(raw / control-char-escaped / trailing-comma-stripped / both) fix this,
+since they don't touch key names at all. Added _quote_unquoted_keys() as
+a new repair candidate below. The trailing-comma hypothesis is NEITHER
+confirmed nor refuted by this - both bugs can and likely do occur
+independently in different Gemini responses, so both repairs are kept.
 """
 
 import os
@@ -263,6 +280,19 @@ def _strip_trailing_commas(text):
     return re.sub(r",\s*([}\]])", r"\1", text)
 
 
+def _quote_unquoted_keys(text):
+    """UNQUOTED-KEY REPAIR FIX (2026-09-11, confirmed - see module
+    docstring). Gemini has been observed emitting a bare/unquoted object
+    key (e.g. `sfx_cue: "..."` instead of `"sfx_cue": "..."`), which is
+    invalid JSON and breaks parsing exactly where the key appears - not
+    near the end of the response. This only quotes an identifier that
+    immediately follows an opening `{` or a `,` (the only positions a
+    JSON key can legally appear), so it will not touch identifiers that
+    happen to appear inside already-quoted string values. Safe no-op on
+    text that doesn't have this problem."""
+    return re.sub(r'([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)(\s*:)', r'\1"\2"\3', text)
+
+
 def extract_json(raw_text):
     """DIAGNOSTIC LOGGING ADDED (2026-08-19): see module docstring - the
     trailing-comma repair below is an unconfirmed hypothesis, not a proven
@@ -270,7 +300,14 @@ def extract_json(raw_text):
     the next successful repair) leaves real evidence in the Actions log:
     which candidate (if any) actually worked, or - if all four fail - a
     preview of the real raw text, so the actual cause can be read directly
-    instead of guessed at again from an offset."""
+    instead of guessed at again from an offset.
+
+    UNQUOTED-KEY REPAIR ADDED (2026-09-11): see _quote_unquoted_keys()
+    docstring - this was the actual confirmed cause of the failures the
+    2026-08-19 logging captured. Repair list expanded from 4 to 8 entries
+    to cover the unquoted-key fix alone and combined with the existing
+    two repairs, in every order, since either bug can occur independently
+    or together in the same response."""
     if not raw_text:
         raise ValueError("Model returned empty/None content (likely a dropped or refused generation).")
     text = raw_text.strip()
@@ -292,11 +329,19 @@ def extract_json(raw_text):
 
     candidate = text[start:end + 1]
 
+    control_escaped = sanitize_json_control_chars(candidate)
+    comma_stripped = _strip_trailing_commas(candidate)
+    keys_quoted = _quote_unquoted_keys(candidate)
+
     attempts = [
         ("raw", candidate),
-        ("control-char-escaped", sanitize_json_control_chars(candidate)),
-        ("trailing-comma-stripped", _strip_trailing_commas(candidate)),
-        ("control-char-escaped + trailing-comma-stripped", _strip_trailing_commas(sanitize_json_control_chars(candidate))),
+        ("control-char-escaped", control_escaped),
+        ("trailing-comma-stripped", comma_stripped),
+        ("unquoted-keys-fixed", keys_quoted),
+        ("control-char-escaped + trailing-comma-stripped", _strip_trailing_commas(control_escaped)),
+        ("control-char-escaped + unquoted-keys-fixed", _quote_unquoted_keys(control_escaped)),
+        ("trailing-comma-stripped + unquoted-keys-fixed", _quote_unquoted_keys(comma_stripped)),
+        ("all three combined", _quote_unquoted_keys(_strip_trailing_commas(control_escaped))),
     ]
     last_error = None
     for label, attempt_text in attempts:
@@ -304,9 +349,8 @@ def extract_json(raw_text):
             parsed = json.loads(attempt_text)
             if label != "raw":
                 # PROOF POINT: this line firing is what confirms (or, for a
-                # different label than trailing-comma, refutes) the
-                # 2026-08-19 hypothesis above - check this log before
-                # treating that theory as settled.
+                # different label, refutes) which repair actually mattered -
+                # check this log if a new failure pattern ever shows up.
                 print(f"[extract_json] raw candidate failed to parse; repair '{label}' fixed it.")
             return parsed
         except json.JSONDecodeError as e:
