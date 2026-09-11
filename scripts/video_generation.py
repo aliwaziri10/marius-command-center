@@ -26,28 +26,34 @@ SEED SUPPORT (2026-09-10): generate_shot_clip now also receives
 shot_index, which clip_generation.py uses to derive a deterministic
 per-shot Agnes seed (see _derive_seed there) - a resumed/retried shot
 reproduces the same visual result instead of a fresh random roll.
+
+SILENT ZERO-ROW PATCH FIX (2026-09-12): every Supabase PATCH/GET call in
+this file used bare `requests.patch()`/`requests.get()` with only
+`resp.raise_for_status()` - which does NOT catch a PATCH that matches
+zero rows (PostgREST returns 2xx either way, see llm_client.py's module
+docstring for the confirmed live bug this caused in script_writing.py's
+mark_topic_generation_failed - a "successful" status update that changed
+nothing). This file had the identical exposure in every mark_* function
+below and in save_progress, just never yet caught live. Switched every
+call to llm_client.retryable_request(), which now raises loudly on a
+zero-row PATCH/DELETE (Prefer: return=representation + an empty-list
+check) and also gains the transient-error retry/backoff behavior
+(429/500/502/503/504) that bare requests.patch()/get() never had here at
+all - a transient Supabase blip on save_progress or mark_video_generated
+would previously have crashed the whole run instead of retrying.
 """
 
 import os
 import json
 import time
 import traceback
-import requests
 from moviepy import AudioFileClip
 
 import storage_b2
+from llm_client import retryable_request, SUPABASE_URL, HEADERS
 from agnes_client import ContentPolicyRejection, AgnesOverloadedError, AgnesBadRequestError
 from clip_generation import generate_shot_clip, get_continuity_anchor, extract_last_frame_url
 from assembly_stage import assemble_final_video, upload_video
-
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
-
-HEADERS = {
-    "apikey": SUPABASE_KEY,
-    "Authorization": f"Bearer {SUPABASE_KEY}",
-    "Content-Type": "application/json",
-}
 
 TRAIL_SECONDS = 3.0
 
@@ -59,16 +65,17 @@ CLIP_VERIFY_RETRY_WAIT = 5
 
 
 def get_ready_scripts(limit=CANDIDATE_POOL_SIZE):
-    resp = requests.get(
+    resp = retryable_request(
+        "GET",
         f"{SUPABASE_URL}/rest/v1/scripts?status=eq.images_generated&order=created_at.asc&limit={limit}",
         headers=HEADERS,
         timeout=30,
     )
-    resp.raise_for_status()
     return resp.json()
 
 
 def download_file(url, out_path):
+    import requests
     r = requests.get(url, timeout=120)
     r.raise_for_status()
     with open(out_path, "wb") as f:
@@ -86,7 +93,8 @@ def record_error(script_id, error_text):
     the original failure.
     """
     try:
-        resp = requests.patch(
+        retryable_request(
+            "PATCH",
             f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
             headers=HEADERS,
             json={
@@ -95,7 +103,6 @@ def record_error(script_id, error_text):
             },
             timeout=30,
         )
-        resp.raise_for_status()
     except Exception as e:
         print(f"Could not record last_error for script {script_id} (secondary failure, non-fatal): {e}")
 
@@ -104,13 +111,13 @@ def clear_error(script_id):
     """Clears a previously recorded last_error once a script succeeds, so
     Supabase never shows a stale failure for a script that's now fine."""
     try:
-        resp = requests.patch(
+        retryable_request(
+            "PATCH",
             f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
             headers=HEADERS,
             json={"last_error": None},
             timeout=30,
         )
-        resp.raise_for_status()
     except Exception as e:
         print(f"Could not clear last_error for script {script_id} (non-fatal): {e}")
 
@@ -142,23 +149,23 @@ def upload_clip(script_id, index, file_path):
 
 
 def save_progress(script_id, video_urls, next_index):
-    resp = requests.patch(
+    retryable_request(
+        "PATCH",
         f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
         headers=HEADERS,
         json={"video_urls": video_urls, "video_next_index": next_index},
         timeout=30,
     )
-    resp.raise_for_status()
 
 
 def mark_content_flagged(script_id, shot_index, reason):
-    resp = requests.patch(
+    retryable_request(
+        "PATCH",
         f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
         headers=HEADERS,
         json={"status": "content_flagged"},
         timeout=30,
     )
-    resp.raise_for_status()
     print(f"Script {script_id} marked content_flagged (shot {shot_index + 1}) - will be skipped by future runs until manually reset. Reason: {reason}")
 
 
@@ -177,13 +184,13 @@ def mark_video_stalled(script_id, shot_index, reason):
     etc.) is understood/fixed, same workflow as content_flagged.
     """
     record_error(script_id, f"AgnesBadRequestError on shot {shot_index + 1}: {reason}")
-    resp = requests.patch(
+    retryable_request(
+        "PATCH",
         f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
         headers=HEADERS,
         json={"status": "video_stalled"},
         timeout=30,
     )
-    resp.raise_for_status()
     print(f"Script {script_id} marked video_stalled (shot {shot_index + 1}) - will be skipped by future runs until manually reset. Reason: {reason}")
 
 
@@ -201,13 +208,13 @@ def mark_video_generated(script_id, video_url=None, video_chunk_urls=None, audio
         # directly from Supabase - no GitHub Actions log access needed to
         # diagnose why music/SFX didn't apply on a given episode.
         update["audio_debug"] = audio_stats.get("audio_debug")
-    resp = requests.patch(
+    retryable_request(
+        "PATCH",
         f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
         headers=HEADERS,
         json=update,
         timeout=30,
     )
-    resp.raise_for_status()
 
 
 def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
