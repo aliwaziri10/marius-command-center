@@ -48,6 +48,35 @@ since they don't touch key names at all. Added _quote_unquoted_keys() as
 a new repair candidate below. The trailing-comma hypothesis is NEITHER
 confirmed nor refuted by this - both bugs can and likely do occur
 independently in different Gemini responses, so both repairs are kept.
+
+SILENT ZERO-ROW PATCH FIX (2026-09-12): found live - topic
+a8512686-efde-41f0-8b65-039d12d23c3a was logged as "marked
+generation_failed" by mark_topic_generation_failed (script_writing.py),
+including the FIX print statement that only runs after the PATCH request
+object returns without raising, but the topic's actual row in Supabase
+was untouched (still status='pending', last_failure_reason=null) an hour
+later, confirmed by direct SQL read and by successfully applying the same
+UPDATE manually via SQL with no trigger/RLS/constraint blocking it. Root
+cause: PostgREST returns 200 OK / 204 No Content for a PATCH even when
+the WHERE clause matches ZERO rows - there is no error, no non-2xx status,
+nothing for resp.raise_for_status() to catch. retryable_request had no way
+to distinguish "updated the row" from "matched nothing and updated
+nothing" for PATCH/DELETE calls, so a caller like mark_topic_generation_failed
+could print a false success message while silently doing nothing - the
+exact same failure class TechPulse hit once with a missing RLS policy,
+just a different mechanism (row-match, not permissions) producing the same
+"looked fine, changed nothing" symptom.
+
+Fix: for PATCH and DELETE, retryable_request now automatically adds
+`Prefer: return=representation` (unless the caller already set a Prefer
+header) so PostgREST returns the actually-affected row(s) as JSON instead
+of an empty 204 body, then explicitly checks that list is non-empty -
+raising a clear RuntimeError naming the exact URL if zero rows came back,
+instead of returning a "successful" response that updated nothing. GET/
+POST are untouched. This makes the exact bug that hid for over one hour
+loud and immediate everywhere retryable_request is used (script_writing.py,
+video_generation.py's mark_* functions, etc.) the next time it happens for
+any reason (wrong id, row deleted elsewhere, wrong table, wrong project).
 """
 
 import os
@@ -89,6 +118,9 @@ RETRYABLE_NETWORK_EXCEPTIONS = (
 )
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
+# SILENT ZERO-ROW PATCH FIX (2026-09-12): see module docstring.
+ROW_CHECKED_METHODS = {"PATCH", "DELETE"}
+
 
 class InfraFailure(RuntimeError):
     """Raised when Gemini never returned a usable response within the infra
@@ -113,6 +145,17 @@ class DailyQuotaExhausted(RuntimeError):
 
 
 def retryable_request(method, url, max_retries=MAX_RETRIES, **kwargs):
+    """SILENT ZERO-ROW PATCH FIX (2026-09-12): see module docstring. For
+    PATCH/DELETE, this now injects `Prefer: return=representation` (only if
+    the caller didn't already set a Prefer header - never overrides an
+    explicit caller choice) and treats an empty returned list as a hard
+    failure, not a success. GET/POST behavior is completely unchanged."""
+    method_upper = method.upper()
+    if method_upper in ROW_CHECKED_METHODS:
+        headers = dict(kwargs.get("headers") or {})
+        headers.setdefault("Prefer", "return=representation")
+        kwargs = {**kwargs, "headers": headers}
+
     last_error = None
     for attempt in range(max_retries):
         try:
@@ -132,6 +175,20 @@ def retryable_request(method, url, max_retries=MAX_RETRIES, **kwargs):
             continue
 
         resp.raise_for_status()
+
+        if method_upper in ROW_CHECKED_METHODS and headers.get("Prefer") == "return=representation":
+            try:
+                affected = resp.json()
+            except (requests.exceptions.JSONDecodeError, ValueError):
+                affected = None
+            if isinstance(affected, list) and len(affected) == 0:
+                raise RuntimeError(
+                    f"Supabase {method_upper} to {url} returned 2xx but matched ZERO rows - "
+                    f"nothing was actually updated/deleted. This is NOT a success, even though "
+                    f"no error was raised - check the id/filter in the URL is correct and the "
+                    f"row actually exists in THIS project."
+                )
+
         return resp
 
     if isinstance(last_error, Exception):
