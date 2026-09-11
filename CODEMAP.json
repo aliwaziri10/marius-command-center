@@ -1093,7 +1093,7 @@
       "functions": [
         {
           "name": "retryable_request",
-          "line": 98,
+          "line": 115,
           "args": [
             "method",
             "url",
@@ -1112,7 +1112,7 @@
         },
         {
           "name": "call_llm",
-          "line": 125,
+          "line": 142,
           "args": [
             "prompt"
           ],
@@ -1134,7 +1134,7 @@
         },
         {
           "name": "sanitize_json_control_chars",
-          "line": 220,
+          "line": 237,
           "args": [
             "text"
           ],
@@ -1147,7 +1147,7 @@
         },
         {
           "name": "_strip_trailing_commas",
-          "line": 255,
+          "line": 272,
           "args": [
             "text"
           ],
@@ -1157,13 +1157,25 @@
           "docstring": "MALFORMED-JSON REPAIR FIX (2026-08-19, hypothesis - see module"
         },
         {
+          "name": "_quote_unquoted_keys",
+          "line": 283,
+          "args": [
+            "text"
+          ],
+          "calls": [
+            "sub"
+          ],
+          "docstring": "UNQUOTED-KEY REPAIR FIX (2026-09-11, confirmed - see module"
+        },
+        {
           "name": "extract_json",
-          "line": 266,
+          "line": 296,
           "args": [
             "raw_text"
           ],
           "calls": [
             "ValueError",
+            "_quote_unquoted_keys",
             "_strip_trailing_commas",
             "find",
             "loads",
