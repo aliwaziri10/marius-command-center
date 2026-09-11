@@ -1159,7 +1159,7 @@
       "functions": [
         {
           "name": "retryable_request",
-          "line": 115,
+          "line": 147,
           "args": [
             "method",
             "url",
@@ -1167,18 +1167,24 @@
           ],
           "calls": [
             "RuntimeError",
+            "dict",
+            "get",
             "isinstance",
+            "json",
+            "len",
             "print",
             "raise_for_status",
             "range",
             "request",
-            "sleep"
+            "setdefault",
+            "sleep",
+            "upper"
           ],
-          "docstring": ""
+          "docstring": "SILENT ZERO-ROW PATCH FIX (2026-09-12): see module docstring. For"
         },
         {
           "name": "call_llm",
-          "line": 142,
+          "line": 199,
           "args": [
             "prompt"
           ],
@@ -1200,7 +1206,7 @@
         },
         {
           "name": "sanitize_json_control_chars",
-          "line": 237,
+          "line": 294,
           "args": [
             "text"
           ],
@@ -1213,7 +1219,7 @@
         },
         {
           "name": "_strip_trailing_commas",
-          "line": 272,
+          "line": 329,
           "args": [
             "text"
           ],
@@ -1224,7 +1230,7 @@
         },
         {
           "name": "_quote_unquoted_keys",
-          "line": 283,
+          "line": 340,
           "args": [
             "text"
           ],
@@ -1235,7 +1241,7 @@
         },
         {
           "name": "extract_json",
-          "line": 296,
+          "line": 353,
           "args": [
             "raw_text"
           ],
