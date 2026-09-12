@@ -18,6 +18,19 @@ change:
 This file now only orchestrates: fetch pending topics, call the two stages
 in order, save the result, and update topic/script status in Supabase.
 
+SILENT-PATCH-NOOP FIX (2026-09-12): confirmed live - a PATCH to Supabase's
+PostgREST endpoint returns 200 OK even when the filter matches zero rows,
+with an empty [] body if Prefer: return=representation is set, or no body
+at all otherwise. Neither retryable_request() nor the old versions of
+mark_topic_scripted()/mark_topic_generation_failed() checked this, so a
+topic whose id had already changed, been deleted, or never matched the
+filter for any reason would silently fail to update while the calling code
+believed it had succeeded. This is the confirmed explanation for topics
+found stuck as status='scripted' with no corresponding row in the scripts
+table at all. Both functions below now request return=representation and
+raise immediately if the response body is empty, instead of returning
+normally.
+
 === FULL PROVIDER-SWITCH HISTORY (preserved for context) ===
 
 PROVIDER SWITCH (2026-08-06): OpenRouter's free-tier request cap was being
@@ -124,23 +137,48 @@ def save_script(topic_id, narration_text, shot_list, music_mood, hook_text, sett
 
 
 def mark_topic_scripted(topic_id):
-    retryable_request(
+    """SILENT-PATCH-NOOP FIX (2026-09-12): see module docstring. Previously
+    this fired the PATCH and returned without checking whether any row was
+    actually updated - a topic_id that didn't match (already changed,
+    wrong type, deleted, anything) would silently do nothing while the
+    caller believed the topic was now marked scripted. Now demands
+    return=representation and raises if the response body is empty, so a
+    no-op surfaces immediately as a loud failure instead of a topic quietly
+    staying in whatever state it was already in."""
+    resp = retryable_request(
         "PATCH",
         f"{SUPABASE_URL}/rest/v1/topics?id=eq.{topic_id}",
-        headers=HEADERS,
+        headers={**HEADERS, "Prefer": "return=representation"},
         json={"status": "scripted"},
         timeout=30,
     )
+    updated = resp.json()
+    if not updated:
+        raise RuntimeError(
+            f"mark_topic_scripted PATCH silently no-op'd for topic_id={topic_id} - "
+            f"0 rows matched. The script itself was already saved to the scripts "
+            f"table, so this topic is now in an inconsistent state (script exists, "
+            f"topic status was never advanced from its previous value) and needs "
+            f"manual review, not a silent continue."
+        )
 
 
 def mark_topic_generation_failed(topic_id, reason):
-    retryable_request(
+    """SILENT-PATCH-NOOP FIX (2026-09-12): see module docstring and
+    mark_topic_scripted() above - identical fix, same reasoning."""
+    resp = retryable_request(
         "PATCH",
         f"{SUPABASE_URL}/rest/v1/topics?id=eq.{topic_id}",
-        headers=HEADERS,
+        headers={**HEADERS, "Prefer": "return=representation"},
         json={"status": "generation_failed", "last_failure_reason": str(reason)[:2000]},
         timeout=30,
     )
+    updated = resp.json()
+    if not updated:
+        raise RuntimeError(
+            f"mark_topic_generation_failed PATCH silently no-op'd for topic_id={topic_id} - "
+            f"0 rows matched. Original failure reason was: {reason}"
+        )
     print(f"Topic {topic_id} marked generation_failed - will be skipped by future runs until manually "
           f"reset. Last reason: {reason}")
     print(f"FIX: review/reword the topic's title or angle in the topics table for {topic_id}, then "
