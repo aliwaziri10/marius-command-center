@@ -1645,7 +1645,7 @@
       "functions": [
         {
           "name": "get_pending_topics",
-          "line": 79,
+          "line": 92,
           "args": [
             "limit"
           ],
@@ -1657,7 +1657,7 @@
         },
         {
           "name": "generate_script",
-          "line": 97,
+          "line": 110,
           "args": [
             "title",
             "angle"
@@ -1670,7 +1670,7 @@
         },
         {
           "name": "save_script",
-          "line": 107,
+          "line": 120,
           "args": [
             "topic_id",
             "narration_text",
@@ -1687,32 +1687,36 @@
         },
         {
           "name": "mark_topic_scripted",
-          "line": 126,
+          "line": 139,
           "args": [
             "topic_id"
           ],
           "calls": [
+            "RuntimeError",
+            "json",
             "retryable_request"
           ],
-          "docstring": ""
+          "docstring": "SILENT-PATCH-NOOP FIX (2026-09-12): see module docstring. Previously"
         },
         {
           "name": "mark_topic_generation_failed",
-          "line": 136,
+          "line": 166,
           "args": [
             "topic_id",
             "reason"
           ],
           "calls": [
+            "RuntimeError",
+            "json",
             "print",
             "retryable_request",
             "str"
           ],
-          "docstring": ""
+          "docstring": "SILENT-PATCH-NOOP FIX (2026-09-12): see module docstring and"
         },
         {
           "name": "main",
-          "line": 150,
+          "line": 188,
           "args": [],
           "calls": [
             "generate_script",
