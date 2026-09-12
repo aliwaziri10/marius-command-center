@@ -23,6 +23,19 @@ punctuation-as-performance rules, emotional arc swings, and a worked
 example - ported and adapted from Nova's proven prompt. quality_checker.py's
 grade_narration rubric gained a matching 6th rule (ENERGY AND RHYTHM) the
 same day so this is actually enforced, not just requested.
+
+CTA-WINDOW FALSE-NEGATIVE FIX (2026-09-12): confirmed live - a topic failed
+with "narration is missing the required like/subscribe/comment call-to-
+action" even though the prompt explicitly requires the CTA to appear
+*before* the final reflective closing line, not necessarily in the very
+last stretch of text. narration_has_engagement_cta() was only scanning the
+last CTA_SEARCH_WINDOW_CHARS (700) characters, so any closing line longer
+than that pushed a genuinely-present CTA outside the search window,
+producing a false content-failure rather than a real one. The keyword list
+here (subscribe, comment, share this, etc.) is specific enough that
+scanning the FULL narration instead of a trailing window has negligible
+false-positive risk, so the window restriction is removed entirely rather
+than just widened.
 """
 
 import time
@@ -44,14 +57,17 @@ CTA_KEYWORDS = (
     "like this", "like and", "tell us", "let us know", "hit follow",
     "hit that", "follow along", "leave a", "drop a",
 )
-CTA_SEARCH_WINDOW_CHARS = 700
 
 
 def narration_has_engagement_cta(narration_text):
+    """CTA-WINDOW FALSE-NEGATIVE FIX (2026-09-12): see module docstring.
+    Previously only scanned the last 700 characters, which could miss a
+    genuinely-present CTA if the closing line after it ran long. Now scans
+    the full narration - these keywords are specific enough that this
+    doesn't introduce meaningful false positives."""
     if not narration_text:
         return False
-    window = narration_text[-CTA_SEARCH_WINDOW_CHARS:].lower()
-    return any(keyword in window for keyword in CTA_KEYWORDS)
+    return any(keyword in narration_text.lower() for keyword in CTA_KEYWORDS)
 
 
 def build_narration_prompt(title, angle):
