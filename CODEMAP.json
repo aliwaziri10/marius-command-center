@@ -1449,7 +1449,7 @@
       "functions": [
         {
           "name": "narration_has_engagement_cta",
-          "line": 50,
+          "line": 62,
           "args": [
             "narration_text"
           ],
@@ -1457,11 +1457,11 @@
             "any",
             "lower"
           ],
-          "docstring": ""
+          "docstring": "CTA-WINDOW FALSE-NEGATIVE FIX (2026-09-12): see module docstring."
         },
         {
           "name": "build_narration_prompt",
-          "line": 57,
+          "line": 73,
           "args": [
             "title",
             "angle"
@@ -1471,7 +1471,7 @@
         },
         {
           "name": "build_narration_continuation_prompt",
-          "line": 182,
+          "line": 198,
           "args": [
             "title",
             "angle",
@@ -1483,7 +1483,7 @@
         },
         {
           "name": "generate_narration",
-          "line": 216,
+          "line": 232,
           "args": [
             "title",
             "angle"
