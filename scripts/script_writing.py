@@ -31,6 +31,25 @@ table at all. Both functions below now request return=representation and
 raise immediately if the response body is empty, instead of returning
 normally.
 
+UNCAUGHT-INFRA-CRASH FIX (2026-09-13): confirmed live via Supabase
+postgrest_logs - the project's free-tier Postgres has been throwing
+frequent "Warp server error: Thread killed by timeout manager" errors all
+day (resource contention under load from the multiple scheduled
+workflows hitting it). get_pending_topics() below was the one Supabase
+call in this file called OUTSIDE of main()'s try/except, so when a
+timeout caused retryable_request to exhaust its retries and raise
+RuntimeError, the exception propagated uncaught and crashed the entire
+script - reported as a hard workflow failure - instead of being treated
+as an ordinary transient infra failure like every other Supabase/Gemini
+call in this pipeline. This is the confirmed root cause of every "Script
+Writing workflow failed" issue since 2026-09-06: zero rows were ever
+written to the scripts table and zero new topics were marked
+generation_failed in that entire window, meaning topics were never even
+being picked up - the crash was happening before the per-topic loop ever
+started. Fixed by wrapping the call and treating a RuntimeError here
+exactly like InfraFailure elsewhere in this file: log it and exit 0 so
+the run isn't reported as failed, and the next scheduled run retries.
+
 === FULL PROVIDER-SWITCH HISTORY (preserved for context) ===
 
 PROVIDER SWITCH (2026-08-06): OpenRouter's free-tier request cap was being
@@ -186,7 +205,19 @@ def mark_topic_generation_failed(topic_id, reason):
 
 
 def main():
-    topics = get_pending_topics(limit=5)
+    # UNCAUGHT-INFRA-CRASH FIX (2026-09-13): see module docstring. This
+    # call previously sat outside any try/except - a Supabase timeout here
+    # (confirmed live, happening frequently on this project) crashed the
+    # entire script before a single topic was ever attempted. Now treated
+    # like any other infra failure: log and exit cleanly so the workflow
+    # isn't reported as failed and the next scheduled run retries.
+    try:
+        topics = get_pending_topics(limit=5)
+    except RuntimeError as e:
+        print(f"Supabase infra failure fetching pending topics - not the topics' fault, "
+              f"exiting cleanly so the next scheduled run retries: {e}")
+        return
+
     if not topics:
         print("No pending topics found. Nothing to do.")
         return
