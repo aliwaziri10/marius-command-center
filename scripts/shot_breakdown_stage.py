@@ -115,12 +115,11 @@ same fix:
 (1) generate_shot_breakdown's call_llm() call now passes a response_schema
 (built by build_shot_breakdown_response_schema below) so Gemini's JSON
 structure - every field present, every enum field restricted to a valid
-value, shot_list length bounded - is constrained by the API itself instead
-of by prose instructions alone. This does not replace any check in
-validate_and_normalize_shot_response - normalize_shot's own defaulting
-logic and every check below still run exactly as before, as the real
-safety net, in case Gemini's structured-output support has gaps for a
-schema this size.
+value - is constrained by the API itself instead of by prose instructions
+alone. This does not replace any check in validate_and_normalize_shot_
+response - normalize_shot's own defaulting logic and every check below
+still run exactly as before, as the real safety net, in case Gemini's
+structured-output support has gaps for a schema this size.
 (2) find_excessive_consecutive_subject and find_dominant_subject were both
 hard rejections that burned a full content attempt whenever the writer
 held on one character too long. Both violations are always mechanically
@@ -132,13 +131,27 @@ auto_repair_dominant_subject) before the corresponding check runs, with
 the original hard-rejection message kept only as a safety net for a
 genuine logic gap in the repair itself.
 
-INT64-AS-STRING FIX (2026-09-14): see build_shot_breakdown_response_schema's
-own docstring below - the schema-constrained generation added above broke
-every single shot-breakdown call outright (100% reproducible 400
-INVALID_ARGUMENT from Gemini) because minItems/maxItems were passed as
-native Python ints instead of the JSON-string form Gemini's int64 schema
-fields require. Fixed there; documented here since it affected every call
-this whole module makes.
+INT64-AS-STRING FIX (2026-09-14, INSUFFICIENT - see next entry): initial
+hypothesis was that minItems/maxItems needed to be JSON strings (Gemini's
+int64 schema convention). Wrapped both in str(). A live run immediately
+after this fix was deployed showed the EXACT SAME 100% reproducible 400
+INVALID_ARGUMENT on every single call, proving this hypothesis was either
+wrong or incomplete.
+
+MINITEMS/MAXITEMS REMOVED (2026-09-14): rather than guess at a third
+serialization format with no way to see Gemini's detailed error body (the
+400 response for this endpoint carries no further detail beyond
+"Request contains an invalid argument"), removed minItems/maxItems from
+the schema entirely. This is a safe removal, not a workaround: the
+function's own prior docstring already documented these two fields as
+"best effort" and NOT the real enforcement mechanism - shot_list length is
+authoritatively checked in generate_shot_breakdown (CHUNK_MIN_SHOTS/
+CHUNK_MAX_SHOTS) and validate_and_normalize_shot_response (MIN_SHOTS/
+MAX_SHOTS) regardless of whether the schema constrains it too. If this
+turns out not to be the actual cause of the 400, the next live failure's
+raw error should be captured and compared against the schema with
+properties/enum/required alone (no array bounds) to isolate whether the
+issue is elsewhere in the schema shape.
 """
 
 import re
@@ -1153,33 +1166,25 @@ def build_shot_breakdown_response_schema(min_shots, max_shots, include_anchor_fi
     Builds the Gemini responseSchema for one chunk call, passed alongside
     responseMimeType=application/json so Gemini's decoding is grammar-
     constrained to this exact shape (every key present, every enum field
-    restricted to a valid value, shot_list length bounded) instead of just
-    being asked nicely in prose. Does not replace
-    validate_and_normalize_shot_response above - that stays as the final
-    safety net - it just makes the checks it runs fail far less often.
-    minItems/maxItems on the shot_list array are a best effort: Google's
-    own docs describe their schema support as only a SUBSET of full
-    JSON Schema, so these may or may not be honored - the existing
-    MIN_SHOTS/MAX_SHOTS (and per-chunk CHUNK_MIN_SHOTS/CHUNK_MAX_SHOTS)
-    checks in validate_and_normalize_shot_response/generate_shot_breakdown
-    are left completely unchanged as the real enforcement either way.
+    restricted to a valid value) instead of just being asked nicely in
+    prose. Does not replace validate_and_normalize_shot_response above -
+    that stays as the final safety net.
 
-    INT64-AS-STRING FIX (2026-09-14): confirmed live - every single call
-    that passed this schema failed immediately with a bare Gemini 400
-    INVALID_ARGUMENT (no further detail in the body), 100% reproducible,
-    on every topic, every chunk. Root cause: minItems/maxItems on Gemini's
-    Schema object are int64 fields, and Google APIs serialize int64 as a
-    JSON STRING (not a native number) to avoid cross-language precision
-    loss - the exact same convention as int64 fields elsewhere in Google's
-    APIs. This function was passing min_shots/max_shots as plain Python
-    ints, which serialize to JSON numbers, an invalid shape for this field.
-    Fixed by wrapping both in str(). No other part of the schema uses an
-    int64-typed field, so this was the only place this bug could hide."""
+    MINITEMS/MAXITEMS REMOVED (2026-09-14): see module docstring. These
+    were tried as native ints, then as str()-wrapped ints (INT64-AS-STRING
+    FIX), and BOTH forms produced a 100% reproducible Gemini 400
+    INVALID_ARGUMENT on every call. Removed entirely rather than guess a
+    third format - they were only ever "best effort" per this function's
+    original docstring, and shot-count enforcement is fully handled
+    elsewhere (CHUNK_MIN_SHOTS/CHUNK_MAX_SHOTS in generate_shot_breakdown,
+    MIN_SHOTS/MAX_SHOTS in validate_and_normalize_shot_response) regardless
+    of whether the schema itself bounds the array length. min_shots/
+    max_shots are still accepted as parameters (unused) so call sites don't
+    need to change if array bounds are ever reintroduced in a supported
+    form later."""
     properties = {
         "shot_list": {
             "type": "ARRAY",
-            "minItems": str(min_shots),
-            "maxItems": str(max_shots),
             "items": SHOT_ITEM_SCHEMA,
         },
     }
