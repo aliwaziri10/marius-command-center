@@ -78,6 +78,30 @@ This mirrors extract_json()'s repair-over-rejection pattern in
 llm_client.py. The keyword scan and prompt instruction are both left in
 place unchanged - this repair is a safety net for when the writer ignores
 that instruction, not a replacement for it.
+
+ONSCREEN-TEXT AUTO-REPAIR SELF-DEFEAT FIX (2026-09-13): confirmed live -
+the 2026-09-12 repair above never actually stopped a shot from being
+rejected. auto_repair_missing_onscreen_text() appends a clarifying phrase
+("...angled and lit so no text on it is legible...") to
+visual_description, but never removes the ORIGINAL keyword that triggered
+the flag (e.g. "newspaper") from the text - it's still sitting right
+there in the rewritten description. find_missing_onscreen_text_shots() is
+a pure keyword scan with no notion of "already repaired", so it
+re-scanned the same (still keyword-containing) text immediately after and
+flagged the exact same shot again as "still missing after auto-repair" -
+every single time, on every attempt, for every topic that hit this path.
+Live logs showed this exact pattern repeatedly: "Auto-repaired 1 shot(s)"
+immediately followed by "1 shot(s) still show ... after auto-repair
+(first at shot N)" - the repair was cosmetic and the hard-rejection
+fallback fired every time regardless, silently reverting this whole fix
+to the original all-or-nothing rejection it was meant to replace. Fixed
+by having auto_repair_missing_onscreen_text() return the set of shot
+indices it actually touched, and having validate_and_normalize_shot_
+response() exclude those indices when re-scanning for "still missing" -
+the post-repair check now only fails on a shot the repair function didn't
+even attempt to touch (a real logic gap between the two functions'
+keyword lists, the scenario the comment already anticipated), not on
+every shot the repair just ran on.
 """
 
 import re
@@ -412,9 +436,19 @@ def find_idle_crowd_shots(normalized_shots):
     return hits
 
 
-def find_missing_onscreen_text_shots(normalized_shots):
+def find_missing_onscreen_text_shots(normalized_shots, skip_indices=None):
+    """ONSCREEN-TEXT AUTO-REPAIR SELF-DEFEAT FIX (2026-09-13): accepts an
+    optional set of shot indices to skip - used to exclude shots that
+    auto_repair_missing_onscreen_text() already rewrote, since that
+    repair does not (and by design cannot, without breaking the object's
+    continuity with the rest of the shot) remove the original keyword
+    from visual_description, so a plain re-scan would immediately
+    re-flag the exact same shot it just "fixed". See module docstring."""
+    skip_indices = skip_indices or set()
     hits = []
     for i, s in enumerate(normalized_shots):
+        if i in skip_indices:
+            continue
         desc = (s["visual_description"] or "").lower()
         if any(kw in desc for kw in ONSCREEN_TEXT_KEYWORDS) and not s["required_onscreen_text"]:
             hits.append(i)
@@ -427,9 +461,13 @@ def auto_repair_missing_onscreen_text(normalized_shots):
     rewrite visual_description in place so the named object is present but
     no longer positioned as readable/legible, instead of rejecting the
     entire shot list over one omitted field. Mutates normalized_shots
-    in place and returns the count repaired, purely for logging."""
-    repaired = 0
-    for s in normalized_shots:
+    in place and returns the SET of shot indices repaired (changed from a
+    plain count on 2026-09-13 - see module docstring's SELF-DEFEAT FIX -
+    so the caller can exclude these exact shots from the post-repair
+    re-scan, since the rewritten text still legitimately contains the
+    original keyword)."""
+    repaired_indices = set()
+    for i, s in enumerate(normalized_shots):
         desc = (s["visual_description"] or "")
         desc_lower = desc.lower()
         if any(kw in desc_lower for kw in ONSCREEN_TEXT_KEYWORDS) and not s["required_onscreen_text"]:
@@ -437,8 +475,8 @@ def auto_repair_missing_onscreen_text(normalized_shots):
                 desc.rstrip(". ")
                 + ", angled and lit so no text on it is legible to the viewer."
             )
-            repaired += 1
-    return repaired
+            repaired_indices.add(i)
+    return repaired_indices
 
 
 def find_anachronistic_object_shots(normalized_shots):
@@ -664,24 +702,30 @@ def validate_and_normalize_shot_response(result, narration_text):
 
     # ONSCREEN-TEXT AUTO-REPAIR (2026-09-12): was a hard rejection here -
     # see module docstring. Now auto-repaired in place instead of failing
-    # the whole shot list; find_missing_onscreen_text_shots is still used
-    # (post-repair, it should always return empty - logged if not).
-    repaired_count = auto_repair_missing_onscreen_text(normalized_shots)
-    if repaired_count:
-        print(f"[shots] Auto-repaired {repaired_count} shot(s) with an unfilled "
+    # the whole shot list.
+    # SELF-DEFEAT FIX (2026-09-13): the repaired shots are excluded from
+    # the post-repair re-scan below, since the repair legitimately leaves
+    # the original keyword in place (it only changes whether that object
+    # is presented as readable) - a plain re-scan would always re-flag
+    # them. Only a shot the repair function didn't touch at all can still
+    # show up here now.
+    repaired_indices = auto_repair_missing_onscreen_text(normalized_shots)
+    if repaired_indices:
+        print(f"[shots] Auto-repaired {len(repaired_indices)} shot(s) with an unfilled "
               f"required_onscreen_text by rewriting them so the named object is "
               f"no longer a readable focus.")
-    still_missing = find_missing_onscreen_text_shots(normalized_shots)
+    still_missing = find_missing_onscreen_text_shots(normalized_shots, skip_indices=repaired_indices)
     if still_missing:
-        # Should be unreachable given the repair above touches every hit;
-        # kept as a hard-fail safety net in case a future edit changes
-        # either function's matching logic out of sync with the other.
+        # Reachable now only when a shot has an unfilled required_onscreen_text
+        # AND was somehow not caught by auto_repair_missing_onscreen_text in
+        # the first place (a genuine mismatch between the two functions'
+        # keyword matching, not the self-defeat bug fixed 2026-09-13).
         return False, (
             f"{len(still_missing)} shot(s) still show a newspaper/letter/sign/"
-            f"document/etc. with required_onscreen_text empty after auto-repair "
-            f"(first at shot {still_missing[0]}) - auto-repair logic did not catch "
-            f"this shot, check auto_repair_missing_onscreen_text for a keyword-"
-            f"matching mismatch against find_missing_onscreen_text_shots."
+            f"document/etc. with required_onscreen_text empty and were not caught "
+            f"by auto-repair (first at shot {still_missing[0]}) - check "
+            f"auto_repair_missing_onscreen_text for a keyword-matching mismatch "
+            f"against find_missing_onscreen_text_shots."
         )
 
     excessive_subject = find_excessive_consecutive_subject(normalized_shots)
