@@ -41,6 +41,26 @@ check) and also gains the transient-error retry/backoff behavior
 (429/500/502/503/504) that bare requests.patch()/get() never had here at
 all - a transient Supabase blip on save_progress or mark_video_generated
 would previously have crashed the whole run instead of retrying.
+
+INFRA-CRASH FIX (2026-09-14): see main()'s own comment below - the
+get_ready_scripts() call at the top of main() was the one remaining
+unguarded Supabase call in this entire file (every other call, in every
+mark_*/save_progress/record_error function and inside the per-script
+loop, already goes through retryable_request AND is wrapped in a
+try/except at its call site). This is the exact same exposure already
+found and fixed in script_writing.py's get_pending_topics() on
+2026-09-13: a Supabase free-tier Postgres timeout ("Warp server error:
+Thread killed by timeout manager", confirmed recurring throughout that
+day in postgrest_logs) makes retryable_request raise an uncaught
+RuntimeError, crashing this entire script before a single candidate is
+even looked at. This matches the observed pattern exactly - Video
+Generation workflow failing on run after run (issues opened for run
+#983 through #997 with no gap) while every failure inside
+process_script's own loop is already caught, logged to last_error, and
+would never surface as a crashed Actions run at all. Fixed the same way:
+wrap the call, treat the RuntimeError as an ordinary infra failure (log
+and return so the run exits 0 instead of being reported as failed), and
+let the next scheduled run retry.
 """
 
 import os
@@ -389,7 +409,21 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
 
 
 def main():
-    candidates = get_ready_scripts(CANDIDATE_POOL_SIZE)
+    # INFRA-CRASH FIX (2026-09-14): see module docstring - this was the
+    # one remaining unguarded Supabase call in the whole file. A timeout
+    # here (confirmed recurring on this project's free-tier Postgres)
+    # previously crashed the entire run before a single candidate script
+    # was even looked at, indistinguishable in the Actions UI from a real
+    # code bug. Treated as an ordinary infra failure now: log and return
+    # so this run exits 0, exactly like get_pending_topics() in
+    # script_writing.py was already fixed to do on 2026-09-13.
+    try:
+        candidates = get_ready_scripts(CANDIDATE_POOL_SIZE)
+    except RuntimeError as e:
+        print(f"Infra failure fetching ready scripts (Supabase likely timed out) - no candidates could "
+              f"even be listed this run. Not a code bug - next scheduled run will retry. Detail: {e}")
+        return
+
     if not candidates:
         print("No scripts with images ready for video generation. Nothing to do.")
         return
