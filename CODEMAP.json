@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 25,
+  "file_count": 26,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -24,7 +24,8 @@
   ],
   "tables": [
     "scripts",
-    "topics"
+    "topics",
+    "trend_signals"
   ],
   "files": [
     {
@@ -2773,6 +2774,63 @@
       ],
       "tables": [
         "topics"
+      ]
+    },
+    {
+      "path": "scripts/trend_research.py",
+      "functions": [
+        {
+          "name": "fetch_top_posts",
+          "line": 52,
+          "args": [
+            "subreddit"
+          ],
+          "calls": [
+            "append",
+            "get",
+            "json",
+            "print",
+            "raise_for_status",
+            "range",
+            "sleep",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "save_signal",
+          "line": 91,
+          "args": [
+            "subreddit",
+            "title",
+            "score"
+          ],
+          "calls": [
+            "post",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 101,
+          "args": [],
+          "calls": [
+            "fetch_top_posts",
+            "len",
+            "print",
+            "save_signal",
+            "sleep"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": [
+        "trend_signals"
       ]
     },
     {
