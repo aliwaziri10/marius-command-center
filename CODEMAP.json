@@ -1160,7 +1160,7 @@
       "functions": [
         {
           "name": "retryable_request",
-          "line": 166,
+          "line": 188,
           "args": [
             "method",
             "url",
@@ -1185,9 +1185,10 @@
         },
         {
           "name": "call_llm",
-          "line": 218,
+          "line": 240,
           "args": [
-            "prompt"
+            "prompt",
+            "response_schema"
           ],
           "calls": [
             "DailyQuotaExhausted",
@@ -1207,7 +1208,7 @@
         },
         {
           "name": "sanitize_json_control_chars",
-          "line": 313,
+          "line": 346,
           "args": [
             "text"
           ],
@@ -1220,7 +1221,7 @@
         },
         {
           "name": "_strip_trailing_commas",
-          "line": 348,
+          "line": 381,
           "args": [
             "text"
           ],
@@ -1231,7 +1232,7 @@
         },
         {
           "name": "_quote_unquoted_keys",
-          "line": 359,
+          "line": 392,
           "args": [
             "text"
           ],
@@ -1242,7 +1243,7 @@
         },
         {
           "name": "extract_json",
-          "line": 381,
+          "line": 414,
           "args": [
             "raw_text"
           ],
