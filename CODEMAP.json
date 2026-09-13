@@ -2693,7 +2693,7 @@
       "functions": [
         {
           "name": "get_existing_titles",
-          "line": 50,
+          "line": 132,
           "args": [],
           "calls": [
             "get",
@@ -2703,43 +2703,62 @@
           "docstring": ""
         },
         {
-          "name": "call_gemini",
-          "line": 60,
+          "name": "generate_topic_candidates",
+          "line": 142,
           "args": [
-            "prompt"
+            "exclude_titles"
           ],
           "calls": [
-            "RuntimeError",
-            "dumps",
-            "encode",
-            "json",
-            "post",
-            "print",
-            "raise_for_status",
-            "range",
-            "sleep"
-          ],
-          "docstring": "Sole provider - OpenRouter removed. Retries with backoff on 429s"
-        },
-        {
-          "name": "generate_topics",
-          "line": 112,
-          "args": [
-            "existing_titles"
-          ],
-          "calls": [
-            "call_gemini",
-            "join",
-            "loads",
-            "split",
-            "startswith",
-            "strip"
+            "call_llm",
+            "extract_json",
+            "get",
+            "join"
           ],
           "docstring": ""
         },
         {
+          "name": "grade_topic_candidates",
+          "line": 184,
+          "args": [
+            "candidates"
+          ],
+          "calls": [
+            "call_llm",
+            "enumerate",
+            "extract_json",
+            "get",
+            "isinstance",
+            "join",
+            "len"
+          ],
+          "docstring": "WRITER/CHECKER SPLIT (2026-09-13): same pattern already proven for"
+        },
+        {
+          "name": "collect_approved_topics",
+          "line": 240,
+          "args": [
+            "existing_titles"
+          ],
+          "calls": [
+            "add",
+            "append",
+            "enumerate",
+            "generate_topic_candidates",
+            "get",
+            "grade_topic_candidates",
+            "len",
+            "list",
+            "lower",
+            "print",
+            "range",
+            "set",
+            "strip"
+          ],
+          "docstring": "Loops up to MAX_GENERATION_ATTEMPTS times, oversampling candidates"
+        },
+        {
           "name": "save_topic",
-          "line": 138,
+          "line": 287,
           "args": [
             "title",
             "angle"
@@ -2753,23 +2772,19 @@
         },
         {
           "name": "main",
-          "line": 149,
+          "line": 298,
           "args": [],
           "calls": [
-            "generate_topics",
-            "get",
+            "collect_approved_topics",
             "get_existing_titles",
             "len",
-            "lower",
             "print",
-            "save_topic",
-            "strip"
+            "save_topic"
           ],
           "docstring": ""
         }
       ],
       "env_vars": [
-        "GEMINI_API_KEY",
         "SUPABASE_SECRET_KEY",
         "SUPABASE_URL"
       ],
