@@ -102,6 +102,35 @@ the post-repair check now only fails on a shot the repair function didn't
 even attempt to touch (a real logic gap between the two functions'
 keyword lists, the scenario the comment already anticipated), not on
 every shot the repair just ran on.
+
+SCHEMA-CONSTRAINED GENERATION + SUBJECT AUTO-REPAIR (2026-09-13): a single
+live run showed all 5 topics in the batch die, and the onscreen-text fix
+above accounted for only some of those deaths - the rest were genuinely
+malformed JSON from Gemini (several distinct shapes, see llm_client.py's
+matching docstring entries) and hard rejections on
+find_excessive_consecutive_subject/find_dominant_subject, the same class
+of "correct rule, unreliable LLM compliance" problem the onscreen-text
+rule had before its auto-repair fix above. Two changes, mirroring that
+same fix:
+(1) generate_shot_breakdown's call_llm() call now passes a response_schema
+(built by build_shot_breakdown_response_schema below) so Gemini's JSON
+structure - every field present, every enum field restricted to a valid
+value, shot_list length bounded - is constrained by the API itself instead
+of by prose instructions alone. This does not replace any check in
+validate_and_normalize_shot_response - normalize_shot's own defaulting
+logic and every check below still run exactly as before, as the real
+safety net, in case Gemini's structured-output support has gaps for a
+schema this size.
+(2) find_excessive_consecutive_subject and find_dominant_subject were both
+hard rejections that burned a full content attempt whenever the writer
+held on one character too long. Both violations are always mechanically
+fixable the same safe way the onscreen-text one was: blanking a shot's
+primary_subject to "" is never wrong (SHOT_RULES_BLOCK already treats ""
+as intentional B-roll and explicitly asks for more of it), so both are now
+auto-repaired in place (auto_repair_excessive_consecutive_subject,
+auto_repair_dominant_subject) before the corresponding check runs, with
+the original hard-rejection message kept only as a safety net for a
+genuine logic gap in the repair itself.
 """
 
 import re
@@ -536,6 +565,66 @@ def find_excessive_consecutive_subject(normalized_shots):
     return None
 
 
+def auto_repair_excessive_consecutive_subject(normalized_shots):
+    """CONSECUTIVE-SUBJECT AUTO-REPAIR (2026-09-13): mirrors the onscreen-
+    text auto-repair pattern above (2026-09-12) - blanking a shot's
+    primary_subject to "" is always safe (SHOT_RULES_BLOCK already treats
+    "" as intentional B-roll and explicitly asks for more of it), so a run
+    longer than MAX_CONSECUTIVE_SAME_SUBJECT can be mechanically broken up
+    by blanking every shot past the allowed run length, instead of
+    rejecting the entire shot list and hoping a fresh generation does
+    better on a rule the writer has repeatedly struggled to hold to
+    unaided (see DOCUMENTARY-STYLE TIGHTENING module docstring entry).
+    Mutates normalized_shots in place and returns the set of repaired
+    indices."""
+    repaired_indices = set()
+    run_subject = None
+    run_length = 0
+    for i, s in enumerate(normalized_shots):
+        subject_lower = s["primary_subject"].lower()
+        if subject_lower and subject_lower == run_subject:
+            run_length += 1
+        else:
+            run_subject = subject_lower
+            run_length = 1 if subject_lower else 0
+        if subject_lower and run_length > MAX_CONSECUTIVE_SAME_SUBJECT:
+            s["primary_subject"] = ""
+            repaired_indices.add(i)
+            run_subject = None
+            run_length = 0
+    return repaired_indices
+
+
+def auto_repair_dominant_subject(normalized_shots):
+    """DOMINANT-SUBJECT AUTO-REPAIR (2026-09-13): same reasoning as above -
+    if one named subject is the primary_subject of more than
+    MAX_SUBJECT_SHOT_RATIO of all shots, mechanically blank enough of
+    their occurrences (picked from the middle of their remaining
+    appearances outward on each pass, so cuts spread through the episode
+    rather than clustering at the start or end) to bring the ratio into
+    compliance, instead of rejecting the whole shot list. Mutates
+    normalized_shots in place and returns the set of repaired indices."""
+    repaired_indices = set()
+    total = len(normalized_shots)
+    if total == 0:
+        return repaired_indices
+    max_allowed = int(total * MAX_SUBJECT_SHOT_RATIO)
+    while True:
+        subject_counts = Counter(
+            s["primary_subject"].lower() for s in normalized_shots if s["primary_subject"]
+        )
+        if not subject_counts:
+            break
+        subject, count = subject_counts.most_common(1)[0]
+        if count <= max_allowed:
+            break
+        indices = [i for i, s in enumerate(normalized_shots) if s["primary_subject"].lower() == subject]
+        idx_to_blank = indices[len(indices) // 2]
+        normalized_shots[idx_to_blank]["primary_subject"] = ""
+        repaired_indices.add(idx_to_blank)
+    return repaired_indices
+
+
 def find_location_change_without_establishing(normalized_shots):
     """DIRECTOR FEATURE (2026-08-20): whenever location_tag changes between
     consecutive shots (and both are non-empty), the new shot must be
@@ -728,27 +817,44 @@ def validate_and_normalize_shot_response(result, narration_text):
             f"against find_missing_onscreen_text_shots."
         )
 
+    # CONSECUTIVE/DOMINANT-SUBJECT AUTO-REPAIR (2026-09-13): were hard
+    # rejections here - see module docstring. Same reasoning as the
+    # onscreen-text fix above: blanking a shot's primary_subject to "" is
+    # always a safe, mechanically guaranteed fix, so both are now
+    # auto-repaired in place instead of burning a whole content attempt on
+    # a rule the writer has repeatedly struggled to hold to unaided.
+    consecutive_repaired = auto_repair_excessive_consecutive_subject(normalized_shots)
+    if consecutive_repaired:
+        print(f"[shots] Auto-repaired {len(consecutive_repaired)} shot(s) that held on "
+              f"the same primary_subject too many shots in a row, by blanking the "
+              f"excess occurrences to pure B-roll.")
     excessive_subject = find_excessive_consecutive_subject(normalized_shots)
     if excessive_subject:
+        # Reachable now only if the repair above has a genuine logic gap -
+        # its single pass over the list is expected to always clear this.
         idx, subject, run_length = excessive_subject
         return False, (
-            f"'{subject}' is the primary_subject of {run_length} consecutive shots "
-            f"ending at shot {idx} (max {MAX_CONSECUTIVE_SAME_SUBJECT}) - cut away to "
-            f"a different subject, angle, or B-roll before returning to this "
-            f"character, instead of holding on the same face shot after shot."
+            f"'{subject}' is STILL the primary_subject of {run_length} consecutive "
+            f"shots ending at shot {idx} (max {MAX_CONSECUTIVE_SAME_SUBJECT}) even "
+            f"after auto-repair - check auto_repair_excessive_consecutive_subject "
+            f"for a logic gap."
         )
 
+    dominant_repaired = auto_repair_dominant_subject(normalized_shots)
+    if dominant_repaired:
+        print(f"[shots] Auto-repaired {len(dominant_repaired)} shot(s) where one named "
+              f"subject dominated the episode's screentime, by blanking excess "
+              f"occurrences to pure B-roll.")
     dominant_subject = find_dominant_subject(normalized_shots)
     if dominant_subject:
+        # Reachable now only if the repair above has a genuine logic gap -
+        # its while loop is expected to always clear this.
         subject, count, ratio = dominant_subject
         return False, (
-            f"'{subject}' is the primary_subject of {count}/{len(normalized_shots)} shots "
-            f"({ratio:.0%}), over the {MAX_SUBJECT_SHOT_RATIO:.0%} episode-wide ceiling - "
-            f"even with cutaways breaking up consecutive runs, this character is in nearly "
-            f"every scene, which doesn't read as a real documentary. Replace enough of "
-            f"their shots with pure B-roll (landscapes, objects, documents, crowds, other "
-            f"people mentioned in the story) so they're a strong presence, not the subject "
-            f"of almost every single shot."
+            f"'{subject}' is STILL the primary_subject of {count}/{len(normalized_shots)} "
+            f"shots ({ratio:.0%}) even after auto-repair, over the "
+            f"{MAX_SUBJECT_SHOT_RATIO:.0%} episode-wide ceiling - check "
+            f"auto_repair_dominant_subject for a logic gap."
         )
 
     location_hits = find_location_change_without_establishing(normalized_shots)
@@ -1006,6 +1112,73 @@ SOUND DESIGNER:
   TOOL above)."""
 
 
+SHOT_ITEM_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "shot_number": {"type": "INTEGER"},
+        "visual_description": {"type": "STRING"},
+        "narration_excerpt": {"type": "STRING"},
+        "shot_type": {"type": "STRING", "enum": sorted(VALID_SHOT_TYPES)},
+        "camera_movement": {"type": "STRING", "enum": sorted(VALID_CAMERA_MOVEMENTS)},
+        "camera_reason": {"type": "STRING"},
+        "lens_effect": {"type": "STRING", "enum": sorted(VALID_LENS_EFFECTS)},
+        "sfx_cue": {"type": "STRING"},
+        "primary_subject": {"type": "STRING"},
+        "required_onscreen_text": {"type": "STRING"},
+        "lighting": {"type": "STRING", "enum": sorted(VALID_LIGHTING)},
+        "beat_intensity": {"type": "STRING", "enum": sorted(VALID_BEAT_INTENSITY)},
+        "location_tag": {"type": "STRING"},
+        "framing_angle": {"type": "STRING", "enum": sorted(VALID_FRAMING_ANGLE)},
+        "depth_of_field": {"type": "STRING", "enum": sorted(VALID_DEPTH_OF_FIELD)},
+    },
+    "required": [
+        "shot_number", "visual_description", "narration_excerpt", "shot_type",
+        "camera_movement", "camera_reason", "lens_effect", "sfx_cue",
+        "primary_subject", "required_onscreen_text", "lighting",
+        "beat_intensity", "location_tag", "framing_angle", "depth_of_field",
+    ],
+}
+
+
+def build_shot_breakdown_response_schema(min_shots, max_shots, include_anchor_fields):
+    """SCHEMA-CONSTRAINED GENERATION (2026-09-13): see module docstring.
+    Builds the Gemini responseSchema for one chunk call, passed alongside
+    responseMimeType=application/json so Gemini's decoding is grammar-
+    constrained to this exact shape (every key present, every enum field
+    restricted to a valid value, shot_list length bounded) instead of just
+    being asked nicely in prose. Does not replace
+    validate_and_normalize_shot_response above - that stays as the final
+    safety net - it just makes the checks it runs fail far less often.
+    minItems/maxItems on the shot_list array are a best effort: Google's
+    own docs describe their schema support as only a SUBSET of full
+    JSON Schema, so these may or may not be honored - the existing
+    MIN_SHOTS/MAX_SHOTS (and per-chunk CHUNK_MIN_SHOTS/CHUNK_MAX_SHOTS)
+    checks in validate_and_normalize_shot_response/generate_shot_breakdown
+    are left completely unchanged as the real enforcement either way."""
+    properties = {
+        "shot_list": {
+            "type": "ARRAY",
+            "minItems": min_shots,
+            "maxItems": max_shots,
+            "items": SHOT_ITEM_SCHEMA,
+        },
+    }
+    required = ["shot_list"]
+    if include_anchor_fields:
+        properties.update({
+            "setting_and_characters": {"type": "STRING"},
+            "color_palette": {"type": "STRING"},
+            "hook_text": {"type": "STRING"},
+            "music_mood": {"type": "STRING"},
+        })
+        required.extend(["setting_and_characters", "color_palette", "hook_text", "music_mood"])
+    return {
+        "type": "OBJECT",
+        "properties": properties,
+        "required": required,
+    }
+
+
 def build_shot_breakdown_chunk_prompt(
     title, angle, chunk_text, chunk_index, num_chunks,
     min_shots_chunk, max_shots_chunk,
@@ -1159,8 +1332,8 @@ will be rejected outright, same as the on-screen-text rule. ALSO check
 every crowd/group shot for idle phrasing ("crowd stands," "onlookers
 watching," "villagers standing around") - give the crowd a real activity
 or remove it. Also confirm every shot has "lighting", "beat_intensity",
-and "location_tag" filled in, and that any location change is opened with
-a wide/establishing shot.
+"location_tag", "framing_angle", and "depth_of_field" filled in, and that
+any location change is opened with a wide/establishing shot.
 
 Return ONLY valid JSON, no other text, no markdown fences, in this exact
 format:
@@ -1180,7 +1353,9 @@ format:
       "required_onscreen_text": "REQUIRED if visual_description names a newspaper/letter/sign/document/etc - the exact wording, otherwise leave as empty string",
       "lighting": "midday",
       "beat_intensity": "mid",
-      "location_tag": "short consistent location name, or empty string"
+      "location_tag": "short consistent location name, or empty string",
+      "framing_angle": "eye_level",
+      "depth_of_field": "standard"
     }}
   ]
 }}
@@ -1200,7 +1375,11 @@ def generate_shot_breakdown(title, angle, narration_text):
     in structure, only extended with the new color_palette/location checks).
     A stitched list that passes those deterministic checks is then graded
     by quality_checker.grade_shot_breakdown (2026-08-20, Loop Skill 2)
-    before being accepted - see module docstring."""
+    before being accepted - see module docstring.
+
+    SCHEMA-CONSTRAINED GENERATION (2026-09-13): each chunk call now passes
+    a response_schema built by build_shot_breakdown_response_schema - see
+    module docstring."""
     chunks = split_narration_into_chunks(narration_text, NUM_SHOT_CHUNKS)
     num_chunks = len(chunks)
 
@@ -1236,8 +1415,12 @@ def generate_shot_breakdown(title, angle, narration_text):
                 prior_last_movement=prior_last_movement,
             )
 
+            schema = build_shot_breakdown_response_schema(
+                CHUNK_MIN_SHOTS, CHUNK_MAX_SHOTS, include_anchor_fields=(idx == 0)
+            )
+
             try:
-                raw = call_llm(prompt)
+                raw = call_llm(prompt, response_schema=schema)
             except DailyQuotaExhausted:
                 # FIX (2026-08-15, later): propagate straight up, do not
                 # treat as an ordinary per-chunk infra retry.
