@@ -65,6 +65,14 @@ originally forced Gemini to return EXACTLY NUM_CANDIDATE_TOPICS every
 attempt (minItems == maxItems). On a later retry, once the exclude-list
 has grown long, forcing an exact count risks the model padding with a
 weak idea just to hit the number. Loosened to a range instead.
+
+TREND GROUNDING ADDED (2026-09-13): a new trend_research.py agent now
+pulls real, currently-popular post titles from curated history-interest
+subreddits into a trend_signals table. generate_topic_candidates() now
+pulls the most recent rows from that table (best-effort - if the table is
+empty or the request fails, generation proceeds without it rather than
+blocking) and offers them to the model as optional inspiration, never a
+requirement, so an idea is never forced just because it matches a trend.
 """
 
 import os
@@ -88,6 +96,7 @@ NUM_NEW_TOPICS = 3
 NUM_CANDIDATE_TOPICS_MIN = 4
 NUM_CANDIDATE_TOPICS_MAX = 6
 MAX_GENERATION_ATTEMPTS = 3
+TREND_SIGNALS_LIMIT = 40
 
 TOPIC_RESPONSE_SCHEMA = {
     "type": "OBJECT",
@@ -139,8 +148,41 @@ def get_existing_titles():
     return [row["title"] for row in resp.json()]
 
 
-def generate_topic_candidates(exclude_titles):
+def get_recent_trend_signals(limit=TREND_SIGNALS_LIMIT):
+    """Best-effort only: trend_signals is optional grounding, not a
+    requirement, so if the table is empty (trend_research.py hasn't run
+    yet) or this request fails for any reason, topic generation must
+    still proceed without it rather than blocking the whole run."""
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/trend_signals"
+            f"?select=post_title,subreddit&order=fetched_at.desc&limit={limit}",
+            headers=HEADERS,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.RequestException as e:
+        print(f"[topics] Could not fetch trend_signals (non-fatal, continuing without it): {e}")
+        return []
+
+
+def generate_topic_candidates(exclude_titles, trend_signals):
     exclude_list = "\n".join(f"- {t}" for t in exclude_titles) or "(none yet)"
+
+    if trend_signals:
+        trend_list = "\n".join(
+            f'- r/{s["subreddit"]}: {s["post_title"]}' for s in trend_signals[:25]
+        )
+        trend_block = f"""
+
+For inspiration only - not a requirement, and never force a connection
+that isn't real - here are real post titles currently getting real
+engagement on history-interest subreddits:
+{trend_list}
+"""
+    else:
+        trend_block = ""
 
     prompt = f"""You are a research assistant for a YouTube documentary channel
 called "Forgotten Names." Each episode tells a real, historically documented
@@ -149,7 +191,7 @@ moment. Not famous leaders - overlooked, real individuals.
 
 Do NOT suggest any of these already-used topics:
 {exclude_list}
-
+{trend_block}
 STAKES ARE MANDATORY (this is what makes someone stop scrolling and watch):
 every topic must involve real danger, a life-or-death choice, a hidden
 injustice, or a moral crisis the person faced - not just an interesting job
@@ -237,7 +279,7 @@ title:
     return result
 
 
-def collect_approved_topics(existing_titles):
+def collect_approved_topics(existing_titles, trend_signals):
     """Loops up to MAX_GENERATION_ATTEMPTS times, oversampling candidates
     and grading them, until NUM_NEW_TOPICS approved topics are collected
     or the attempt budget runs out (in which case whatever passed so far
@@ -251,7 +293,7 @@ def collect_approved_topics(existing_titles):
             break
 
         exclude_titles = list(existing_titles) + [a["title"] for a in approved]
-        candidates = generate_topic_candidates(exclude_titles)
+        candidates = generate_topic_candidates(exclude_titles, trend_signals)
 
         fresh_candidates = []
         for c in candidates:
@@ -299,7 +341,10 @@ def main():
     existing = get_existing_titles()
     print(f"Found {len(existing)} existing topics.")
 
-    approved_topics = collect_approved_topics(existing)
+    trend_signals = get_recent_trend_signals()
+    print(f"Found {len(trend_signals)} recent trend signals to draw from.")
+
+    approved_topics = collect_approved_topics(existing, trend_signals)
     if not approved_topics:
         print("No topics passed the stakes/relevance check this run - nothing saved.")
         return
