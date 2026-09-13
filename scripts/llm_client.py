@@ -49,6 +49,25 @@ a new repair candidate below. The trailing-comma hypothesis is NEITHER
 confirmed nor refuted by this - both bugs can and likely do occur
 independently in different Gemini responses, so both repairs are kept.
 
+MALFORMED-KEY VARIANT FIX (2026-09-13) - CONFIRMED via a live run's raw
+candidate: a second, distinct malformed-key shape was found, e.g.:
+    "lens_effect": "none",
+    sfx_cue": "Low wind howling across frozen ground, distant muffled gunfire",
+Here the key has a STRAY TRAILING QUOTE but no matching leading quote
+(`sfx_cue"` instead of `sfx_cue` or `"sfx_cue"`) - this is different from
+the fully-unquoted case above, which _quote_unquoted_keys()'s original
+regex could not catch, since that regex required the identifier to be
+followed directly by whitespace-then-colon with nothing in between; here
+a stray `"` sits between the identifier and the colon, so the match
+failed and every one of the 8 repair combinations still failed, dying
+after all 3 content attempts. Widened _quote_unquoted_keys()'s regex to
+optionally consume a leading and/or trailing quote around the identifier
+and always re-emit exactly one well-formed quoted pair - this is a strict
+superset of the old behavior (idempotent on already-correctly-quoted
+keys, still fixes the fully-bare case, and now also fixes the
+stray-trailing-quote case) rather than a separate new function, so no
+change to the 8-entry attempts list in extract_json() is needed.
+
 SILENT ZERO-ROW PATCH FIX (2026-09-12): found live - topic
 a8512686-efde-41f0-8b65-039d12d23c3a was logged as "marked
 generation_failed" by mark_topic_generation_failed (script_writing.py),
@@ -342,12 +361,21 @@ def _quote_unquoted_keys(text):
     docstring). Gemini has been observed emitting a bare/unquoted object
     key (e.g. `sfx_cue: "..."` instead of `"sfx_cue": "..."`), which is
     invalid JSON and breaks parsing exactly where the key appears - not
-    near the end of the response. This only quotes an identifier that
-    immediately follows an opening `{` or a `,` (the only positions a
-    JSON key can legally appear), so it will not touch identifiers that
-    happen to appear inside already-quoted string values. Safe no-op on
-    text that doesn't have this problem."""
-    return re.sub(r'([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)(\s*:)', r'\1"\2"\3', text)
+    near the end of the response.
+
+    MALFORMED-KEY VARIANT FIX (2026-09-13, confirmed - see module
+    docstring): widened to also catch a key with a STRAY TRAILING quote
+    and no leading quote (e.g. `sfx_cue": "..."`), which the original
+    stricter regex (identifier directly followed by whitespace-then-colon)
+    could not match. The optional `"?` around the identifier consumes
+    either shape - and consumes a pre-existing correctly-placed quote pair
+    too - so the substitution always re-emits exactly one well-formed
+    quoted key regardless of which malformed (or already-correct) shape
+    it started as. This only touches an identifier immediately following
+    an opening `{` or a `,` (the only positions a JSON key can legally
+    appear), so it will not touch identifiers that happen to appear inside
+    already-quoted string values."""
+    return re.sub(r'([{,]\s*)"?([A-Za-z_][A-Za-z0-9_]*)"?(\s*:)', r'\1"\2"\3', text)
 
 
 def extract_json(raw_text):
@@ -364,7 +392,13 @@ def extract_json(raw_text):
     2026-08-19 logging captured. Repair list expanded from 4 to 8 entries
     to cover the unquoted-key fix alone and combined with the existing
     two repairs, in every order, since either bug can occur independently
-    or together in the same response."""
+    or together in the same response.
+
+    MALFORMED-KEY VARIANT FIX (2026-09-13): _quote_unquoted_keys()'s regex
+    was widened (see its docstring) rather than adding a 9th/10th repair
+    entry - it now covers both the fully-unquoted and stray-trailing-quote
+    shapes under the same repair name, so the existing 8-entry attempts
+    list below did not need to change."""
     if not raw_text:
         raise ValueError("Model returned empty/None content (likely a dropped or refused generation).")
     text = raw_text.strip()
