@@ -2742,7 +2742,7 @@
       "functions": [
         {
           "name": "get_existing_titles",
-          "line": 132,
+          "line": 141,
           "args": [],
           "calls": [
             "get",
@@ -2752,10 +2752,25 @@
           "docstring": ""
         },
         {
-          "name": "generate_topic_candidates",
-          "line": 142,
+          "name": "get_recent_trend_signals",
+          "line": 151,
           "args": [
-            "exclude_titles"
+            "limit"
+          ],
+          "calls": [
+            "get",
+            "json",
+            "print",
+            "raise_for_status"
+          ],
+          "docstring": "Best-effort only: trend_signals is optional grounding, not a"
+        },
+        {
+          "name": "generate_topic_candidates",
+          "line": 170,
+          "args": [
+            "exclude_titles",
+            "trend_signals"
           ],
           "calls": [
             "call_llm",
@@ -2767,7 +2782,7 @@
         },
         {
           "name": "grade_topic_candidates",
-          "line": 184,
+          "line": 226,
           "args": [
             "candidates"
           ],
@@ -2784,9 +2799,10 @@
         },
         {
           "name": "collect_approved_topics",
-          "line": 240,
+          "line": 282,
           "args": [
-            "existing_titles"
+            "existing_titles",
+            "trend_signals"
           ],
           "calls": [
             "add",
@@ -2807,7 +2823,7 @@
         },
         {
           "name": "save_topic",
-          "line": 287,
+          "line": 329,
           "args": [
             "title",
             "angle"
@@ -2821,11 +2837,12 @@
         },
         {
           "name": "main",
-          "line": 298,
+          "line": 340,
           "args": [],
           "calls": [
             "collect_approved_topics",
             "get_existing_titles",
+            "get_recent_trend_signals",
             "len",
             "print",
             "save_topic"
@@ -2838,7 +2855,8 @@
         "SUPABASE_URL"
       ],
       "tables": [
-        "topics"
+        "topics",
+        "trend_signals"
       ]
     },
     {
