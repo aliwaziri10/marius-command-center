@@ -96,6 +96,28 @@ POST are untouched. This makes the exact bug that hid for over one hour
 loud and immediate everywhere retryable_request is used (script_writing.py,
 video_generation.py's mark_* functions, etc.) the next time it happens for
 any reason (wrong id, row deleted elsewhere, wrong table, wrong project).
+
+SCHEMA-CONSTRAINED GENERATION (2026-09-13): every fix above (2026-08-19,
+2026-09-11, 2026-09-13 key-quote widening) has been another regex patch
+reacting to one more distinct shape of malformed JSON that Gemini
+produced anyway. Rather than waiting for the next malformed-key variant
+to show up live and adding a 9th regex, call_llm now accepts an optional
+response_schema, forwarded as generationConfig.responseSchema - Gemini's
+structured-output mode, which constrains decoding to actually match a
+supplied JSON Schema. Checked against Google's own docs before writing
+this: the correct field names are camelCase (responseMimeType,
+responseSchema) - the generationConfig dict below was previously using
+response_mime_type (snake_case), which is NOT the documented field name,
+even though it had apparently been working (Google's API is evidently
+lenient about this). Both fields are now written in the documented
+camelCase form rather than relying on that leniency continuing to hold.
+This does not remove any of the repair functions below - they stay as a
+safety net for whichever caller doesn't pass a schema, or in case
+Gemini's structured-output support (documented as only a SUBSET of full
+OpenAPI/JSON Schema - some keywords may be silently ignored) has gaps for
+a given schema - but the shot-breakdown stage (the only caller with a
+JSON payload complex enough to have hit these bugs) now passes one, which
+should make this entire repair list fire far less often going forward.
 """
 
 import os
@@ -215,7 +237,7 @@ def retryable_request(method, url, max_retries=MAX_RETRIES, **kwargs):
     raise RuntimeError(f"Supabase call still failing after {max_retries} attempts: {last_error.status_code if last_error else 'unknown'} {last_error.text if last_error else ''}")
 
 
-def call_llm(prompt):
+def call_llm(prompt, response_schema=None):
     """PROVIDER SWITCH (2026-08-17): Groq replaced with Gemini
     (gemini-3.5-flash-lite), same call_gemini() pattern already proven
     working in TechPulse's script/generate_script.py. Reasons: (1) Groq's
@@ -228,14 +250,25 @@ def call_llm(prompt):
     unambiguous signal Groq never gave us. (3) Gemini's free tier (1,500
     requests/day, 1M token context) removes the need for the
     shot-breakdown chunking hack entirely - the full prompt + narration +
-    shot list fits in a single call. response_mime_type forces native
-    JSON output so it's never wrapped in markdown fences."""
+    shot list fits in a single call. responseMimeType forces native JSON
+    output so it's never wrapped in markdown fences.
+
+    SCHEMA-CONSTRAINED GENERATION (2026-09-13): optional response_schema
+    param, forwarded as generationConfig.responseSchema - see module
+    docstring, including the camelCase field-name correction made at the
+    same time. None by default so every existing caller (narration_stage.py,
+    quality_checker.py) is unaffected; only shot_breakdown_stage.py passes
+    one so far."""
+    generation_config = {
+        "responseMimeType": "application/json",
+        "maxOutputTokens": GEMINI_MAX_OUTPUT_TOKENS,
+    }
+    if response_schema is not None:
+        generation_config["responseSchema"] = response_schema
+
     body = json.dumps({
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "response_mime_type": "application/json",
-            "maxOutputTokens": GEMINI_MAX_OUTPUT_TOKENS,
-        },
+        "generationConfig": generation_config,
     }).encode()
     last_error = None
     for attempt in range(MAX_RETRIES):
@@ -439,9 +472,6 @@ def extract_json(raw_text):
         try:
             parsed = json.loads(attempt_text)
             if label != "raw":
-                # PROOF POINT: this line firing is what confirms (or, for a
-                # different label, refutes) which repair actually mattered -
-                # check this log if a new failure pattern ever shows up.
                 print(f"[extract_json] raw candidate failed to parse; repair '{label}' fixed it.")
             return parsed
         except json.JSONDecodeError as e:
