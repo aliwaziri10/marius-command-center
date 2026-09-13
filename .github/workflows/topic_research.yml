@@ -1,11 +1,11 @@
 name: Topic Research
 
 on:
-  # Paused 2026-08-15 at Zia's request: 241 topics already pending, no need
-  # to generate more right now. This workflow was competing with
-  # script_writing.py for the same GEMINI_API_KEY quota, contributing to
-  # 429 rate-limit failures. Re-enable the schedule below once the backlog
-  # is meaningfully drawn down.
+  # RE-ENABLED 2026-09-14: paused 2026-08-15 with a 241-topic backlog and an
+  # explicit note to re-enable once that backlog was drawn down. Confirmed
+  # today the topics table is now at zero pending (only 3 rows total,
+  # all previously generation_failed) - the pause condition this comment
+  # described no longer holds, so resuming on schedule.
   schedule:
   - cron: '0 */6 * * *'
   workflow_dispatch:
