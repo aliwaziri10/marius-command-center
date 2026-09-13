@@ -131,6 +131,14 @@ auto-repaired in place (auto_repair_excessive_consecutive_subject,
 auto_repair_dominant_subject) before the corresponding check runs, with
 the original hard-rejection message kept only as a safety net for a
 genuine logic gap in the repair itself.
+
+INT64-AS-STRING FIX (2026-09-14): see build_shot_breakdown_response_schema's
+own docstring below - the schema-constrained generation added above broke
+every single shot-breakdown call outright (100% reproducible 400
+INVALID_ARGUMENT from Gemini) because minItems/maxItems were passed as
+native Python ints instead of the JSON-string form Gemini's int64 schema
+fields require. Fixed there; documented here since it affected every call
+this whole module makes.
 """
 
 import re
@@ -1154,12 +1162,24 @@ def build_shot_breakdown_response_schema(min_shots, max_shots, include_anchor_fi
     JSON Schema, so these may or may not be honored - the existing
     MIN_SHOTS/MAX_SHOTS (and per-chunk CHUNK_MIN_SHOTS/CHUNK_MAX_SHOTS)
     checks in validate_and_normalize_shot_response/generate_shot_breakdown
-    are left completely unchanged as the real enforcement either way."""
+    are left completely unchanged as the real enforcement either way.
+
+    INT64-AS-STRING FIX (2026-09-14): confirmed live - every single call
+    that passed this schema failed immediately with a bare Gemini 400
+    INVALID_ARGUMENT (no further detail in the body), 100% reproducible,
+    on every topic, every chunk. Root cause: minItems/maxItems on Gemini's
+    Schema object are int64 fields, and Google APIs serialize int64 as a
+    JSON STRING (not a native number) to avoid cross-language precision
+    loss - the exact same convention as int64 fields elsewhere in Google's
+    APIs. This function was passing min_shots/max_shots as plain Python
+    ints, which serialize to JSON numbers, an invalid shape for this field.
+    Fixed by wrapping both in str(). No other part of the schema uses an
+    int64-typed field, so this was the only place this bug could hide."""
     properties = {
         "shot_list": {
             "type": "ARRAY",
-            "minItems": min_shots,
-            "maxItems": max_shots,
+            "minItems": str(min_shots),
+            "maxItems": str(max_shots),
             "items": SHOT_ITEM_SCHEMA,
         },
     }
