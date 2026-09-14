@@ -152,6 +152,21 @@ turns out not to be the actual cause of the 400, the next live failure's
 raw error should be captured and compared against the schema with
 properties/enum/required alone (no array bounds) to isolate whether the
 issue is elsewhere in the schema shape.
+
+LOCATION-ESTABLISHING AUTO-REPAIR (2026-09-14): with onscreen-text and
+subject-dominance now auto-repaired instead of hard-rejected, a live run
+showed find_location_change_without_establishing become the new dominant
+cause of dead topics by a wide margin - 4 of 5 topics in one batch died
+here, almost every single content attempt across them, all the same
+shape: a shot opens a new location_tag without shot_type being 'wide' or
+'establishing'. Same "correct rule, unreliable LLM compliance" pattern as
+the two fixes above, and the same safe mechanical fix applies: forcing the
+offending shot's shot_type to "establishing" is never wrong (it's a
+factually valid choice for any shot, and SHOT_RULES_BLOCK already asks for
+exactly this), so this is now auto-repaired
+(auto_repair_location_change_without_establishing) instead of rejecting
+the whole attempt, with the original hard-rejection message kept only as
+a safety net for a genuine logic gap in the repair itself.
 """
 
 import re
@@ -663,6 +678,36 @@ def find_location_change_without_establishing(normalized_shots):
     return hits
 
 
+def auto_repair_location_change_without_establishing(normalized_shots):
+    """LOCATION-ESTABLISHING AUTO-REPAIR (2026-09-14): see module docstring -
+    this became the new dominant cause of dead topics once the onscreen-
+    text/subject checks above stopped hard-rejecting. Forcing the offending
+    shot's shot_type to "establishing" is always a safe, valid choice for
+    any shot (unlike, say, inventing new visual content), so this is
+    mechanically repaired the same way instead of rejecting the whole
+    attempt. Also nudges depth_of_field back to "standard" when it was
+    "shallow", since SHOT_RULES_BLOCK itself says shallow only reads
+    correctly on medium/close_up/extreme_close_up shots - a small
+    consistency bonus alongside the real fix, not a separate requirement.
+    Mirrors find_location_change_without_establishing's own loop exactly,
+    so it flags/repairs precisely the same shots that function would find.
+    Mutates normalized_shots in place and returns the set of repaired
+    indices."""
+    repaired_indices = set()
+    prev_location = None
+    for i, s in enumerate(normalized_shots):
+        loc = s["location_tag"]
+        if loc and prev_location and loc.lower() != prev_location.lower():
+            if s["shot_type"] not in ("wide", "establishing"):
+                s["shot_type"] = "establishing"
+                if s["depth_of_field"] == "shallow":
+                    s["depth_of_field"] = "standard"
+                repaired_indices.add(i)
+        if loc:
+            prev_location = loc
+    return repaired_indices
+
+
 def validate_and_normalize_shot_response(result, narration_text):
     """Validates everything EXCEPT narration_text/CTA, since those were
     already confirmed during the narration stage before this is ever called.
@@ -878,14 +923,25 @@ def validate_and_normalize_shot_response(result, narration_text):
             f"auto_repair_dominant_subject for a logic gap."
         )
 
+    # LOCATION-ESTABLISHING AUTO-REPAIR (2026-09-14): was a hard rejection
+    # here - see module docstring. Now auto-repaired in place the same way
+    # as the checks above, instead of failing the whole attempt over one
+    # shot's shot_type.
+    location_repaired = auto_repair_location_change_without_establishing(normalized_shots)
+    if location_repaired:
+        print(f"[shots] Auto-repaired {len(location_repaired)} shot(s) that opened a "
+              f"new location without a wide/establishing shot, by forcing that "
+              f"shot's type to establishing.")
     location_hits = find_location_change_without_establishing(normalized_shots)
     if location_hits:
+        # Reachable now only if the repair above has a genuine logic gap -
+        # its single pass over the list is expected to always clear this.
         idx, prev_loc, new_loc = location_hits[0]
         return False, (
-            f"shot {idx} moves location from {prev_loc!r} to {new_loc!r} without using "
-            f"a 'wide' or 'establishing' shot_type - whenever the story cuts to a new "
-            f"location, the first shot there must re-establish it wide before cutting "
-            f"closer, exactly like a real documentary edit."
+            f"shot {idx} STILL moves location from {prev_loc!r} to {new_loc!r} "
+            f"without using a 'wide' or 'establishing' shot_type even after "
+            f"auto-repair - check auto_repair_location_change_without_establishing "
+            f"for a logic gap."
         )
 
     result["shot_list"] = normalized_shots
