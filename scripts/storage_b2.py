@@ -26,16 +26,39 @@ every single time something actually needs to fetch or hand a URL to an
 external system (e.g. passing an anchor image to Agnes, which needs a
 real fetchable URL, not a key) - see presigned_url() below. This makes
 expiry a non-issue regardless of how long an episode takes.
+
+CREDENTIAL WHITESPACE FIX (2026-09-14) - CONFIRMED live: a video_generation
+run failed every single upload with botocore raising "Invalid header
+value" on the Authorization header, showing a literal embedded newline
+right after "Credential=" in the printed AWS4-HMAC-SHA256 string. HTTP
+header values cannot contain a raw \n - this is not a code logic bug, it's
+a trailing newline that ended up inside the B2_KEY_ID (or possibly
+B2_APPLICATION_KEY/B2_ENDPOINT_URL) GitHub Actions secret itself, most
+likely from how the value was originally pasted in when the secret was
+created. All three env vars were being read completely raw with no
+normalization at all. Since a secret's stored value can't be fixed from
+here, and a stray trailing newline in a pasted credential is an extremely
+common, easy-to-reintroduce mistake, defensively .strip()'d all three at
+the point they're read - this is a permanent, safe fix regardless of
+whether the underlying secret is ever cleaned up, and costs nothing if
+the values were already clean.
 """
 
 import os
 import boto3
 from botocore.client import Config
 
-B2_ENDPOINT_URL = os.environ["B2_ENDPOINT_URL"]
-B2_KEY_ID = os.environ["B2_KEY_ID"]
-B2_APPLICATION_KEY = os.environ["B2_APPLICATION_KEY"]
-B2_BUCKET_NAME = os.environ.get("B2_BUCKET_NAME", "marius-media-zia")
+# CREDENTIAL WHITESPACE FIX (2026-09-14): see module docstring. .strip()
+# defends against a stray leading/trailing newline or space in any of
+# these three GitHub Actions secrets - a raw newline here breaks the AWS
+# SigV4 Authorization header (HTTP headers cannot contain \n), causing
+# every single upload/request to fail with an opaque
+# "Invalid header value" error that has nothing to do with the actual
+# credentials being wrong.
+B2_ENDPOINT_URL = os.environ["B2_ENDPOINT_URL"].strip()
+B2_KEY_ID = os.environ["B2_KEY_ID"].strip()
+B2_APPLICATION_KEY = os.environ["B2_APPLICATION_KEY"].strip()
+B2_BUCKET_NAME = os.environ.get("B2_BUCKET_NAME", "marius-media-zia").strip()
 
 # Max presigned URL lifetime this module ever issues. Only relevant for
 # the brief window between generating a presigned URL and something
