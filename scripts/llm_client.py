@@ -118,6 +118,27 @@ OpenAPI/JSON Schema - some keywords may be silently ignored) has gaps for
 a given schema - but the shot-breakdown stage (the only caller with a
 JSON payload complex enough to have hit these bugs) now passes one, which
 should make this entire repair list fire far less often going forward.
+
+GEMINI_API_KEY IMPORT CRASH FIX (2026-09-14) - CONFIRMED, root cause of
+every single Video Generation workflow failure: GEMINI_KEY was read at
+MODULE IMPORT TIME via os.environ["GEMINI_API_KEY"] (a bare dict lookup,
+raises KeyError if absent). video_generation.py imports this module only
+for retryable_request/SUPABASE_URL/HEADERS - it has never called call_llm
+or needed Gemini at all (it uses Agnes for video, not Gemini) - and
+video_generation.yml correctly has no GEMINI_API_KEY secret configured,
+since it genuinely doesn't need one. The result: `from llm_client import
+retryable_request, SUPABASE_URL, HEADERS` crashed with an uncaught
+KeyError on the very first line of video_generation.py, before main() -
+or even the module's own try/except around get_ready_scripts() from the
+2026-09-14 INFRA-CRASH FIX - ever ran. Every prior fix aimed at
+video_generation.py's own logic was correct but irrelevant, since the
+process never got far enough to reach any of it. Fixed by making
+GEMINI_KEY/GEMINI_URL lazy: the module-level constant is now
+os.environ.get("GEMINI_API_KEY") (None if absent, no crash), and
+call_llm() itself raises a clear, specific RuntimeError up front if it's
+None - so a script that actually needs Gemini still fails loudly and
+immediately if the key is missing, but a script that merely imports this
+module for its Supabase helpers is completely unaffected either way.
 """
 
 import os
@@ -148,9 +169,17 @@ CONTENT_RETRY_WAIT_SECONDS = 25
 # produce invalid JSON.
 GEMINI_MAX_OUTPUT_TOKENS = 8192
 
-GEMINI_KEY = os.environ["GEMINI_API_KEY"]
+# GEMINI_API_KEY IMPORT CRASH FIX (2026-09-14): see module docstring. Was
+# os.environ["GEMINI_API_KEY"] (crashes on import if unset) - now a lazy,
+# non-crashing lookup. Any caller that actually needs Gemini gets a clear,
+# specific error from call_llm() itself instead of an opaque KeyError
+# thrown from deep inside an unrelated import chain.
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = "gemini-3.5-flash-lite"
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_KEY}"
+GEMINI_URL = (
+    f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_KEY}"
+    if GEMINI_KEY else None
+)
 
 RETRYABLE_NETWORK_EXCEPTIONS = (
     requests.exceptions.ChunkedEncodingError,
@@ -258,7 +287,18 @@ def call_llm(prompt, response_schema=None):
     docstring, including the camelCase field-name correction made at the
     same time. None by default so every existing caller (narration_stage.py,
     quality_checker.py) is unaffected; only shot_breakdown_stage.py passes
-    one so far."""
+    one so far.
+
+    GEMINI_API_KEY IMPORT CRASH FIX (2026-09-14): GEMINI_KEY/GEMINI_URL are
+    now lazily-None if the env var is absent (see module docstring) rather
+    than crashing on import - so this function raises the clear error
+    instead, at the point something actually tried to use Gemini."""
+    if not GEMINI_KEY:
+        raise RuntimeError(
+            "call_llm() was invoked but GEMINI_API_KEY is not set in this environment - "
+            "add it as a secret to whichever workflow's env block is calling this."
+        )
+
     generation_config = {
         "responseMimeType": "application/json",
         "maxOutputTokens": GEMINI_MAX_OUTPUT_TOKENS,
