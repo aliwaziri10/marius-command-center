@@ -1160,7 +1160,7 @@
       "functions": [
         {
           "name": "retryable_request",
-          "line": 188,
+          "line": 217,
           "args": [
             "method",
             "url",
@@ -1185,7 +1185,7 @@
         },
         {
           "name": "call_llm",
-          "line": 240,
+          "line": 269,
           "args": [
             "prompt",
             "response_schema"
@@ -1208,7 +1208,7 @@
         },
         {
           "name": "sanitize_json_control_chars",
-          "line": 346,
+          "line": 386,
           "args": [
             "text"
           ],
@@ -1221,7 +1221,7 @@
         },
         {
           "name": "_strip_trailing_commas",
-          "line": 381,
+          "line": 421,
           "args": [
             "text"
           ],
@@ -1232,7 +1232,7 @@
         },
         {
           "name": "_quote_unquoted_keys",
-          "line": 392,
+          "line": 432,
           "args": [
             "text"
           ],
@@ -1243,7 +1243,7 @@
         },
         {
           "name": "extract_json",
-          "line": 414,
+          "line": 454,
           "args": [
             "raw_text"
           ],
