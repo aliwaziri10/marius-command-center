@@ -167,6 +167,30 @@ exactly this), so this is now auto-repaired
 (auto_repair_location_change_without_establishing) instead of rejecting
 the whole attempt, with the original hard-rejection message kept only as
 a safety net for a genuine logic gap in the repair itself.
+
+SCHEMA-CONSTRAINED GENERATION REVERTED FOR THIS CALL (2026-09-14,
+CONFIRMED): two straight guesses at the schema's shape (int64-as-string,
+then removing array bounds entirely) both failed to fix a 100%
+reproducible 400 INVALID_ARGUMENT - confirmed via a live run started
+AFTER the array-bounds-removal fix was already committed, which still
+hit the exact same error on every call. This endpoint's error body
+carries no further detail to diagnose a third guess against. The one
+clear, confirmed-working comparison point is topic_research.py's schema
+(small: 2-4 STRING/INTEGER properties per item, no enum fields)
+succeeding repeatedly on real live runs, versus this file's schema (16
+properties per shot item, several constrained to enum lists of 10-26
+values, nested inside a larger anchor object on the first chunk) failing
+every single time. Rather than continue guessing which part of a much
+larger, enum-heavy schema Gemini's structured-output mode is rejecting,
+generate_shot_breakdown() has been reverted to call_llm(prompt) with no
+response_schema - the same approach already proven reliable across many
+real historical runs via extract_json()'s repair pipeline (see
+llm_client.py) before schema-constrained generation was introduced.
+build_shot_breakdown_response_schema is left in the file, unused, in
+case a future session wants to retry structured output for this call
+with real visibility into why Gemini rejects it (e.g. testing with enum
+fields removed first, in isolation, to narrow down whether enums
+specifically are the trigger).
 """
 
 import re
@@ -1218,26 +1242,20 @@ SHOT_ITEM_SCHEMA = {
 
 
 def build_shot_breakdown_response_schema(min_shots, max_shots, include_anchor_fields):
-    """SCHEMA-CONSTRAINED GENERATION (2026-09-13): see module docstring.
-    Builds the Gemini responseSchema for one chunk call, passed alongside
-    responseMimeType=application/json so Gemini's decoding is grammar-
-    constrained to this exact shape (every key present, every enum field
-    restricted to a valid value) instead of just being asked nicely in
-    prose. Does not replace validate_and_normalize_shot_response above -
-    that stays as the final safety net.
+    """UNUSED as of 2026-09-14 - see module docstring's SCHEMA-CONSTRAINED
+    GENERATION REVERTED FOR THIS CALL entry. Left in place, not deleted,
+    for a future session to retry structured output on this call with a
+    narrower experiment (e.g. removing all enum fields first, in
+    isolation) once there's a way to see Gemini's actual rejection reason
+    for a schema this size - do not wire this back into generate_shot_
+    breakdown without new evidence of what specifically fails.
 
-    MINITEMS/MAXITEMS REMOVED (2026-09-14): see module docstring. These
-    were tried as native ints, then as str()-wrapped ints (INT64-AS-STRING
-    FIX), and BOTH forms produced a 100% reproducible Gemini 400
-    INVALID_ARGUMENT on every call. Removed entirely rather than guess a
-    third format - they were only ever "best effort" per this function's
-    original docstring, and shot-count enforcement is fully handled
-    elsewhere (CHUNK_MIN_SHOTS/CHUNK_MAX_SHOTS in generate_shot_breakdown,
-    MIN_SHOTS/MAX_SHOTS in validate_and_normalize_shot_response) regardless
-    of whether the schema itself bounds the array length. min_shots/
-    max_shots are still accepted as parameters (unused) so call sites don't
-    need to change if array bounds are ever reintroduced in a supported
-    form later."""
+    MINITEMS/MAXITEMS REMOVED (2026-09-14): these were tried as native
+    ints, then as str()-wrapped ints (INT64-AS-STRING FIX), and BOTH forms
+    produced a 100% reproducible Gemini 400 INVALID_ARGUMENT on every
+    call - and removing them entirely (this version) ALSO did not fix it,
+    confirming array bounds were never the real cause. min_shots/max_shots
+    are unused parameters kept for call-site compatibility."""
     properties = {
         "shot_list": {
             "type": "ARRAY",
@@ -1458,9 +1476,12 @@ def generate_shot_breakdown(title, angle, narration_text):
     by quality_checker.grade_shot_breakdown (2026-08-20, Loop Skill 2)
     before being accepted - see module docstring.
 
-    SCHEMA-CONSTRAINED GENERATION (2026-09-13): each chunk call now passes
-    a response_schema built by build_shot_breakdown_response_schema - see
-    module docstring."""
+    SCHEMA-CONSTRAINED GENERATION REVERTED (2026-09-14): each chunk call
+    no longer passes a response_schema - see module docstring's REVERTED
+    entry. Relies entirely on prose instructions (SHOT_RULES_BLOCK, the
+    JSON example, the FINAL CHECK reminder) plus llm_client.extract_json's
+    repair pipeline, exactly as before schema-constrained generation was
+    introduced on 2026-09-13."""
     chunks = split_narration_into_chunks(narration_text, NUM_SHOT_CHUNKS)
     num_chunks = len(chunks)
 
@@ -1496,12 +1517,8 @@ def generate_shot_breakdown(title, angle, narration_text):
                 prior_last_movement=prior_last_movement,
             )
 
-            schema = build_shot_breakdown_response_schema(
-                CHUNK_MIN_SHOTS, CHUNK_MAX_SHOTS, include_anchor_fields=(idx == 0)
-            )
-
             try:
-                raw = call_llm(prompt, response_schema=schema)
+                raw = call_llm(prompt)
             except DailyQuotaExhausted:
                 # FIX (2026-08-15, later): propagate straight up, do not
                 # treat as an ordinary per-chunk infra retry.
