@@ -2197,7 +2197,7 @@
       "functions": [
         {
           "name": "_get_client",
-          "line": 51,
+          "line": 74,
           "args": [],
           "calls": [
             "Config",
@@ -2207,7 +2207,7 @@
         },
         {
           "name": "upload_bytes",
-          "line": 64,
+          "line": 87,
           "args": [
             "object_key",
             "file_bytes",
@@ -2221,7 +2221,7 @@
         },
         {
           "name": "upload_file",
-          "line": 77,
+          "line": 100,
           "args": [
             "object_key",
             "local_path",
@@ -2236,7 +2236,7 @@
         },
         {
           "name": "presigned_url",
-          "line": 82,
+          "line": 105,
           "args": [
             "object_key",
             "expires_in"
@@ -2249,7 +2249,7 @@
         },
         {
           "name": "download_to_file",
-          "line": 95,
+          "line": 118,
           "args": [
             "object_key",
             "local_path"
@@ -2262,7 +2262,7 @@
         },
         {
           "name": "object_exists",
-          "line": 104,
+          "line": 127,
           "args": [
             "object_key"
           ],
@@ -2274,7 +2274,7 @@
         },
         {
           "name": "object_size",
-          "line": 117,
+          "line": 140,
           "args": [
             "object_key"
           ],
@@ -2287,7 +2287,7 @@
         },
         {
           "name": "delete_object",
-          "line": 137,
+          "line": 160,
           "args": [
             "object_key"
           ],
