@@ -316,10 +316,24 @@ def narrate_one_script(supabase, script):
 def main():
     supabase = create_client(SUPABASE_URL, SUPABASE_SECRET_KEY)
 
-    # 1. Get a batch of pending scripts (was limit(1) - narration now runs
-    # every 30 min instead of 2x/day, so pulling only one per run would
-    # waste the tighter cron whenever more than one script is pending).
-    result = supabase.table("scripts").select("*").eq("status", "pending").limit(MAX_SCRIPTS_PER_RUN).execute()
+    # UNCAUGHT-INFRA-CRASH FIX (2026-09-13): this fetch had no error
+    # handling at all - script_writing.py hit the exact same shape of bug
+    # (confirmed live via Supabase's own logs: "Warp server error: Thread
+    # killed by timeout manager" under load on this free-tier project) and
+    # it crashed that entire script before a single topic was ever looked
+    # at, for every one of its ~241 straight "workflow failed" alerts
+    # between 2026-08-15 and 2026-09-10. This fetch was never fixed to
+    # match - a Supabase timeout here would crash this script the same
+    # way, reported as a hard failure even though no script here did
+    # anything wrong. Now treated like every other infra hiccup in this
+    # pipeline: log it and exit cleanly so the next scheduled run retries.
+    try:
+        result = supabase.table("scripts").select("*").eq("status", "pending").limit(MAX_SCRIPTS_PER_RUN).execute()
+    except Exception as e:
+        print(f"Supabase infra failure fetching pending scripts - not any script's fault, "
+              f"exiting cleanly so the next scheduled run retries: {e}")
+        return
+
     if not result.data:
         print("No pending scripts found. Exiting.")
         return
