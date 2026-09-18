@@ -2235,18 +2235,27 @@
       "path": "scripts/storage_b2.py",
       "functions": [
         {
-          "name": "_new_client",
-          "line": 108,
+          "name": "_client_config",
+          "line": 127,
           "args": [],
           "calls": [
-            "Config",
+            "Config"
+          ],
+          "docstring": "CHECKSUM-COMPAT CHANGE (2026-09-19, HYPOTHESIS - see module"
+        },
+        {
+          "name": "_new_client",
+          "line": 143,
+          "args": [],
+          "calls": [
+            "_client_config",
             "client"
           ],
           "docstring": "Builds a brand-new boto3 S3 client (fresh TCP+TLS connection,"
         },
         {
           "name": "_get_client",
-          "line": 121,
+          "line": 156,
           "args": [],
           "calls": [
             "_new_client"
@@ -2255,7 +2264,7 @@
         },
         {
           "name": "upload_bytes",
-          "line": 128,
+          "line": 163,
           "args": [
             "object_key",
             "file_bytes",
@@ -2274,7 +2283,7 @@
         },
         {
           "name": "upload_file",
-          "line": 161,
+          "line": 196,
           "args": [
             "object_key",
             "local_path",
@@ -2289,7 +2298,7 @@
         },
         {
           "name": "presigned_url",
-          "line": 166,
+          "line": 201,
           "args": [
             "object_key",
             "expires_in"
@@ -2302,7 +2311,7 @@
         },
         {
           "name": "download_to_file",
-          "line": 179,
+          "line": 214,
           "args": [
             "object_key",
             "local_path"
@@ -2315,7 +2324,7 @@
         },
         {
           "name": "object_exists",
-          "line": 188,
+          "line": 223,
           "args": [
             "object_key"
           ],
@@ -2327,7 +2336,7 @@
         },
         {
           "name": "object_size",
-          "line": 201,
+          "line": 236,
           "args": [
             "object_key"
           ],
@@ -2340,7 +2349,7 @@
         },
         {
           "name": "delete_object",
-          "line": 221,
+          "line": 256,
           "args": [
             "object_key"
           ],
