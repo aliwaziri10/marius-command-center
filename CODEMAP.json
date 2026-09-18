@@ -2196,7 +2196,7 @@
       "functions": [
         {
           "name": "_get_client",
-          "line": 74,
+          "line": 94,
           "args": [],
           "calls": [
             "Config",
@@ -2206,21 +2206,25 @@
         },
         {
           "name": "upload_bytes",
-          "line": 87,
+          "line": 107,
           "args": [
             "object_key",
             "file_bytes",
             "content_type"
           ],
           "calls": [
+            "RuntimeError",
             "_get_client",
-            "put_object"
+            "print",
+            "put_object",
+            "range",
+            "sleep"
           ],
           "docstring": "Uploads bytes to B2 under object_key. Returns object_key unchanged"
         },
         {
           "name": "upload_file",
-          "line": 100,
+          "line": 135,
           "args": [
             "object_key",
             "local_path",
@@ -2235,7 +2239,7 @@
         },
         {
           "name": "presigned_url",
-          "line": 105,
+          "line": 140,
           "args": [
             "object_key",
             "expires_in"
@@ -2248,7 +2252,7 @@
         },
         {
           "name": "download_to_file",
-          "line": 118,
+          "line": 153,
           "args": [
             "object_key",
             "local_path"
@@ -2261,7 +2265,7 @@
         },
         {
           "name": "object_exists",
-          "line": 127,
+          "line": 162,
           "args": [
             "object_key"
           ],
@@ -2273,7 +2277,7 @@
         },
         {
           "name": "object_size",
-          "line": 140,
+          "line": 175,
           "args": [
             "object_key"
           ],
@@ -2286,7 +2290,7 @@
         },
         {
           "name": "delete_object",
-          "line": 160,
+          "line": 195,
           "args": [
             "object_key"
           ],
