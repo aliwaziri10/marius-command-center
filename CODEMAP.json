@@ -2881,28 +2881,28 @@
       "path": "scripts/trend_research.py",
       "functions": [
         {
-          "name": "fetch_top_posts",
-          "line": 52,
-          "args": [
-            "subreddit"
-          ],
+          "name": "fetch_top_articles",
+          "line": 94,
+          "args": [],
           "calls": [
-            "append",
+            "RuntimeError",
+            "format",
             "get",
             "json",
+            "now",
             "print",
             "raise_for_status",
             "range",
             "sleep",
-            "strip"
+            "strftime",
+            "timedelta"
           ],
           "docstring": ""
         },
         {
           "name": "save_signal",
-          "line": 91,
+          "line": 120,
           "args": [
-            "subreddit",
             "title",
             "score"
           ],
@@ -2914,14 +2914,18 @@
         },
         {
           "name": "main",
-          "line": 101,
+          "line": 130,
           "args": [],
           "calls": [
-            "fetch_top_posts",
+            "RuntimeError",
+            "fetch_top_articles",
+            "get",
             "len",
             "print",
+            "replace",
             "save_signal",
-            "sleep"
+            "startswith",
+            "strip"
           ],
           "docstring": ""
         }
