@@ -1,4 +1,4 @@
-# Marius / Erased — Continuation Notes (2026-08-22, CHUNK-STITCH SESSION)
+# Marius / Erased — Continuation Notes (2026-09-19, THROUGHPUT + AGNES-REPLACEMENT SESSION)
 
 **Read this entire file before touching any code.**
 
@@ -9,90 +9,96 @@ verifying it first.
 
 ---
 
-## 2026-08-22 session — YouTube uploads silently stalled since 08-17, fix in progress, NOT YET VERIFIED WORKING
+## 2026-09-19 session — B2/Agnes fixes landed, throughput math checked, Agnes-replacement researched
 
 ### What's CONFIRMED this session
 
-- Ali reported no YouTube uploads since the corrupted/144p 19-minute
-  video was fixed. Traced via direct Supabase query: two real finished
-  videos have been stuck at `status = video_generated` with ZERO upload
-  attempts — `ba5d96c8` (10 chunks, `video_generated` since 08-17
-  09:37 UTC) and `37993b31` (7 chunks, since 08-18 20:16 UTC). Both have
-  `video_url: null`, only `video_chunk_urls` populated.
-- Root cause, confirmed by reading the live `scripts/youtube_upload.py`:
-  it only ever checks `script.get("video_url")`. It has no branch for
-  `video_chunk_urls` at all — so every script that got chunked by the
-  2026-08-20 CHUNKED-UPLOAD QUALITY FIX in `video_generation.py` (which
-  splits output into `part_NNN.mp4` files instead of crushing bitrate,
-  whenever a full-quality encode exceeds Supabase's 50MB single-file
-  cap) has been silently skipped by every `youtube_upload.yml` run
-  since, with no error logged anywhere — just "Script has no video_url
-  yet. Skipping." forever.
-- Separately, `scripts/video_generation.py` got a real fix this session
-  too (commit `2cf8958`, pushed 08:05 UTC): `process_script()`'s
-  assembly step and `main()`'s per-script loop were both unprotected —
-  any exception crashed the entire run before other candidates got a
-  turn. Now wrapped in try/except, real tracebacks recorded to the new
-  `scripts.last_error`/`last_error_at` columns via `record_error()`.
-  Confirmed via query: `last_error` is empty across all scripts (no
-  crash has occurred to test it against yet, but the wrapping itself is
-  confirmed live in the fetched file).
+- **Root cause of "no video in over a month" was two real bugs, not the
+  CLIP_BATCH_LIMIT/CANDIDATE_POOL_SIZE pacing.** Both now fixed and live:
+  1. `storage_b2.py`: `upload_bytes`'s retry loop (added 2026-09-18) was
+     reusing the same cached boto3 client/connection on every retry, so a
+     dead pooled TLS connection reproduced the identical
+     `SSLEOFError`/`SSLError` 4/4 times instead of getting a fresh
+     connection. Fixed (commit `4a989ea`, 2026-09-18): every retry
+     attempt after the first now builds a brand-new client
+     (`_new_client()`), forcing a fresh TCP+TLS connection.
+  2. `agnes_client.py`'s poll-timeout crash (Agnes `ReadTimeoutError`
+     killing the whole script run) was **already fixed same-day
+     2026-09-18**, before this session started — confirmed by reading
+     the live file, no further action needed there.
+- **Checked whether raising `CLIP_BATCH_LIMIT` (currently 8) had ever
+  been tried before, per Ali's request.** Went through the full commit
+  history of `scripts/video_generation.py` (86 commits, back to file
+  creation 2026-07-08). `CLIP_BATCH_LIMIT` itself has **never** been
+  changed in any commit. The only related constant ever touched was
+  `CANDIDATE_POOL_SIZE` (5 → 15, 2026-07-25) — a different setting (how
+  many stuck scripts get considered per run, not how many shots get
+  generated). So raising `CLIP_BATCH_LIMIT` is a genuinely untried idea,
+  not a dead end.
+- **Re-checked the throughput math with the two bugs actually fixed**:
+  the 8-shot budget is spent sequentially by the oldest queued script,
+  not split evenly across 15 candidates — one script can burn a full
+  ~25-shot episode in about 4 runs (~2.7 hours) once it's succeeding.
+  The "one shot of progress per script per run" symptom Ali/Claude
+  observed before this session was almost certainly the two bugs above
+  (failing candidates burning a run's attention with `shots_used = 0`
+  and no real budget spent), not an inherent pacing ceiling. **No
+  `CLIP_BATCH_LIMIT` change made this session** — recommend watching a
+  few scheduled runs first to confirm `video_urls` is actually advancing
+  on the oldest queued script before touching this constant at all.
 
-### Fix written this session — PROCESS FAILURE, logged for accountability
+### Agnes-replacement research (requested by Ali — "generate video on a
+laptop/CPU instead of paying for Agnes")
 
-Wrote `stitch_chunks_to_local_file()` in `youtube_upload.py` (downloads
-every chunk, concatenates via moviepy, uploads the result same as
-before) and pushed it successfully via `create_or_update_file` — this
-part worked. **But I did not check `youtube_upload.yml`'s dependency
-install step before adding the moviepy import**, which is a direct
-violation of DEBUGGING_METHODOLOGY.md step 2/3 (read the actual live
-code/config the fix runs under, not just the target script). Ali ran the
-workflow and it crashed immediately: `ModuleNotFoundError: No module
-named 'moviepy'`. That workflow installs deps via a hardcoded
-`pip install requests` line — it does NOT use `requirements.txt` (which
-DOES list moviepy, confirmed) the way `video_generation.yml` and
-`narration.yml` do. This should have been checked first and wasn't.
+Researched this in depth. Honest finding: **there is no real CPU-only or
+laptop-only equivalent to what Agnes actually does for Marius** (prompt
+→ realistic AI-generated scene video). The rumor Ali saw is very likely
+about a different category of pipeline — CPU-only "faceless shorts"
+generators (e.g. `NanoBotAgent/video-generator-ytshorts`, built to run
+on free GitHub Actions CPU runners) that produce a TTS voiceover over a
+static/animated **gradient background** rendered with plain FFmpeg, not
+a real generated scene. That's a fundamentally different, much simpler
+visual style than Marius's documentary-style AI shots and would be a
+content/format change, not a drop-in Agnes replacement.
 
-Also caught (after being called out, not before): moviepy's
-`write_videofile()` needs the actual `ffmpeg` binary on the runner, not
-just the pip package — `narration.yml` has a dedicated
-`sudo apt-get install -y ffmpeg` step for this exact reason.
-`youtube_upload.yml` has neither that step nor `requirements.txt`.
+Real open-source text-to-video models that could genuinely replace
+Agnes on quality (Wan2.2, HunyuanVideo, LTX-2) all still need a real GPU
+with meaningful VRAM (8GB+ even with GGUF quantization) — none run
+usably on CPU; a CPU render of even a few seconds of real video-diffusion
+output takes on the order of hours, not viable for a daily pipeline.
+GitHub-hosted Actions runners are CPU-only for all non-Enterprise plans
+(confirmed no GPU option). The closest realistic paths to a genuinely
+cheaper/free Agnes alternative, if this is worth pursuing later:
+- A GPU-backed self-hosted runner (rent a cheap cloud GPU, e.g. a single
+  T4, and point a GitHub Actions job at it) — real infra cost, not free.
+- Offloading generation to a free-tier GPU-backed Hugging Face Space
+  (ZeroGPU) running an open model like Wan2.2 — free but rate-limited
+  and would need real integration work to swap in for the Agnes API
+  calls in `agnes_client.py`.
+- Staying on Agnes and treating today's two fixes as the actual
+  unblock — likely the highest-leverage move right now given no CPU/free
+  option matches Agnes's output quality or throughput.
 
-### CURRENT BLOCKER — needs Ali to paste manually
-
-GitHub write access is confirmed working for regular files this session
-(multiple successful pushes to `.py` and `.md` files), but **fails with
-403 "Resource not accessible by integration" specifically on
-`.github/workflows/*.yml` files** — this is very likely a missing
-`workflow` OAuth scope on the connected token, distinct from repo
-write access generally. This is a NEW finding, not previously
-documented — worth remembering: workflow YAML edits need the manual
-paste flow even when regular file pushes work fine.
-
-**youtube_upload.yml fix, NOT yet applied — Ali needs to paste this
-manually via the `.../edit/main/.github/workflows/youtube_upload.yml`
-URL:** add an `Install ffmpeg` step (`sudo apt-get update && sudo
-apt-get install -y ffmpeg`) before the existing install step, and
-change `pip install requests` to `pip install requests moviepy`.
+**No code changed for this thread this session** — flagging the
+research honestly rather than pushing a fake "laptop GPU-free" fix, since
+what's actually available wouldn't produce Marius's current visual style
+or throughput.
 
 ### NEXT STEP for next session (or later this one)
 
-1. Confirm Ali has pasted the corrected `youtube_upload.yml`.
-2. Manually trigger the `YouTube Upload` workflow (`workflow_dispatch`).
-3. Watch the real run output — don't assume success from a green
-   checkmark alone (per DEBUGGING_STANDARDS.md point 1). Confirm via
-   direct Supabase query that `ba5d96c8` or `37993b31` actually flips to
-   `status = uploaded` with a real `youtube_video_id` set.
-4. Only after that live confirmation, treat the chunk-stitch fix as
-   proven — not before.
+1. Let a few scheduled `Video Generation` runs fire now that both B2 and
+   Agnes-poll fixes are live; confirm via Supabase that `video_urls` is
+   actually advancing on the oldest `images_generated` script.
+2. Only if throughput is still clearly bottlenecked after that (not just
+   "slower than we'd like"), revisit `CLIP_BATCH_LIMIT` as a real,
+   never-before-tried lever.
+3. Agnes-replacement is parked as a real option, not abandoned — if
+   Ali wants to pursue it, the ZeroGPU/self-hosted-runner paths above are
+   the realistic next step, not a mythical CPU-only equivalent.
 
 ---
 
-*Prior session history (2026-08-20 and earlier — freeze-frames, named-
-character-in-every-shot, gender-drift-on-continuity-removal, bitrate/
-quality trade-off options, music/SFX, narration tone) trimmed from this
-file to keep it usable — see `git log -- CONTINUATION.md` for full
-detail. That work is a SEPARATE, STILL OPEN thread from this session's
-chunk-stitch issue — do not assume either session's fixes touched the
-other's problems.*
+*Prior session history (2026-08-22 chunk-stitch/YouTube-upload session
+and earlier) trimmed from this file to keep it usable — see
+`git log -- CONTINUATION.md` for full detail. That work is a SEPARATE
+thread from this session's throughput/Agnes-replacement work.*
