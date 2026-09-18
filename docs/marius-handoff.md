@@ -1,98 +1,203 @@
 # Marius Command Center — Handoff Doc
-Last updated: 2026-08-29
-Re-verify against live data — don't trust this doc at face value.
+Last updated: 2026-09-19 (IST) — full rewrite, prior content was stale since 2026-08-29.
+Re-verify against live data before trusting anything below — this doc lags reality
+by definition. If something here contradicts live Supabase/GitHub state, live state wins.
 
-## READ BEFORE EDITING ANY FILE IN scripts/
-Any session (any AI, any tool) must `view`/fetch the FULL current content
-of a file from GitHub main immediately before editing it. Do not edit
-from memory of an earlier version, a chat-log summary, or a cached
-snippet — files here have been rewritten multiple times in the same week
-by different sessions. Pasting an old version back overwrites newer fixes
-with no error or warning.
+---
 
-Current `scripts/` files (2026-08-20):
-`health_check.py`, `llm_client.py`, `narration.py`, `narration_stage.py`,
-`quality_checker.py`, `script_writing.py`, `shot_breakdown_stage.py`,
-`stall_monitor.py`, `thumbnail_generation.py`, `topic_research.py`,
-`update_status.py`, `verify_run_output.py`, `video_generation.py`,
-`youtube_upload.py`. (`image_generation.py`, `test_narration_edgetts.py`,
-`test_narration_freellm.py` also present — legacy/test, not in the live
-pipeline path; confirm before touching.)
+## STANDING RULES (read this section first, every session, no exceptions)
+
+These apply to any session — any AI, any tool, any profile — working on this repo.
+
+1. **Never edit a file from memory.** `view`/fetch the FULL current content of a
+   file from GitHub `main` immediately before editing it, every time, even if you
+   edited it minutes ago in the same session. Files here get rewritten by
+   different sessions in the same week. Pasting an old version back silently
+   overwrites newer fixes with no error or warning from GitHub.
+
+2. **Every fix gets a dated docstring/comment, in-file, at the point of the
+   change** — not just in this handoff doc. Say what broke, the confirmed root
+   cause (not a guess — cite the actual error/traceback/live data that proved
+   it), and what the fix does. This file summarizes; the code is the permanent
+   record. Follow the existing convention already used throughout every file in
+   `scripts/` (e.g. `POLL-TIMEOUT CRASH FIX (2026-09-18)` in `agnes_client.py`).
+
+3. **Update this handoff doc at the end of any session that changes root-cause-
+   relevant state** — a real bug fixed, a schema change, a provider/credential
+   swap, a new file added to the pipeline. Skipping this is what made the
+   previous version of this doc stale for three weeks. A session that only
+   answers questions or investigates without changing anything doesn't need to
+   update this file.
+
+4. **Confirm root cause from live data before fixing anything** — a Supabase
+   query, a GitHub Actions issue body, an actual traceback. Never fix based on
+   a guess or a pattern-match to "looks like the same bug as last time." Every
+   fix committed to this repo should be traceable to a specific piece of
+   evidence, not a hunch.
+
+5. **One project per session where avoidable** — don't touch Marius and Nova in
+   the same session/commit. They are separate Supabase orgs, separate repos,
+   separate B2 buckets, separate everything except the underlying agent
+   pattern. A fix confirmed on one is not automatically valid on the other —
+   re-verify independently.
+
+6. **Targeted fixes only, not full-file rewrites, unless the change genuinely
+   touches most of the file.** Preserve every existing comment/docstring in a
+   file you're editing — they're the fix history, not clutter. Only rewrite a
+   whole file (as this handoff doc itself was, this session) when the doc/file
+   is broadly stale, not for a single fix.
+
+7. **Never assume a workflow that "exits 0" actually did anything.** This
+   pipeline has a confirmed history (`trend_research.py`, fixed 2026-09-19) of
+   a script silently swallowing every failure with `print()` + `continue` and
+   exiting clean while doing nothing at all, for weeks, with zero GitHub issues
+   ever opened. When investigating "why isn't X happening," check the real
+   data the script was supposed to produce (a table's row count, a file's
+   existence) — not just whether its workflow runs show green.
+
+8. **Secrets can silently contain leading/trailing whitespace or newlines from
+   how they were pasted in.** This has caused a full pipeline stall at least
+   once (`B2_KEY_ID`, 2026-09-14/18 — see below). Every secret this pipeline
+   reads should be `.strip()`'d at the point of use, defensively, regardless of
+   whether the current value is known-clean.
+
+---
 
 ## Pipeline
-topic_research → script_writing (now split: llm_client.py +
-narration_stage.py + shot_breakdown_stage.py, orchestrated by
-script_writing.py) → narration → images_generated → video_generation
-(resumable) → video_generated → uploaded. Channel: @erased.fromhistory
-(Erased From History).
 
-## Current LLM provider: Gemini (`gemini-3.5-flash-lite`)
-Switched back from Groq 2026-08-17. Uses `GEMINI_API_KEY` secret
-(confirmed present in repo). Groq abandoned because its 429s can show
-FULLY replenished per-minute headers (1000/1000 requests, 12000/12000
-tokens) while still permanently failing — the real constraint (likely
-Groq's daily TPD cap) is structurally invisible in anything readable from
-the response. Gemini's 429 body instead names the exact quota metric hit
-(`quotaMetric`/`quotaId`) — an unambiguous signal Groq never gave.
-`llm_client.py` now raises `DailyQuotaExhausted` only when the body
-explicitly names a daily/free-tier metric, not from guessed headers.
+`topic_research` (grounded, since 2026-09-19, by real Wikipedia-pageviews
+trend signals — see below) → `script_writing` (orchestrates `llm_client.py` +
+`narration_stage.py` + `shot_breakdown_stage.py`) → `narration` → `images_generated`
+→ `video_generation` (resumable, per-script shot budget shared across a run) →
+`video_generated` → `youtube_upload` → `uploaded`. Channel: `@erased.fromhistory`
+("Erased From History").
 
-**Do not switch providers again without a live test proving the new
-provider's failure mode is actually diagnosable — Groq's silent-failure
-behavior is exactly why it was replaced. See DailyQuotaExhausted class
-docstring in llm_client.py for the full reasoning.**
+Housekeeping workflows: `health_check`, `stall_monitor`, `update_status`,
+`cleanup_dead_storage`, `code_health_check`, `codemap`, `thumbnail_generation`,
+`dependency_graph`.
 
-## Confirmed working (2026-08-20)
-```sql
-select id, status, created_at from scripts order by created_at desc limit 5;
-```
-5 new scripts since 2026-08-19, most recent same-day. Status breakdown:
-23 `uploaded`, 18 `archived`, 7 `images_generated` (normal queue depth).
-Zero-output period (2026-08-06 to 2026-08-17) is resolved.
+## Current `scripts/` files (2026-09-19, confirmed live via GitHub listing)
 
-## File split (2026-08-18, separate session)
-`script_writing.py` used to hold everything. Now:
-- `llm_client.py`: `call_llm()`, `retryable_request()`, `InfraFailure`,
-  `DailyQuotaExhausted`, JSON extraction/sanitization
-- `narration_stage.py`: `generate_narration()` and its prompts
-- `shot_breakdown_stage.py`: `generate_shot_breakdown()`, shot validation,
-  chunking logic
-- `script_writing.py`: orchestration only (fetch topic, call both
-  stages, save, update status)
-No behavior change from the split itself — same logic, moved.
+Pipeline path: `agnes_client.py`, `assembly_stage.py`, `clip_generation.py`,
+`health_agent.py`, `health_check.py`, `llm_client.py`, `narration.py`,
+`narration_stage.py`, `prompt_builder.py`, `quality_checker.py`,
+`script_writing.py`, `shot_breakdown_stage.py`, `stall_monitor.py`,
+`storage_b2.py`, `thumbnail_generation.py`, `topic_research.py`,
+`trend_research.py`, `update_status.py`, `verify_run_output.py`,
+`video_generation.py`, `youtube_upload.py`, `cleanup_dead_storage.py`.
 
-## Video quality fix (2026-08-20, separate session)
-19-minute upload ("The Gambian Weaver and Refugee Relief",
-`ba5d96c8-5c00-4619-9d84-830291ed9aab`) came out visibly bad quality.
-Root cause: video bitrate scaled down as episode duration increased.
-Fixed in `video_generation.py` — bitrate now fixed at 3000 kbps
-regardless of duration (`QUALITY_VIDEO_BITRATE_KBPS`). That script was
-reset to `images_generated` with video fields cleared on 2026-08-20 to
-regenerate at the corrected bitrate — **will create a NEW public YouTube
-upload, does not overwrite the old one**. Old video
-(`youtube.com/watch?v=g_dJrGizi9Q`) needs manual deletion by Zia once the
-new one is confirmed live.
+Legacy/test, not in the live pipeline path (confirm before touching):
+`image_generation.py`, `test_narration_edgetts.py`, `test_narration_freellm.py`.
 
-## Color/style — do not confuse with Nova
-Marius `QUALITY_GUARD` (in `video_generation.py`) explicitly requires
-**vivid saturated color**, explicitly bans desaturation/sepia/monochrome.
-Marius has never had a monochrome guard. Full-motion black & white is
-**Nova-only** (separate repo, separate pipeline). Confirmed live in code
-2026-08-20 — do not carry Nova's B&W direction into Marius work.
+## Storage: Backblaze B2 (migrated 2026-09-02, still current)
 
-## Abbreviation-split fix — confirmed matches Nova (2026-08-29)
-Both `scripts/narration.py` (Marius) and NovaCommandCenter's
-`.github/scripts/narrate.py` (Alternate Earth) were fetched live from
-GitHub main this session and compared directly. `split_into_segments()`
-and its `_ABBREVIATIONS` set are byte-for-byte identical logic in both
-files (same regex, same abbreviation/initial guard, same fallback). This
-confirms the fix for the "narration stutters / doesn't finish a sentence"
-bug (root cause: naive `.`/`!`/`?` split treating "Dr.", "U.S.", etc. as
-sentence ends) is committed and live on Marius, not just planned.
+All video/image assets live in B2 (bucket `marius-media-zia`), not Supabase
+Storage (Supabase org is Free tier — real per-object size ceiling). Only the
+permanent, non-expiring B2 **object key** is ever persisted to Supabase
+(`video_urls`, `video_url`, `video_chunk_urls`, `character_reference_url`) —
+never a presigned URL. See `storage_b2.py` module docstring for the full
+reasoning (a single resumable episode can span 19+ days across runs, so any
+fixed-expiry URL would silently break mid-episode).
 
-**Not yet verified by this check:** whether the fix actually eliminates
-the audible mid-sentence pause on a real rendered episode — Marius has
-stopped generating videos until end of September, so no fresh narration
-output exists to listen-test against yet. Treat the code-level fix as
-confirmed; treat the audible-result fix as still open until a real
-post-fix clip can be reviewed.
+## Supabase project (re-verify at the start of every session — this has
+changed twice before)
+
+Project ID as of 2026-09-18: `iwgocbiqjjhlvkygmcir`, name `marius`, org
+`pvckgioutauwsnbvhwfs`, region `ap-northeast-1`. Separate org from Nova's —
+never assume shared quota or shared anything with Nova's Supabase project.
+
+---
+
+## Session log (most recent first — keep this section, don't delete old
+entries; trim only once it gets unwieldy)
+
+### 2026-09-19 — Trend grounding was completely dead since creation
+`trend_signals` table had **zero rows, ever**, since it was created
+2026-09-13 — `trend_research.py` ran daily via cron and silently saved
+nothing every single time. Confirmed root cause: the old version pulled
+from Reddit's unauthenticated JSON API, which blocks essentially all
+cloud/datacenter IP traffic (GitHub Actions runners are Azure) — no
+User-Agent or retry-count fix gets around this. Compounding it: every
+failure path caught its own exception, printed, and continued — the
+workflow always exited 0 and never opened a single failure issue, so this
+was invisible from the Actions UI. Rewrote `trend_research.py` to pull
+from Wikipedia's official Pageviews API instead (public, unauthenticated,
+does not block cloud IPs), and made a total-failure run raise instead of
+silently succeeding at doing nothing. `topic_research.py` already treats
+trend_signals as optional best-effort grounding (unchanged) — this fix
+just makes sure that grounding is ever actually present.
+
+Separately, 56 of 72 topics were sitting in `generation_failed` (content-
+quality rejections in `shot_breakdown_stage.py` — modern-object mentions,
+hook-text length, independent-shot-quality checker rejections — genuine
+misses, not one repeating bug) leaving only 1 topic in the `pending`
+queue. Requeued all 56 back to `pending` for a fresh generation attempt.
+`MAX_GENERATION_ATTEMPTS = 3` in `shot_breakdown_stage.py` is thin against
+how often these hard-rejections fire — worth revisiting if this recurs.
+
+### 2026-09-18/19 — Video generation stall, three independent root causes
+`video_generation` had been failing continuously since ~2026-09-06 (254+
+open "workflow failed" issues, run #965 through #1001+), leaving every
+`images_generated` script stuck at 0-1 clips generated. Three separate,
+independently confirmed causes, fixed in this order:
+1. `B2_KEY_ID` GitHub secret had a literal embedded newline, corrupting
+   the AWS SigV4 Authorization header on every single upload
+   (`ValueError: Invalid header value`) — fixed by Zia re-pasting the
+   secret clean; `storage_b2.py` also defensively `.strip()`s all three
+   B2 env vars now regardless.
+2. `poll_agnes_task` in `agnes_client.py` had a bare 30s timeout with no
+   try/except — a normal slow-but-not-actually-failed Agnes poll response
+   crashed the entire script's run instead of just waiting and polling
+   again. Fixed: catches `requests.exceptions.RequestException` inside
+   the poll loop, retries up to `POLL_MAX_CONSECUTIVE_NETWORK_ERRORS`
+   times before giving up.
+3. `storage_b2.upload_bytes` had no retry around `put_object` — a dropped
+   TLS connection mid-upload (`SSLEOFError`) killed the run even though
+   boto3's own default retry (3 attempts) had already run and still
+   surfaced it. Fixed: explicit retry loop, `UPLOAD_MAX_RETRIES = 4`.
+
+Separately (same investigation): `color_palette` was added to
+`shot_breakdown_stage.py`'s write-time validation on 2026-08-20, but the
+matching Supabase column was **never created** — every write of it since
+then silently failed against a schema PostgREST rejected, and
+`verify_run_output.py`'s script_writing check has been failing on every
+run since, for every script created after that date, with the real
+`color_palette` text permanently lost (generated in-memory, never
+persisted). Fixed: column added (`ALTER TABLE scripts ADD COLUMN
+color_palette text`), the 15 affected existing rows backfilled with a
+placeholder (their real palette text is unrecoverable — the shots/video
+for those episodes were already generated before this was caught, so the
+placeholder has no practical effect on those specific episodes).
+
+**Not yet verified:** whether a full script now completes end-to-end
+(images_generated → video_generated → uploaded) post-fix — check
+`video_next_index` / clip counts against `total_shots` for the
+in-progress candidates on the next session, and confirm at least one new
+`uploaded` script appears.
+
+---
+
+## Older history (pre-2026-09-18, unverified against current live state —
+kept for context only, do not trust without re-checking)
+
+- LLM provider: Gemini, `gemini-3.5-flash-lite` model (switched back from
+  Groq 2026-08-17 — Groq's 429 headers could show fully replenished quota
+  while still permanently failing on an invisible daily cap; Gemini names
+  the exact quota metric hit instead). Do not switch providers again
+  without a live test proving the new provider's failure mode is
+  diagnosable.
+- `script_writing.py` was split (2026-08-18) into `llm_client.py` /
+  `narration_stage.py` / `shot_breakdown_stage.py` + orchestration —
+  no behavior change from the split itself.
+- Video bitrate fixed at `QUALITY_VIDEO_BITRATE_KBPS` regardless of
+  duration (2026-08-20) — previously scaled down on longer episodes,
+  visibly hurting quality.
+- Marius `QUALITY_GUARD` explicitly requires vivid saturated color, bans
+  desaturation/sepia/monochrome. **Marius has never had a monochrome
+  guard** — full-motion black & white is Nova-only. Do not carry Nova's
+  B&W direction into Marius work.
+- Narration sentence-splitting (`_ABBREVIATIONS` guard in `narration.py`)
+  confirmed byte-for-byte identical to Nova's equivalent as of 2026-08-29
+  — fixes the "narration cuts off mid-sentence on Dr./U.S./etc." bug at
+  the code level. Whether this actually eliminates the audible pause on a
+  real rendered episode was still unverified as of that date.
