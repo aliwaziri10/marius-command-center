@@ -70,6 +70,25 @@ a retried request on the same one. upload_bytes now forces a new client
 on every retry attempt (attempt > 0) instead of reusing the cached
 singleton, while normal (non-retry, non-upload) callers still get the
 cheap cached client via _get_client().
+
+CHECKSUM-COMPAT CHANGE (2026-09-19) - HYPOTHESIS, NOT YET VERIFIED BY A
+LIVE RUN: the fresh-client fix above (commit 4a989ea, pushed 20:56 UTC)
+did NOT clear the failure - script e086c4f2 logged a new 4/4 upload
+failure at 21:53:45 UTC, well after that commit, from a run that should
+have started on the fixed code (unconfirmed without the run's log - check
+for "with a fresh connection" in its retry lines). requirements.txt
+leaves boto3 unpinned, so every run installs the latest release. boto3
+1.36+ turned on default request checksums (aws-chunked/trailer
+integrity protection), which several S3-compatible providers, Backblaze
+B2 among them, have had trouble with. Uploads have not worked on B2 with
+this pipeline since the 2026-09-02 migration (video_next_index is 0 for
+every queued script), which fits a client-config incompatibility better
+than random connection flakiness. _client_config() below therefore sets
+request_checksum_calculation / response_checksum_validation to
+"when_required" (the documented opt-out). Falls back to the plain config
+on older botocore that does not know those options. If a live run (or
+scripts/b2_preflight.py) still fails 4/4 with this in place, revert
+nothing - it is harmless - and treat this hypothesis as ruled out.
 """
 
 import time
@@ -105,6 +124,22 @@ UPLOAD_RETRY_WAIT_SECONDS = 8
 _client = None
 
 
+def _client_config():
+    """CHECKSUM-COMPAT CHANGE (2026-09-19, HYPOTHESIS - see module
+    docstring): opts out of boto3 1.36+'s default request/response
+    checksums, which B2's S3 API has had trouble with. Older botocore
+    raises TypeError on unknown Config options and also does not add the
+    default checksums, so plain config is the correct fallback there."""
+    try:
+        return Config(
+            signature_version="s3v4",
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
+        )
+    except TypeError:
+        return Config(signature_version="s3v4")
+
+
 def _new_client():
     """Builds a brand-new boto3 S3 client (fresh TCP+TLS connection,
     fresh connection pool) rather than reusing any cached one. Used by
@@ -114,7 +149,7 @@ def _new_client():
         endpoint_url=f"https://{B2_ENDPOINT_URL}",
         aws_access_key_id=B2_KEY_ID,
         aws_secret_access_key=B2_APPLICATION_KEY,
-        config=Config(signature_version="s3v4"),
+        config=_client_config(),
     )
 
 
