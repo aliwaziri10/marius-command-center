@@ -41,14 +41,27 @@ timeout caused retryable_request to exhaust its retries and raise
 RuntimeError, the exception propagated uncaught and crashed the entire
 script - reported as a hard workflow failure - instead of being treated
 as an ordinary transient infra failure like every other Supabase/Gemini
-call in this pipeline. This is the confirmed root cause of every "Script
-Writing workflow failed" issue since 2026-09-06: zero rows were ever
-written to the scripts table and zero new topics were marked
-generation_failed in that entire window, meaning topics were never even
-being picked up - the crash was happening before the per-topic loop ever
-started. Fixed by wrapping the call and treating a RuntimeError here
-exactly like InfraFailure elsewhere in this file: log it and exit 0 so
-the run isn't reported as failed, and the next scheduled run retries.
+call in this pipeline. This was believed at the time to be the confirmed
+root cause of every "Script Writing workflow failed" issue since
+2026-09-06.
+
+UNCAUGHT-INFRA-CRASH FIX WAS INCOMPLETE (2026-09-19) - CONFIRMED live via
+GitHub issues #1130 through #1152: Script Writing kept failing on every
+run from 2026-09-15 through 2026-09-18, well after the 2026-09-13 fix
+above was committed - meaning that fix did not actually stop the crashes,
+it only moved the exposed window earlier in the run. Root cause: the same
+class of uncaught-RuntimeError-from-retryable_request bug also existed in
+save_script() and mark_topic_scripted(), both called AFTER the per-topic
+try/except block in the loop below (which only wraps generate_script()).
+A transient Supabase timeout during the save-script POST or the
+mark-scripted PATCH - the exact same free-tier "Warp server error"
+condition named in the 2026-09-13 fix - still crashed the whole run
+uncaught, just one or two calls later than the case that was actually
+fixed. Fixed by widening the try/except to cover the entire per-topic
+body (generate, save, and mark) as one unit: any RuntimeError from any
+Supabase/Gemini call anywhere in a topic's processing is now treated as
+an ordinary infra failure - logged, and the run moves on cleanly - instead
+of only failures during generation being caught.
 
 === FULL PROVIDER-SWITCH HISTORY (preserved for context) ===
 
@@ -224,8 +237,26 @@ def main():
 
     for topic in topics:
         print(f"Writing script for: {topic['title']}")
+
+        # UNCAUGHT-INFRA-CRASH FIX WAS INCOMPLETE (2026-09-19): see module
+        # docstring. This try/except now wraps generation AND save AND
+        # mark-scripted as one unit - previously only generate_script() was
+        # covered, so a transient Supabase failure during save_script() or
+        # mark_topic_scripted() still crashed the whole run uncaught,
+        # exactly the bug the 2026-09-13 fix was supposed to have already
+        # eliminated, confirmed still happening on every run 2026-09-15
+        # through 2026-09-18 (issues #1130-#1152).
         try:
             result = generate_script(topic["title"], topic["angle"])
+            save_script(
+                topic["id"],
+                result["narration_text"],
+                result["shot_list"],
+                result["music_mood"],
+                result["hook_text"],
+                result["setting_and_characters"],
+            )
+            mark_topic_scripted(topic["id"])
         except DailyQuotaExhausted as e:
             # Every remaining topic in this batch would hit the exact same
             # wall - stop the whole run immediately instead of burning
@@ -244,18 +275,23 @@ def main():
                   f"this run instead of exiting: {e}")
             continue
         except RuntimeError as e:
+            # Covers: a genuine content/shot-breakdown failure from
+            # generate_script (existing behavior), AND now also a Supabase
+            # infra failure during save_script/mark_topic_scripted (new).
+            # These two cases are handled the same way here deliberately:
+            # if the script was never saved, marking generation_failed is
+            # correct and safe. If save_script DID succeed but
+            # mark_topic_scripted then hit an infra RuntimeError (not its
+            # own "0 rows matched" case, which already has a clear message),
+            # this will mark the topic generation_failed even though a
+            # scripts row exists for it - an inconsistent state, but one
+            # that surfaces loudly with the real error message attached
+            # instead of crashing the whole run silently. Prefer
+            # investigating a generation_failed topic with an infra-looking
+            # reason over resetting it blindly.
             mark_topic_generation_failed(topic["id"], str(e))
             continue
 
-        save_script(
-            topic["id"],
-            result["narration_text"],
-            result["shot_list"],
-            result["music_mood"],
-            result["hook_text"],
-            result["setting_and_characters"],
-        )
-        mark_topic_scripted(topic["id"])
         print("Done.")
         return
 
