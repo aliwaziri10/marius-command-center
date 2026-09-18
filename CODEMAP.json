@@ -176,7 +176,7 @@
       "functions": [
         {
           "name": "round_to_valid_frames",
-          "line": 77,
+          "line": 101,
           "args": [
             "num_frames"
           ],
@@ -188,7 +188,7 @@
         },
         {
           "name": "create_agnes_task",
-          "line": 89,
+          "line": 113,
           "args": [
             "prompt",
             "num_frames",
@@ -212,7 +212,7 @@
         },
         {
           "name": "extract_video_url",
-          "line": 170,
+          "line": 194,
           "args": [
             "data"
           ],
@@ -227,7 +227,7 @@
         },
         {
           "name": "poll_agnes_task",
-          "line": 181,
+          "line": 205,
           "args": [
             "video_id",
             "max_wait",
