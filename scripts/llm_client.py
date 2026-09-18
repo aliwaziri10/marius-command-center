@@ -139,6 +139,20 @@ call_llm() itself raises a clear, specific RuntimeError up front if it's
 None - so a script that actually needs Gemini still fails loudly and
 immediately if the key is missing, but a script that merely imports this
 module for its Supabase helpers is completely unaffected either way.
+
+FAILURE-WINDOW LOGGING FIX (2026-09-19): confirmed live - a run hit
+"Expecting value: line 217 column 24 (char 12915)" in extract_json() and
+every one of the 8 repairs still failed, but the failure log only printed
+the first 1500 chars of the candidate - useless for an error 12,915 chars
+in, hiding the actual evidence needed to diagnose this new malformed-JSON
+shape (distinct from the unquoted-key/trailing-comma cases already fixed
+above). Per this repo's standing rule against fixing without live
+evidence, no new repair regex is being guessed at here. extract_json()'s
+total-failure log now also prints a window of text centered on the
+JSONDecodeError's own reported character offset (its .pos attribute) -
+the actual text at and around the real failure point, wherever in the
+candidate that falls - so the next occurrence of this shape gives real
+evidence instead of another guess from an offset alone.
 """
 
 import os
@@ -471,7 +485,22 @@ def extract_json(raw_text):
     was widened (see its docstring) rather than adding a 9th/10th repair
     entry - it now covers both the fully-unquoted and stray-trailing-quote
     shapes under the same repair name, so the existing 8-entry attempts
-    list below did not need to change."""
+    list below did not need to change.
+
+    FAILURE-WINDOW LOGGING FIX (2026-09-19): confirmed live - a run hit
+    "Expecting value: line 217 column 24 (char 12915)" and every one of
+    the 8 repairs still failed, but the existing log only printed the
+    first 1500 chars of the candidate - useless for an error 12,915 chars
+    in, hiding the actual evidence needed to diagnose this new malformed-
+    JSON shape (distinct from the unquoted-key/trailing-comma cases already
+    fixed). Per this repo's standing rule against fixing without live
+    evidence, no new repair is being guessed at here. Instead: on total
+    failure, the log now also prints a window centered on the
+    JSONDecodeError's own reported character offset (via its .pos
+    attribute) - the actual text at and around the real failure point -
+    regardless of how far into the candidate that is, so the next
+    occurrence gives real evidence instead of another guess from an
+    offset alone."""
     if not raw_text:
         raise ValueError("Model returned empty/None content (likely a dropped or refused generation).")
     text = raw_text.strip()
@@ -518,5 +547,18 @@ def extract_json(raw_text):
             last_error = e
             continue
 
-    print(f"[extract_json] all repair attempts failed ({last_error}). Raw candidate (first 1500 chars): {candidate[:1500]!r}")
+    # FAILURE-WINDOW LOGGING FIX (2026-09-19): print the real text around
+    # the actual reported failure offset, not just the start of the
+    # candidate - the start is often nowhere near where parsing broke.
+    print(f"[extract_json] all repair attempts failed ({last_error}).")
+    if last_error is not None and hasattr(last_error, "pos"):
+        pos = last_error.pos
+        window_start = max(0, pos - 300)
+        window_end = min(len(candidate), pos + 300)
+        print(
+            f"[extract_json] text around reported failure offset (char {pos}), "
+            f"showing chars {window_start}-{window_end}: "
+            f"{candidate[window_start:window_end]!r}"
+        )
+    print(f"[extract_json] raw candidate (first 1500 chars, for overall shape context): {candidate[:1500]!r}")
     raise last_error
