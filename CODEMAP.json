@@ -2199,18 +2199,27 @@
       "path": "scripts/storage_b2.py",
       "functions": [
         {
-          "name": "_get_client",
-          "line": 94,
+          "name": "_new_client",
+          "line": 108,
           "args": [],
           "calls": [
             "Config",
             "client"
           ],
+          "docstring": "Builds a brand-new boto3 S3 client (fresh TCP+TLS connection,"
+        },
+        {
+          "name": "_get_client",
+          "line": 121,
+          "args": [],
+          "calls": [
+            "_new_client"
+          ],
           "docstring": ""
         },
         {
           "name": "upload_bytes",
-          "line": 107,
+          "line": 128,
           "args": [
             "object_key",
             "file_bytes",
@@ -2219,6 +2228,7 @@
           "calls": [
             "RuntimeError",
             "_get_client",
+            "_new_client",
             "print",
             "put_object",
             "range",
@@ -2228,7 +2238,7 @@
         },
         {
           "name": "upload_file",
-          "line": 135,
+          "line": 161,
           "args": [
             "object_key",
             "local_path",
@@ -2243,7 +2253,7 @@
         },
         {
           "name": "presigned_url",
-          "line": 140,
+          "line": 166,
           "args": [
             "object_key",
             "expires_in"
@@ -2256,7 +2266,7 @@
         },
         {
           "name": "download_to_file",
-          "line": 153,
+          "line": 179,
           "args": [
             "object_key",
             "local_path"
@@ -2269,7 +2279,7 @@
         },
         {
           "name": "object_exists",
-          "line": 162,
+          "line": 188,
           "args": [
             "object_key"
           ],
@@ -2281,7 +2291,7 @@
         },
         {
           "name": "object_size",
-          "line": 175,
+          "line": 201,
           "args": [
             "object_key"
           ],
@@ -2294,7 +2304,7 @@
         },
         {
           "name": "delete_object",
-          "line": 195,
+          "line": 221,
           "args": [
             "object_key"
           ],
