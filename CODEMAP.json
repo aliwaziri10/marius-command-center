@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 26,
+  "file_count": 27,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -663,6 +663,42 @@
         "FREESOUND_API_KEY",
         "HF_TOKEN"
       ],
+      "tables": []
+    },
+    {
+      "path": "scripts/b2_preflight.py",
+      "functions": [
+        {
+          "name": "probe",
+          "line": 41,
+          "args": [
+            "label",
+            "n_bytes"
+          ],
+          "calls": [
+            "print",
+            "time",
+            "upload_bytes",
+            "urandom"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 53,
+          "args": [],
+          "calls": [
+            "all",
+            "delete_object",
+            "exit",
+            "print",
+            "probe",
+            "values"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [],
       "tables": []
     },
     {
