@@ -8,6 +8,23 @@ the exception types the rest of the pipeline catches to decide what kind
 of failure just happened (content-policy rejection vs transient overload
 vs a genuine bad-request bug). No Supabase/B2/moviepy logic lives here -
 this file only knows about Agnes's HTTP contract.
+
+POLL-TIMEOUT CRASH FIX (2026-09-18): poll_agnes_task's per-request
+requests.get() had a bare timeout=30 with no try/except around it. Agnes
+routinely takes longer than 30s to answer a single poll request while a
+video is still rendering - that's normal load, not a failure - but a
+ReadTimeoutError/ConnectionError from requests is not one of
+ContentPolicyRejection/AgnesOverloadedError/AgnesBadRequestError, so it
+was never caught by process_script's per-shot handling in
+video_generation.py. It fell straight through to main()'s generic
+per-script catch-all, which logs it and moves to the next script -
+silently killing that script's progress for the run instead of just
+waiting and polling again. Confirmed live: scripts 4d32a7b4 and
+b8a63d7f both stuck at 1/N clips for days with this exact traceback in
+last_error. Fixed by catching requests.exceptions.RequestException
+inside the poll loop and treating it as a transient miss (log, sleep the
+normal interval, try again) instead of letting it propagate - the
+existing max_wait budget still bounds total time spent polling.
 """
 
 import os
@@ -39,6 +56,13 @@ MAX_CLIP_SECONDS = MAX_FRAMES / FRAME_RATE
 AGNES_RETRYABLE_CODES = {429, 500, 502, 503, 504}
 AGNES_MAX_RETRIES = 4
 AGNES_IMAGE_MAX_RETRIES = 3
+
+# POLL-TIMEOUT CRASH FIX (2026-09-18): a single dropped/slow poll request
+# no longer ends the whole poll loop - it's retried up to this many times
+# (each still bounded by the per-request timeout below) before giving up
+# and surfacing as AgnesOverloadedError, same as a real max_wait timeout.
+POLL_REQUEST_TIMEOUT = 30
+POLL_MAX_CONSECUTIVE_NETWORK_ERRORS = 5
 
 
 class ContentPolicyRejection(Exception):
@@ -180,13 +204,33 @@ def extract_video_url(data):
 
 def poll_agnes_task(video_id, max_wait=300, interval=10):
     waited = 0
+    consecutive_network_errors = 0
     while waited < max_wait:
-        resp = requests.get(
-            AGNES_POLL_URL,
-            params={"video_id": video_id, "model_name": "agnes-video-v2.0"},
-            headers=AGNES_HEADERS,
-            timeout=30,
-        )
+        try:
+            resp = requests.get(
+                AGNES_POLL_URL,
+                params={"video_id": video_id, "model_name": "agnes-video-v2.0"},
+                headers=AGNES_HEADERS,
+                timeout=POLL_REQUEST_TIMEOUT,
+            )
+        except requests.exceptions.RequestException as e:
+            # POLL-TIMEOUT CRASH FIX (2026-09-18): a slow/dropped poll
+            # request used to propagate straight up and kill this whole
+            # script's run (see module docstring). Treat it exactly like a
+            # not-ready-yet poll instead - wait the normal interval and
+            # try again, bounded by the same max_wait budget, but bail
+            # out with AgnesOverloadedError if the network itself looks
+            # broken rather than Agnes just being slow.
+            consecutive_network_errors += 1
+            print(f"AGNES POLL network error ({consecutive_network_errors}/{POLL_MAX_CONSECUTIVE_NETWORK_ERRORS}): {e}")
+            if consecutive_network_errors >= POLL_MAX_CONSECUTIVE_NETWORK_ERRORS:
+                raise AgnesOverloadedError(f"Agnes poll network errors {consecutive_network_errors}x in a row for video_id {video_id}: {e}")
+            time.sleep(interval)
+            waited += interval
+            continue
+
+        consecutive_network_errors = 0
+
         if resp.status_code == 400 and "content_policy_violation" in resp.text:
             raise ContentPolicyRejection(resp.text)
         if resp.status_code >= 400:
