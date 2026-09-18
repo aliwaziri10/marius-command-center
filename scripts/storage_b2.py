@@ -56,6 +56,20 @@ used elsewhere in this pipeline - see CLIP_VERIFY_RETRIES in
 video_generation.py and the Agnes poll retry in agnes_client.py) so a
 single dropped TLS connection during a large video upload no longer
 kills the entire script's run.
+
+STALE-CONNECTION RETRY FIX (2026-09-19) - CONFIRMED live: the retry loop
+added above was still producing 4/4 identical SSLEOFErrors on the same
+shot across multiple scripts. Root cause: the module-level `_client`
+singleton was being reused across every retry attempt, so when the
+underlying TLS connection itself had already died (not just one HTTP
+request), every retry reused the same dead pooled connection out of
+boto3/urllib3's connection pool and reproduced the exact same failure
+every time - a well-known boto3/urllib3 pattern. A dead keep-alive
+connection needs a brand-new client (fresh TCP+TLS connection), not just
+a retried request on the same one. upload_bytes now forces a new client
+on every retry attempt (attempt > 0) instead of reusing the cached
+singleton, while normal (non-retry, non-upload) callers still get the
+cheap cached client via _get_client().
 """
 
 import time
@@ -91,16 +105,23 @@ UPLOAD_RETRY_WAIT_SECONDS = 8
 _client = None
 
 
+def _new_client():
+    """Builds a brand-new boto3 S3 client (fresh TCP+TLS connection,
+    fresh connection pool) rather than reusing any cached one. Used by
+    upload_bytes on retry attempts - see STALE-CONNECTION RETRY FIX."""
+    return boto3.client(
+        "s3",
+        endpoint_url=f"https://{B2_ENDPOINT_URL}",
+        aws_access_key_id=B2_KEY_ID,
+        aws_secret_access_key=B2_APPLICATION_KEY,
+        config=Config(signature_version="s3v4"),
+    )
+
+
 def _get_client():
     global _client
     if _client is None:
-        _client = boto3.client(
-            "s3",
-            endpoint_url=f"https://{B2_ENDPOINT_URL}",
-            aws_access_key_id=B2_KEY_ID,
-            aws_secret_access_key=B2_APPLICATION_KEY,
-            config=Config(signature_version="s3v4"),
-        )
+        _client = _new_client()
     return _client
 
 
@@ -110,10 +131,15 @@ def upload_bytes(object_key, file_bytes, content_type="application/octet-stream"
 
     UPLOAD SSL-DROP RETRY FIX (2026-09-18): retries on a dropped
     connection / SSL error during the upload itself, instead of letting a
-    single bad connection kill the whole run (see module docstring)."""
-    client = _get_client()
+    single bad connection kill the whole run (see module docstring).
+
+    STALE-CONNECTION RETRY FIX (2026-09-19): every retry attempt after
+    the first uses a brand-new client instead of the cached singleton,
+    since a dead keep-alive TLS connection reproduces the identical
+    SSLEOFError if it's simply reused (see module docstring)."""
     last_error = None
     for attempt in range(UPLOAD_MAX_RETRIES):
+        client = _get_client() if attempt == 0 else _new_client()
         try:
             client.put_object(
                 Bucket=B2_BUCKET_NAME,
@@ -127,7 +153,7 @@ def upload_bytes(object_key, file_bytes, content_type="application/octet-stream"
             wait = UPLOAD_RETRY_WAIT_SECONDS * (attempt + 1)
             print(f"B2 upload error for {object_key!r} (attempt {attempt + 1}/{UPLOAD_MAX_RETRIES}): {e}")
             if attempt < UPLOAD_MAX_RETRIES - 1:
-                print(f"Retrying upload in {wait}s...")
+                print(f"Retrying upload in {wait}s with a fresh connection...")
                 time.sleep(wait)
     raise RuntimeError(f"B2 upload failed after {UPLOAD_MAX_RETRIES} attempts for {object_key!r}: {last_error}")
 
