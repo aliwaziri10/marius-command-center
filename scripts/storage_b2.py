@@ -42,11 +42,27 @@ common, easy-to-reintroduce mistake, defensively .strip()'d all three at
 the point they're read - this is a permanent, safe fix regardless of
 whether the underlying secret is ever cleaned up, and costs nothing if
 the values were already clean.
+
+UPLOAD SSL-DROP RETRY FIX (2026-09-18) - CONFIRMED live: with the header
+bug above actually fixed (secret re-pasted clean), uploads started
+failing instead with botocore.exceptions.SSLError /
+ssl.SSLEOFError("EOF occurred in violation of protocol") mid-upload to
+the B2 endpoint - a dropped connection, not a credential or logic
+problem. boto3's own default retry handling (legacy mode, 3 attempts)
+already ran and still surfaced this, so it's not simply under-retried at
+the botocore layer for this particular exception type. upload_bytes now
+wraps put_object in its own explicit retry loop (same pattern already
+used elsewhere in this pipeline - see CLIP_VERIFY_RETRIES in
+video_generation.py and the Agnes poll retry in agnes_client.py) so a
+single dropped TLS connection during a large video upload no longer
+kills the entire script's run.
 """
 
+import time
 import os
 import boto3
 from botocore.client import Config
+from botocore.exceptions import BotoCoreError, ClientError
 
 # CREDENTIAL WHITESPACE FIX (2026-09-14): see module docstring. .strip()
 # defends against a stray leading/trailing newline or space in any of
@@ -68,6 +84,10 @@ B2_BUCKET_NAME = os.environ.get("B2_BUCKET_NAME", "marius-media-zia").strip()
 # never expire.
 PRESIGNED_URL_EXPIRY_SECONDS = 3600  # 1 hour - generous for any single run's own use of a URL it just requested
 
+# UPLOAD SSL-DROP RETRY FIX (2026-09-18): see module docstring.
+UPLOAD_MAX_RETRIES = 4
+UPLOAD_RETRY_WAIT_SECONDS = 8
+
 _client = None
 
 
@@ -86,15 +106,30 @@ def _get_client():
 
 def upload_bytes(object_key, file_bytes, content_type="application/octet-stream"):
     """Uploads bytes to B2 under object_key. Returns object_key unchanged
-    (the caller persists this key to Supabase - never a URL)."""
+    (the caller persists this key to Supabase - never a URL).
+
+    UPLOAD SSL-DROP RETRY FIX (2026-09-18): retries on a dropped
+    connection / SSL error during the upload itself, instead of letting a
+    single bad connection kill the whole run (see module docstring)."""
     client = _get_client()
-    client.put_object(
-        Bucket=B2_BUCKET_NAME,
-        Key=object_key,
-        Body=file_bytes,
-        ContentType=content_type,
-    )
-    return object_key
+    last_error = None
+    for attempt in range(UPLOAD_MAX_RETRIES):
+        try:
+            client.put_object(
+                Bucket=B2_BUCKET_NAME,
+                Key=object_key,
+                Body=file_bytes,
+                ContentType=content_type,
+            )
+            return object_key
+        except (BotoCoreError, ClientError, OSError) as e:
+            last_error = e
+            wait = UPLOAD_RETRY_WAIT_SECONDS * (attempt + 1)
+            print(f"B2 upload error for {object_key!r} (attempt {attempt + 1}/{UPLOAD_MAX_RETRIES}): {e}")
+            if attempt < UPLOAD_MAX_RETRIES - 1:
+                print(f"Retrying upload in {wait}s...")
+                time.sleep(wait)
+    raise RuntimeError(f"B2 upload failed after {UPLOAD_MAX_RETRIES} attempts for {object_key!r}: {last_error}")
 
 
 def upload_file(object_key, local_path, content_type="application/octet-stream"):
