@@ -1160,7 +1160,7 @@
       "functions": [
         {
           "name": "retryable_request",
-          "line": 217,
+          "line": 231,
           "args": [
             "method",
             "url",
@@ -1185,7 +1185,7 @@
         },
         {
           "name": "call_llm",
-          "line": 269,
+          "line": 283,
           "args": [
             "prompt",
             "response_schema"
@@ -1208,7 +1208,7 @@
         },
         {
           "name": "sanitize_json_control_chars",
-          "line": 386,
+          "line": 400,
           "args": [
             "text"
           ],
@@ -1221,7 +1221,7 @@
         },
         {
           "name": "_strip_trailing_commas",
-          "line": 421,
+          "line": 435,
           "args": [
             "text"
           ],
@@ -1232,7 +1232,7 @@
         },
         {
           "name": "_quote_unquoted_keys",
-          "line": 432,
+          "line": 446,
           "args": [
             "text"
           ],
@@ -1243,7 +1243,7 @@
         },
         {
           "name": "extract_json",
-          "line": 454,
+          "line": 468,
           "args": [
             "raw_text"
           ],
@@ -1252,7 +1252,11 @@
             "_quote_unquoted_keys",
             "_strip_trailing_commas",
             "find",
+            "hasattr",
+            "len",
             "loads",
+            "max",
+            "min",
             "print",
             "rfind",
             "sanitize_json_control_chars",
