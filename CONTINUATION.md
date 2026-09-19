@@ -1,3 +1,26 @@
+# Marius / Erased — Continuation Notes (2026-09-19 PART 4, SKILLS + DECLUTTER, read this section FIRST)
+
+**Claude picking this up: this section is newest. Re-verify against live GitHub/Supabase before acting — do not trust this doc at face value.**
+
+## What happened this session
+- Built 3 Atlas Frame custom skills (not repo files — Claude custom skills, uploaded per-profile in Claude.ai settings): `atlas-debug-protocol` (verify-live/reproduce-by-execution/two-angle debugging standard + known-bug catalog), `atlas-session-handoff` (this handoff format + cross-profile continuity), `atlas-code-delivery` (push policy, 403 fallback, Zia's exact paste-formatting rules). Handed to Zia as `.skill` files to upload to each profile individually (no org-wide sharing tier).
+- Ran a declutter pass on `aliwaziri10/marius-command-center`. Findings:
+  - `scripts/image_generation.py` — PLAYBOOK.md's "still exists as dead code" note is now STALE; the file is not in the repo. No action needed, but PLAYBOOK.md's known-gotchas section still says it exists — worth a PLAYBOOK.md correction next session.
+  - `scripts/b2_preflight.py` and `scripts/verify_run_output.py` — no matching workflow, no import found via code search. Likely manual/dev-run tools, not proven dead. NOT deleted — deletion without confirming they're truly unused would violate the debug-protocol two-angle-proof standard. If Zia confirms these are never run, delete them next session.
+  - `scripts/narration.py` vs `scripts/narration_stage.py` — confusingly similar names but BOTH are live and different: `narration.py` is the actual TTS/audio-generation stage (run by `narration.yml`); `narration_stage.py` is a text-generation helper module (`generate_narration()`) imported by `script_writing.py`. Not clutter — just a naming collision worth flagging to Zia, not fixing (renaming risks breaking imports for no functional gain).
+  - `code_health_check.yml` only runs `py_compile`, which would NOT have caught the 2026-09-19 scene-by-scene import break. A real fix (adding an import-check step) touches a workflow file → 403 → needs Zia's paste. NOT done this session — flagging as a real open item, not built.
+
+## EXACT NEXT STEPS for whoever picks this up
+1. Continue the chain-beats verification from PART 3 above (unchanged, still open) — this session did not touch that thread.
+2. If Zia confirms `b2_preflight.py`/`verify_run_output.py` are unused, delete them and re-verify nothing imports them broke (`py_compile` + a repo-wide import check).
+3. Optional: correct PLAYBOOK.md's stale `image_generation.py` reference.
+4. Optional, needs Zia's paste (workflow file): add an import-check step to `code_health_check.yml` so a cross-file break like the 2026-09-19 incident gets caught automatically next time.
+
+## Where the next profile should look
+Every Atlas Frame profile: `CONTINUATION.md` top section on `main`, this pipeline's repo. Standing cross-pipeline rules are in each profile's own memory, not this file.
+
+---
+
 # Marius / Erased — Continuation Notes (2026-09-19 PART 3, CHAIN BEATS — read this section FIRST)
 
 **Re-verify everything below against live GitHub/Supabase. Do not trust this doc at face value.**
