@@ -848,7 +848,7 @@
       "functions": [
         {
           "name": "_derive_seed",
-          "line": 55,
+          "line": 64,
           "args": [
             "script_id",
             "shot_index",
@@ -864,7 +864,7 @@
         },
         {
           "name": "download_file",
-          "line": 62,
+          "line": 71,
           "args": [
             "url",
             "out_path"
@@ -879,7 +879,7 @@
         },
         {
           "name": "upload_reference_image",
-          "line": 70,
+          "line": 79,
           "args": [
             "script_id",
             "file_name",
@@ -893,7 +893,7 @@
         },
         {
           "name": "generate_character_reference",
-          "line": 79,
+          "line": 88,
           "args": [
             "script"
           ],
@@ -915,7 +915,7 @@
         },
         {
           "name": "extract_last_frame_url",
-          "line": 149,
+          "line": 158,
           "args": [
             "script_id",
             "shot_index",
@@ -937,7 +937,7 @@
         },
         {
           "name": "get_continuity_anchor",
-          "line": 165,
+          "line": 174,
           "args": [
             "script",
             "video_urls"
@@ -954,7 +954,7 @@
         },
         {
           "name": "_generate_one_segment",
-          "line": 180,
+          "line": 189,
           "args": [
             "shot",
             "segment_duration",
@@ -978,7 +978,7 @@
         },
         {
           "name": "_extract_last_frame_local",
-          "line": 206,
+          "line": 215,
           "args": [
             "video_path"
           ],
@@ -995,7 +995,7 @@
         },
         {
           "name": "_upload_local_image_for_anchor",
-          "line": 215,
+          "line": 224,
           "args": [
             "script_id",
             "tag",
@@ -1010,7 +1010,7 @@
         },
         {
           "name": "generate_shot_clip",
-          "line": 223,
+          "line": 232,
           "args": [
             "shot",
             "target_duration",
@@ -1027,11 +1027,15 @@
             "_generate_one_segment",
             "_upload_local_image_for_anchor",
             "append",
+            "apply_beat_to_shot",
+            "author_chain_beats",
             "basename",
+            "ceil",
             "close",
             "concatenate_videoclips",
             "exists",
             "fit_clip_to_duration",
+            "len",
             "min",
             "print",
             "range",
@@ -1044,7 +1048,7 @@
         },
         {
           "name": "fit_clip_to_duration",
-          "line": 290,
+          "line": 305,
           "args": [
             "clip",
             "target"
