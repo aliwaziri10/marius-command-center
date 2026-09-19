@@ -17,6 +17,18 @@ generate_shot_clip now asks beat_director.py (fail-soft Gemini call, one per
 shot that actually needs chaining) for a distinct action/camera/shot_type
 per chain segment. If beat_director returns None for any reason, behavior
 is identical to the pre-2026-09-19 code.
+
+ANCHOR-URL FIX (2026-09-20): extract_last_frame_url used to return the raw
+B2 object key from upload_reference_image (storage_b2.upload_file/
+upload_bytes explicitly documents that it returns the key unchanged, never
+a URL) and hand that key straight to Agnes as the "image" field. Agnes/
+ComfyUI cannot fetch a bare object key, so every shot that used a real
+continuity anchor (shot 2 onward on every script, since continuity was
+re-enabled 2026-09-10) failed with an identical, non-transient
+"ComfyUI /prompt failed: 400 Bad Request" on every attempt. Fixed by
+wrapping the key in storage_b2.presigned_url() before returning it, the
+same way _upload_local_image_for_anchor already did for chain-extension
+segments.
 """
 
 import os
@@ -163,9 +175,11 @@ def extract_last_frame_url(script_id, shot_index, local_video_path):
         img = Image.fromarray(frame)
         png_path = local_video_path.replace(".mp4", "_lastframe.png")
         img.save(png_path)
-        url = upload_reference_image(script_id, f"shot_{shot_index:03d}_lastframe.png", png_path)
+        key = upload_reference_image(script_id, f"shot_{shot_index:03d}_lastframe.png", png_path)
         os.remove(png_path)
-        return url
+        if not key:
+            return None
+        return storage_b2.presigned_url(key)
     except Exception as e:
         print(f"Could not extract/upload last frame for shot {shot_index}, continuing without a continuity anchor for the next shot: {e}")
         return None
