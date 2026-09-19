@@ -1,7 +1,10 @@
 # Marius Playbook (rarely changes — read alongside STATUS.md)
 
+**LATEST HANDOFFS (read first): `docs/marius-chain-beats-handoff.md` (2026-09-19, chain beats) and `CONTINUATION.md`.**
+
 Repo: https://github.com/aliwaziri10/marius-command-center
-Supabase: https://supabase.com/dashboard/project/swnjzzejsuupecdgbzzf
+Supabase (LIVE project as of 2026-09-19, verified by recent rows): https://supabase.com/dashboard/project/iwgocbiqjjhlvkygmcir
+(Older note listed project `swnjzzejsuupecdgbzzf` - unverified/stale, not accessible via the connected Supabase tool.)
 Ali is non-coder. Never ask him to explain the schema/structure - it's all below. Just tell him what to click.
 
 **FLAGGED 2026-08-19: the "Pipeline order" and "Database" sections below were NOT
@@ -41,7 +44,7 @@ SUPABASE_URL, SUPABASE_SECRET_KEY, GEMINI_API_KEY, AGNES_API_KEY, ACE_MUSIC_API_
 - A green tick on a workflow does NOT mean it did real work - always verify counts in the database or files in the bucket. A scheduled cron trigger can also be silently delayed by GitHub itself for hours - check actual run timestamps in the Actions tab before assuming the pipeline code is broken.
 - Content-policy rejections (`content_flagged`) can be triggered by the anchor text (`setting_and_characters`, sent with every shot prompt) OR by the visual content of a specific shot itself, independent of any text fix. If a text-level fix (stripping sensitive words from the anchor) doesn't clear a stuck shot after a real retry, don't keep re-diagnosing the text - replace that one shot's `visual_description` with something generic and neutral (e.g. a static empty-room shot) and move on. Pipeline flow matters more than that one shot's fidelity.
 - This repo is PUBLIC - GitHub Actions minutes are uncapped (the free-tier 2,000 min/month cap only applies to private repos). Don't hold back a scheduling/frequency change over an Actions-minutes budget that doesn't apply here.
-- GitHub write access for this repo is confirmed WORKING as of 2026-08-19 (see DEBUGGING_STANDARDS.md point 4) - this reverses the old "permanently read-only by design" note that used to be here. Default to pushing code changes directly; only fall back to Ali pasting into the GitHub web editor if a live write attempt actually fails in that session. Data-only fixes (status resets, shot_list rewording) still don't need a GitHub paste at all - do those directly via Supabase.
+- GitHub write access for this repo is confirmed WORKING as of 2026-08-19 (see DEBUGGING_STANDARDS.md point 4) - this reverses the old "permanently read-only by design" note that used to be here. Default to pushing code changes directly; only fall back to Ali pasting into the GitHub web editor if a live write attempt actually fails in that session. Data-only fixes (status resets, shot_list rewording) still don't need a GitHub paste at all - do those directly via Supabase. Exception (2026-09-19): connector writes to `.github/workflows/*` return 403 - Zia must commit workflow files by hand.
 
 ## Remaining stages to build
 YouTube Upload: done and live (see `scripts/youtube_upload.py`) - this section is historical, kept for context on what used to be outstanding.
