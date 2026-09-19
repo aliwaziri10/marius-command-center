@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 27,
+  "file_count": 28,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -699,6 +699,99 @@
         }
       ],
       "env_vars": [],
+      "tables": []
+    },
+    {
+      "path": "scripts/beat_director.py",
+      "functions": [
+        {
+          "name": "_build_prompt",
+          "line": 55,
+          "args": [
+            "shot",
+            "setting_and_characters",
+            "num_beats"
+          ],
+          "calls": [
+            "get",
+            "join",
+            "sorted"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_call_gemini_once",
+          "line": 88,
+          "args": [
+            "prompt"
+          ],
+          "calls": [
+            "RuntimeError",
+            "get",
+            "json",
+            "post",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_validate_beats",
+          "line": 106,
+          "args": [
+            "parsed",
+            "num_beats",
+            "first_camera"
+          ],
+          "calls": [
+            "any",
+            "append",
+            "enumerate",
+            "get",
+            "isinstance",
+            "len",
+            "lower",
+            "next",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "author_chain_beats",
+          "line": 138,
+          "args": [
+            "shot",
+            "setting_and_characters",
+            "num_beats"
+          ],
+          "calls": [
+            "_build_prompt",
+            "_call_gemini_once",
+            "_validate_beats",
+            "extract_json",
+            "get",
+            "len",
+            "print",
+            "range",
+            "sleep"
+          ],
+          "docstring": "Returns a list of exactly num_beats dicts"
+        },
+        {
+          "name": "apply_beat_to_shot",
+          "line": 166,
+          "args": [
+            "shot",
+            "beat"
+          ],
+          "calls": [
+            "dict"
+          ],
+          "docstring": "Returns a COPY of shot with the beat's action/camera/shot_type swapped"
+        }
+      ],
+      "env_vars": [
+        "GEMINI_API_KEY"
+      ],
       "tables": []
     },
     {
