@@ -846,7 +846,7 @@
       "functions": [
         {
           "name": "_derive_seed",
-          "line": 64,
+          "line": 76,
           "args": [
             "script_id",
             "shot_index",
@@ -862,7 +862,7 @@
         },
         {
           "name": "download_file",
-          "line": 71,
+          "line": 83,
           "args": [
             "url",
             "out_path"
@@ -877,7 +877,7 @@
         },
         {
           "name": "upload_reference_image",
-          "line": 79,
+          "line": 91,
           "args": [
             "script_id",
             "file_name",
@@ -891,7 +891,7 @@
         },
         {
           "name": "generate_character_reference",
-          "line": 88,
+          "line": 100,
           "args": [
             "script"
           ],
@@ -913,7 +913,7 @@
         },
         {
           "name": "extract_last_frame_url",
-          "line": 158,
+          "line": 170,
           "args": [
             "script_id",
             "shot_index",
@@ -925,6 +925,7 @@
             "fromarray",
             "get_frame",
             "max",
+            "presigned_url",
             "print",
             "remove",
             "replace",
@@ -935,7 +936,7 @@
         },
         {
           "name": "get_continuity_anchor",
-          "line": 174,
+          "line": 188,
           "args": [
             "script",
             "video_urls"
@@ -952,7 +953,7 @@
         },
         {
           "name": "_generate_one_segment",
-          "line": 189,
+          "line": 203,
           "args": [
             "shot",
             "segment_duration",
@@ -976,7 +977,7 @@
         },
         {
           "name": "_extract_last_frame_local",
-          "line": 215,
+          "line": 229,
           "args": [
             "video_path"
           ],
@@ -993,7 +994,7 @@
         },
         {
           "name": "_upload_local_image_for_anchor",
-          "line": 224,
+          "line": 238,
           "args": [
             "script_id",
             "tag",
@@ -1008,7 +1009,7 @@
         },
         {
           "name": "generate_shot_clip",
-          "line": 232,
+          "line": 246,
           "args": [
             "shot",
             "target_duration",
@@ -1046,7 +1047,7 @@
         },
         {
           "name": "fit_clip_to_duration",
-          "line": 305,
+          "line": 319,
           "args": [
             "clip",
             "target"
