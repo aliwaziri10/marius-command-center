@@ -1,6 +1,6 @@
 # Marius Playbook (rarely changes — read alongside STATUS.md)
 
-**LATEST HANDOFFS (read first): `docs/marius-chain-beats-handoff.md` (2026-09-19, chain beats) and `CONTINUATION.md`.**
+**LATEST HANDOFF (read first): `CONTINUATION.md`, PART 3 at the top (2026-09-19, chain beats).**
 
 Repo: https://github.com/aliwaziri10/marius-command-center
 Supabase (LIVE project as of 2026-09-19, verified by recent rows): https://supabase.com/dashboard/project/iwgocbiqjjhlvkygmcir
