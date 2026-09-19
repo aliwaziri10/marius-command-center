@@ -754,19 +754,8 @@
       "path": "scripts/clip_generation.py",
       "functions": [
         {
-          "name": "_chain_beat_cue",
-          "line": 94,
-          "args": [
-            "chain_index"
-          ],
-          "calls": [
-            "len"
-          ],
-          "docstring": ""
-        },
-        {
           "name": "_derive_seed",
-          "line": 98,
+          "line": 55,
           "args": [
             "script_id",
             "shot_index",
@@ -782,7 +771,7 @@
         },
         {
           "name": "download_file",
-          "line": 105,
+          "line": 62,
           "args": [
             "url",
             "out_path"
@@ -797,7 +786,7 @@
         },
         {
           "name": "upload_reference_image",
-          "line": 113,
+          "line": 70,
           "args": [
             "script_id",
             "file_name",
@@ -811,7 +800,7 @@
         },
         {
           "name": "generate_character_reference",
-          "line": 122,
+          "line": 79,
           "args": [
             "script"
           ],
@@ -833,7 +822,7 @@
         },
         {
           "name": "extract_last_frame_url",
-          "line": 192,
+          "line": 149,
           "args": [
             "script_id",
             "shot_index",
@@ -855,7 +844,7 @@
         },
         {
           "name": "get_continuity_anchor",
-          "line": 208,
+          "line": 165,
           "args": [
             "script",
             "video_urls"
@@ -872,15 +861,14 @@
         },
         {
           "name": "_generate_one_segment",
-          "line": 223,
+          "line": 180,
           "args": [
             "shot",
             "segment_duration",
             "out_path",
             "setting_and_characters",
             "anchor_image_url",
-            "seed",
-            "beat_cue"
+            "seed"
           ],
           "calls": [
             "build_agnes_prompt",
@@ -893,11 +881,11 @@
             "print",
             "round_to_valid_frames"
           ],
-          "docstring": "beat_cue (CHAIN-VARIATION FIX, 2026-09-19): optional short camera/"
+          "docstring": ""
         },
         {
           "name": "_extract_last_frame_local",
-          "line": 264,
+          "line": 206,
           "args": [
             "video_path"
           ],
@@ -914,7 +902,7 @@
         },
         {
           "name": "_upload_local_image_for_anchor",
-          "line": 273,
+          "line": 215,
           "args": [
             "script_id",
             "tag",
@@ -929,7 +917,7 @@
         },
         {
           "name": "generate_shot_clip",
-          "line": 281,
+          "line": 223,
           "args": [
             "shot",
             "target_duration",
@@ -941,7 +929,6 @@
           ],
           "calls": [
             "VideoFileClip",
-            "_chain_beat_cue",
             "_derive_seed",
             "_extract_last_frame_local",
             "_generate_one_segment",
@@ -964,7 +951,7 @@
         },
         {
           "name": "fit_clip_to_duration",
-          "line": 358,
+          "line": 290,
           "args": [
             "clip",
             "target"
