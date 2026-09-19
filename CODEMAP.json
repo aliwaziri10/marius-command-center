@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 27,
+  "file_count": 28,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -1675,6 +1675,139 @@
             "get",
             "join",
             "len"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [],
+      "tables": []
+    },
+    {
+      "path": "scripts/scene_director.py",
+      "functions": [
+        {
+          "name": "_subject_tokens",
+          "line": 109,
+          "args": [
+            "subject"
+          ],
+          "calls": [
+            "findall",
+            "len",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "split_anchor",
+          "line": 116,
+          "args": [
+            "anchor",
+            "subject"
+          ],
+          "calls": [
+            "_subject_tokens",
+            "any",
+            "append",
+            "join",
+            "lower",
+            "search",
+            "split",
+            "strip"
+          ],
+          "docstring": "Splits the episode anchor into (setting_text, character_text)."
+        },
+        {
+          "name": "_strip_subject_clauses",
+          "line": 136,
+          "args": [
+            "text",
+            "subject"
+          ],
+          "calls": [
+            "_subject_tokens",
+            "any",
+            "append",
+            "findall",
+            "join",
+            "lower",
+            "set",
+            "split",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_narration_moment",
+          "line": 151,
+          "args": [
+            "shot",
+            "beat_index"
+          ],
+          "calls": [
+            "get",
+            "len",
+            "min",
+            "split",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "beat_kind",
+          "line": 161,
+          "args": [
+            "shot",
+            "beat_index"
+          ],
+          "calls": [
+            "bool",
+            "get",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_movement_phrase",
+          "line": 170,
+          "args": [
+            "shot",
+            "has_subject_in_frame"
+          ],
+          "calls": [
+            "get",
+            "replace"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_beat_prompt",
+          "line": 179,
+          "args": [
+            "shot",
+            "anchor",
+            "beat_index",
+            "shot_index",
+            "fallback_level"
+          ],
+          "calls": [
+            "_movement_phrase",
+            "_narration_moment",
+            "_sanitize_anchor_for_fallback",
+            "_strip_subject_clauses",
+            "any",
+            "append",
+            "beat_kind",
+            "bool",
+            "extend",
+            "get",
+            "join",
+            "len",
+            "lower",
+            "replace",
+            "rstrip",
+            "split_anchor",
+            "strip"
           ],
           "docstring": ""
         }
