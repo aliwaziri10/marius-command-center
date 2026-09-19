@@ -1,4 +1,34 @@
-# Marius / Erased — Continuation Notes (2026-09-19 PART 2, LIVE HANDOFF — read this section FIRST)
+# Marius / Erased — Continuation Notes (2026-09-19 PART 3, CHAIN BEATS — read this section FIRST)
+
+**Re-verify everything below against live GitHub/Supabase. Do not trust this doc at face value.**
+
+## Verified live on `main` (2026-09-19)
+
+- Scene-by-scene rewrite of `clip_generation.py` broke the `assembly_stage.py` import; reverted (`79ecfd2`). `scene_director.py` removed (`4f56b08`). Chain-variation patch (`daaa60c`) reverted (`15009a0`).
+- NEW `scripts/beat_director.py` (`7105ba4`): one fail-soft Gemini call per shot that needs chaining. Returns N beats (`action`, `camera_movement`, `shot_type`) or `None` on ANY failure. Bounded: 2 attempts x 45s, own call (not `llm_client.call_llm` retry loops), key via `x-goog-api-key` header.
+- `scripts/clip_generation.py` (`397da0d`): `generate_shot_clip` calls `author_chain_beats` once before the chain loop; each chain segment gets `apply_beat_to_shot(shot, beat)`. `None` = old repeated-prompt behavior. Signatures unchanged.
+- `.github/workflows/video_generation.yml`: `GEMINI_API_KEY` added to the "Run video generation" env (committed by Zia, verified by re-fetch). Secret exists at repo level (listed in `PLAYBOOK.md`, used by `script_writing.py`).
+- Connector write: 403 on `.github/workflows/*` (Zia must commit those); OK on `scripts/*` and docs.
+- Live Supabase project is `iwgocbiqjjhlvkygmcir` (rows dated 2026-09-19). `PLAYBOOK.md`'s old `swnjzzejsuupecdgbzzf` is stale/inaccessible via the connector.
+- `code_health_check.yml` only runs `py_compile` per file. It would NOT catch a broken cross-file import (the scene-by-scene incident).
+
+## Tests run (sandbox, mocked Agnes/moviepy)
+
+- Both live files pass `py_compile`.
+- 20s shot, beats present: segments get `ORIG/static`, `B1/orbit`, `B2/tilt_up` (7/7/6s).
+- 20s shot, `beat_director` returns `None`: all segments `ORIG/static` = pre-change behavior.
+- `beat_director` validation: bad enum coerced, consecutive same camera changed, wrong count / modern-object word -> `None`, missing key -> `None`.
+
+## NOT verified
+
+- No live Video Generation run since these changes. Next run: look for `[beat_director] authored N chain beat(s)` vs `falling back` in the log; confirm chained shots visibly differ.
+- Premise is a HYPOTHESIS: that identical repeated prompts are why long shots look like a looped moment. Not proven from real output.
+- Beats are LLM-authored and not checked against `narration_excerpt`.
+- Supabase 2026-09-19: `acf67e3b` and `41fd7031` at `video_next_index = 1`; other recent scripts at 0.
+
+---
+
+# Marius / Erased — Continuation Notes (2026-09-19 PART 2, LIVE HANDOFF)
 
 **Claude picking this up: this section is a live handoff from a session
 that ended at ~90% context. Everything below "CURRENT STATE" is exactly
