@@ -754,8 +754,19 @@
       "path": "scripts/clip_generation.py",
       "functions": [
         {
+          "name": "_chain_beat_cue",
+          "line": 94,
+          "args": [
+            "chain_index"
+          ],
+          "calls": [
+            "len"
+          ],
+          "docstring": ""
+        },
+        {
           "name": "_derive_seed",
-          "line": 73,
+          "line": 98,
           "args": [
             "script_id",
             "shot_index",
@@ -767,11 +778,11 @@
             "int",
             "md5"
           ],
-          "docstring": "SEED SUPPORT (2026-09-10): Agnes's own docs confirm a seed field this"
+          "docstring": ""
         },
         {
           "name": "download_file",
-          "line": 92,
+          "line": 105,
           "args": [
             "url",
             "out_path"
@@ -786,7 +797,7 @@
         },
         {
           "name": "upload_reference_image",
-          "line": 100,
+          "line": 113,
           "args": [
             "script_id",
             "file_name",
@@ -796,11 +807,11 @@
             "print",
             "upload_file"
           ],
-          "docstring": "Returns the B2 object KEY (not a URL) - see storage_b2.py docstring"
+          "docstring": ""
         },
         {
           "name": "generate_character_reference",
-          "line": 113,
+          "line": 122,
           "args": [
             "script"
           ],
@@ -818,11 +829,11 @@
             "str",
             "strip"
           ],
-          "docstring": "Generates ONE reference image per script (via agnes-image-2.1-flash),"
+          "docstring": ""
         },
         {
           "name": "extract_last_frame_url",
-          "line": 198,
+          "line": 192,
           "args": [
             "script_id",
             "shot_index",
@@ -840,11 +851,11 @@
             "save",
             "upload_reference_image"
           ],
-          "docstring": "Pulls the final frame of a just-generated (or already-downloaded) shot"
+          "docstring": ""
         },
         {
           "name": "get_continuity_anchor",
-          "line": 226,
+          "line": 208,
           "args": [
             "script",
             "video_urls"
@@ -857,18 +868,19 @@
             "print",
             "remove"
           ],
-          "docstring": "Reconstructs the correct anchor image for the NEXT shot to generate:"
+          "docstring": ""
         },
         {
           "name": "_generate_one_segment",
-          "line": 256,
+          "line": 223,
           "args": [
             "shot",
             "segment_duration",
             "out_path",
             "setting_and_characters",
             "anchor_image_url",
-            "seed"
+            "seed",
+            "beat_cue"
           ],
           "calls": [
             "build_agnes_prompt",
@@ -881,11 +893,11 @@
             "print",
             "round_to_valid_frames"
           ],
-          "docstring": ""
+          "docstring": "beat_cue (CHAIN-VARIATION FIX, 2026-09-19): optional short camera/"
         },
         {
           "name": "_extract_last_frame_local",
-          "line": 282,
+          "line": 264,
           "args": [
             "video_path"
           ],
@@ -898,11 +910,11 @@
             "replace",
             "save"
           ],
-          "docstring": "Extracts the last frame of a local clip file and uploads it nowhere -"
+          "docstring": ""
         },
         {
           "name": "_upload_local_image_for_anchor",
-          "line": 296,
+          "line": 273,
           "args": [
             "script_id",
             "tag",
@@ -913,11 +925,11 @@
             "remove",
             "upload_reference_image"
           ],
-          "docstring": "Chain-extension anchors must be passed to Agnes as a real fetchable"
+          "docstring": ""
         },
         {
           "name": "generate_shot_clip",
-          "line": 309,
+          "line": 281,
           "args": [
             "shot",
             "target_duration",
@@ -929,6 +941,7 @@
           ],
           "calls": [
             "VideoFileClip",
+            "_chain_beat_cue",
             "_derive_seed",
             "_extract_last_frame_local",
             "_generate_one_segment",
@@ -951,7 +964,7 @@
         },
         {
           "name": "fit_clip_to_duration",
-          "line": 399,
+          "line": 358,
           "args": [
             "clip",
             "target"
