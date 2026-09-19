@@ -61,6 +61,37 @@ would never surface as a crashed Actions run at all. Fixed the same way:
 wrap the call, treat the RuntimeError as an ordinary infra failure (log
 and return so the run exits 0 instead of being reported as failed), and
 let the next scheduled run retry.
+
+GLOBAL-OVERLOAD EARLY-STOP FIX (2026-09-20) - CONFIRMED live via a real
+run's log (2026-09-19 ~19:00-19:36 UTC): all 15 of 15 candidate scripts
+this run hit an identical Agnes free-tier rate limit
+("You've reached the API rate limit for free users") and/or repeated
+poll network timeouts, one after another, with zero net progress. Agnes
+rate-limits are keyed to this pipeline's one account/API key, not to any
+individual script, so once script 1 gets rate-limited, scripts 2 through
+15 are guaranteed to hit the exact same wall - main()'s per-candidate
+loop was moving straight to the next candidate on any zero-progress
+result, treating a global account-level rate limit exactly like an
+ordinary "this one script is stalled" case. That produced 15 back-to-back
+failed attempts (each already paying its own internal retry/backoff cost
+in agnes_client.py) for zero clips generated, and additionally spent 15x
+the API calls against the very rate limit that was blocking progress -
+actively working against it clearing sooner.
+
+Fix: process_script now propagates AgnesOverloadedError up to main()
+(instead of swallowing it into a shots_used=0 return) specifically when
+zero shots were generated for that script this run - if any shots DID
+get generated before the overload hit, that is still real progress and
+is not treated as a global-overload signal, since it could just mean
+this one particular request happened to be rejected. main() catches this
+specifically and stops the ENTIRE run immediately, rather than trying the
+remaining candidates, so a confirmed overload signal ends the run in one
+failed attempt instead of the full candidate pool - respecting Agnes's
+real free-tier pace instead of hammering it, and leaving the rest of the
+queue for the next scheduled run once the rate limit window has likely
+reset. No change to any per-shot retry/backoff/timing logic already in
+agnes_client.py or clip_generation.py - this only changes how main()
+reacts to the case where retries there are already exhausted.
 """
 
 import os
@@ -338,11 +369,20 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
                 if shots_used:
                     print(f"Progress already saved through shot {i}/{total_shots} ({len(video_urls)} clips done) "
                           f"this run - stopping here instead of crashing; next scheduled run resumes from here.")
-                else:
-                    print(f"Zero progress made on this script this run - moving on to the next-oldest "
-                          f"eligible candidate instead of ending the run. This script's own turn will "
-                          f"come back around once Agnes's load eases.")
-                return shots_used
+                    return shots_used
+                # GLOBAL-OVERLOAD EARLY-STOP FIX (2026-09-20): zero shots
+                # generated this run before hitting the overload means
+                # this is very likely Agnes's account-wide free-tier rate
+                # limit, not a problem with this one script - re-raise so
+                # main() can stop the ENTIRE run here instead of hammering
+                # the identical wall on the next 14 candidates. See module
+                # docstring.
+                print("Zero progress made on this script this run - this looks like an account-wide "
+                      "rate limit rather than a problem with this one script, so re-raising to stop "
+                      "the whole run here instead of retrying the same wall on every other candidate.")
+                raise
+            except Exception:
+                raise
 
             clip_url = upload_clip(script_id, i, raw_path)
             video_urls.append(clip_url)
@@ -439,6 +479,22 @@ def main():
 
         try:
             shots_used = process_script(script, shot_limit=remaining_budget)
+        except AgnesOverloadedError as e:
+            # GLOBAL-OVERLOAD EARLY-STOP FIX (2026-09-20): see module
+            # docstring. process_script only re-raises this specific
+            # exception when it made zero progress before hitting the
+            # overload - treated here as a signal that Agnes's account-
+            # wide free-tier rate limit is active right now, so trying the
+            # remaining candidates would just repeat the identical failure
+            # (and spend more API calls against the very limit blocking
+            # progress). Stop the whole run here instead of continuing the
+            # loop - the next scheduled run tries the full queue again
+            # once the rate-limit window has had time to reset.
+            print(f"Stopping this run early - Agnes appears to be rate-limiting this account right now "
+                  f"({e}). Trying the remaining {len(candidates) - candidates.index(script) - 1} "
+                  f"candidate(s) would very likely hit the identical limit. Next scheduled run will "
+                  f"retry the full queue.")
+            return
         except Exception as e:
             # VERIFIER-GATE FIX (2026-08-22): a crash ANYWHERE inside
             # process_script (not just assembly) used to kill this whole
