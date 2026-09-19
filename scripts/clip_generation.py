@@ -10,31 +10,6 @@ chain-extension logic for shots longer than one Agnes generation can
 produce, and the freeze-hold fit-to-duration fallback. Imports the Agnes
 HTTP contract from agnes_client.py and the prompt-building logic from
 prompt_builder.py rather than owning either.
-
-CHAIN-VARIATION FIX (2026-09-19): confirmed live on script e086c4f2 (30
-shots, avg 27s, max 45s) - a shot needing more than one Agnes generation
-was chained by repeating the EXACT SAME prompt (same visual_description,
-same anchor text) for every ~7s segment, each one anchored to the
-previous segment's last frame. That produced the same action repeating
-every ~7s, people vanishing/duplicating, and the shot's primary subject
-persisting into every segment even on B-roll-heavy shots. Two changes,
-both scoped to chain segments only (the FIRST/main segment of every shot
-is unchanged, so shot_type/camera_movement/framing choices made by
-shot_breakdown_stage.py are still respected exactly as before):
-  1. _generate_one_segment now accepts an optional beat_cue string,
-     appended to the prompt so segment 2, 3, 4... of the same shot each
-     get a distinct camera/framing instruction instead of an identical
-     prompt repeated verbatim.
-  2. Chain segments alternate whether they carry the previous segment's
-     image anchor forward - every other segment drops the anchor and
-     generates from the prompt text alone, which breaks the "same face
-     cloned into every 7-second slice" pattern an unbroken anchor chain
-     produces, while still giving every other segment a soft visual
-     handoff so the cuts aren't jarring.
-This is a scoped mitigation, not the full fix - see /areas/marius-
-command-center.md for the larger per-beat director plan (separate LLM
-pass to author each ~7s beat individually) that supersedes this once
-built.
 """
 
 import os
@@ -75,24 +50,6 @@ HEADERS = {
 }
 
 MAX_CHAIN_SEGMENTS = 6
-
-# CHAIN-VARIATION FIX (2026-09-19): short, generic camera/framing cues
-# rotated across chain segments so segment 2/3/4... of the same shot each
-# read as a distinct beat instead of a verbatim repeat of segment 1. Kept
-# deliberately generic (no new subject/action content) so these never
-# fight the shot's own visual_description or introduce new continuity
-# problems of their own.
-CHAIN_BEAT_CUES = [
-    "camera holds a slightly wider framing on the same scene, subject and setting unchanged",
-    "camera holds a slightly closer framing on the same scene, subject and setting unchanged",
-    "camera angle shifts a few degrees to a fresh perspective on the same scene, subject and setting unchanged",
-    "camera lingers on the surrounding environment and setting rather than the main subject",
-    "camera holds steady on the same scene from a slightly different height, subject and setting unchanged",
-]
-
-
-def _chain_beat_cue(chain_index):
-    return CHAIN_BEAT_CUES[chain_index % len(CHAIN_BEAT_CUES)]
 
 
 def _derive_seed(script_id, shot_index, variant=0):
@@ -220,24 +177,13 @@ def get_continuity_anchor(script, video_urls):
     return generate_character_reference(script)
 
 
-def _generate_one_segment(shot, segment_duration, out_path, setting_and_characters="", anchor_image_url=None, seed=None, beat_cue=None):
-    """
-    beat_cue (CHAIN-VARIATION FIX, 2026-09-19): optional short camera/
-    framing instruction appended to the built prompt, used only by chain-
-    extension segments 2+ of the same shot (see generate_shot_clip below)
-    so each one reads as a distinct beat instead of an identical repeat.
-    None (default) preserves the exact prior prompt/behavior - the main
-    segment of every shot, and assembly_stage.py's trail-extension call,
-    are both unaffected.
-    """
+def _generate_one_segment(shot, segment_duration, out_path, setting_and_characters="", anchor_image_url=None, seed=None):
     raw_frames = int(segment_duration * FRAME_RATE)
     raw_frames = max(MIN_FRAMES, min(MAX_FRAMES, raw_frames))
     num_frames = round_to_valid_frames(raw_frames)
     num_frames = max(MIN_FRAMES, min(MAX_FRAMES, num_frames))
 
     prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=0)
-    if beat_cue:
-        prompt = f"{prompt}, {beat_cue}"
     try:
         video_id = create_agnes_task(prompt, num_frames, image_url=anchor_image_url, negative_prompt=NEGATIVE_PROMPT, seed=seed)
     except ContentPolicyRejection:
@@ -245,15 +191,11 @@ def _generate_one_segment(shot, segment_duration, out_path, setting_and_characte
               "(tier 1, image anchor also dropped this attempt)...")
         try:
             fallback_prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=1)
-            if beat_cue:
-                fallback_prompt = f"{fallback_prompt}, {beat_cue}"
             video_id = create_agnes_task(fallback_prompt, num_frames, image_url=None, negative_prompt=NEGATIVE_PROMPT, seed=seed)
         except ContentPolicyRejection:
             print("Sanitized-anchor fallback ALSO rejected - retrying once more with a fully generic, "
                   "anchor-free prompt AND no image anchor (tier 2, last resort before giving up on this shot)...")
             ultra_prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=2)
-            if beat_cue:
-                ultra_prompt = f"{ultra_prompt}, {beat_cue}"
             video_id = create_agnes_task(ultra_prompt, num_frames, image_url=None, negative_prompt=NEGATIVE_PROMPT, seed=seed)
 
     video_url = poll_agnes_task(video_id)
@@ -298,26 +240,16 @@ def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="
         seg_duration = min(remaining, MAX_CLIP_SECONDS)
         seg_out_path = out_path.replace(".mp4", f"_chain{chain_used + 1}.mp4")
 
-        # CHAIN-VARIATION FIX (2026-09-19): every OTHER chain segment drops
-        # the previous segment's image anchor and generates from the text
-        # prompt alone (still combined with beat_cue below) - an unbroken
-        # anchor chain across 4-7 segments is exactly what was cloning the
-        # same face/framing into every ~7s slice of a long shot.
-        use_anchor_this_segment = (chain_used % 2 == 0)
-        beat_cue = _chain_beat_cue(chain_used)
-
         segment_ok = False
         last_chain_error = None
         for chain_attempt in range(3):
             try:
-                chain_anchor_url = None
-                if use_anchor_this_segment:
-                    local_frame_path = _extract_last_frame_local(current_anchor_path)
-                    chain_anchor_url = _upload_local_image_for_anchor(
-                        script_id or "unknown", f"chain_{os.path.basename(seg_out_path)}", local_frame_path
-                    )
+                local_frame_path = _extract_last_frame_local(current_anchor_path)
+                chain_anchor_url = _upload_local_image_for_anchor(
+                    script_id or "unknown", f"chain_{os.path.basename(seg_out_path)}", local_frame_path
+                )
                 chain_seed = _derive_seed(script_id, shot_index, variant=f"chain{chain_used + 1}-{chain_attempt}")
-                _generate_one_segment(shot, seg_duration, seg_out_path, setting_and_characters, anchor_image_url=chain_anchor_url, seed=chain_seed, beat_cue=beat_cue)
+                _generate_one_segment(shot, seg_duration, seg_out_path, setting_and_characters, anchor_image_url=chain_anchor_url, seed=chain_seed)
                 segment_ok = True
                 break
             except (ContentPolicyRejection, AgnesOverloadedError, Exception) as e:
