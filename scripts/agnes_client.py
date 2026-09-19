@@ -25,6 +25,29 @@ last_error. Fixed by catching requests.exceptions.RequestException
 inside the poll loop and treating it as a transient miss (log, sleep the
 normal interval, try again) instead of letting it propagate - the
 existing max_wait budget still bounds total time spent polling.
+
+POLL-429 RETRY FIX (2026-09-20): the fix above only covered network-level
+exceptions (timeouts, dropped connections). It did NOT cover the case
+where the poll request actually completes but Agnes answers with an HTTP
+error status - specifically 429 "too many video status queries", which
+is a DIFFERENT rate limit from the one on task creation (create_agnes_task
+already retries 429/500/502/503/504 there). poll_agnes_task still did
+`resp.raise_for_status()` unconditionally on any 4xx/5xx, so a 429 from
+the poll endpoint raised a bare requests.HTTPError immediately - not one
+of the exception types callers were built to retry around. Confirmed live
+in a real run's log (2026-09-19 ~21:48-22:13 UTC): every single "AGNES
+POLL ERROR 429" line was immediately followed by either a chain-extension
+segment burning one of its 3 retry attempts, or the entire script being
+abandoned for the run ("moving to next candidate") - across 7 different
+scripts in that one run, each only ever completing exactly one shot
+before hitting this wall. Fixed by treating AGNES_RETRYABLE_CODES the
+same way network errors are already treated here: back off and poll
+again (same shared consecutive-failure counter and ceiling as network
+errors, so the two failure modes can't combine to silently double the
+allowed retry budget), instead of raising immediately. Backoff now grows
+with each consecutive miss (10s, 20s, 30s...) instead of a flat interval,
+since a flat retry pace was itself partly what was triggering "too many
+status queries" back-to-back.
 """
 
 import os
@@ -61,8 +84,15 @@ AGNES_IMAGE_MAX_RETRIES = 3
 # no longer ends the whole poll loop - it's retried up to this many times
 # (each still bounded by the per-request timeout below) before giving up
 # and surfacing as AgnesOverloadedError, same as a real max_wait timeout.
+#
+# POLL-429 RETRY FIX (2026-09-20): this ceiling is now shared between
+# network errors AND retryable HTTP status codes from the poll endpoint
+# (see poll_agnes_task) - either kind of consecutive miss counts against
+# the same limit, so a poll loop can't silently get more total retries
+# than intended just because the failures alternate between the two
+# kinds. Renamed from POLL_MAX_CONSECUTIVE_NETWORK_ERRORS to reflect that.
 POLL_REQUEST_TIMEOUT = 30
-POLL_MAX_CONSECUTIVE_NETWORK_ERRORS = 5
+POLL_MAX_CONSECUTIVE_TRANSIENT_ERRORS = 5
 
 
 class ContentPolicyRejection(Exception):
@@ -204,7 +234,7 @@ def extract_video_url(data):
 
 def poll_agnes_task(video_id, max_wait=300, interval=10):
     waited = 0
-    consecutive_network_errors = 0
+    consecutive_transient_errors = 0
     while waited < max_wait:
         try:
             resp = requests.get(
@@ -217,22 +247,42 @@ def poll_agnes_task(video_id, max_wait=300, interval=10):
             # POLL-TIMEOUT CRASH FIX (2026-09-18): a slow/dropped poll
             # request used to propagate straight up and kill this whole
             # script's run (see module docstring). Treat it exactly like a
-            # not-ready-yet poll instead - wait the normal interval and
-            # try again, bounded by the same max_wait budget, but bail
-            # out with AgnesOverloadedError if the network itself looks
-            # broken rather than Agnes just being slow.
-            consecutive_network_errors += 1
-            print(f"AGNES POLL network error ({consecutive_network_errors}/{POLL_MAX_CONSECUTIVE_NETWORK_ERRORS}): {e}")
-            if consecutive_network_errors >= POLL_MAX_CONSECUTIVE_NETWORK_ERRORS:
-                raise AgnesOverloadedError(f"Agnes poll network errors {consecutive_network_errors}x in a row for video_id {video_id}: {e}")
-            time.sleep(interval)
-            waited += interval
+            # not-ready-yet poll instead - wait and try again, bounded by
+            # the same max_wait budget, but bail out with
+            # AgnesOverloadedError if the network itself looks broken
+            # rather than Agnes just being slow.
+            consecutive_transient_errors += 1
+            print(f"AGNES POLL network error ({consecutive_transient_errors}/{POLL_MAX_CONSECUTIVE_TRANSIENT_ERRORS}): {e}")
+            if consecutive_transient_errors >= POLL_MAX_CONSECUTIVE_TRANSIENT_ERRORS:
+                raise AgnesOverloadedError(f"Agnes poll network errors {consecutive_transient_errors}x in a row for video_id {video_id}: {e}")
+            wait = interval * consecutive_transient_errors
+            time.sleep(wait)
+            waited += wait
             continue
-
-        consecutive_network_errors = 0
 
         if resp.status_code == 400 and "content_policy_violation" in resp.text:
             raise ContentPolicyRejection(resp.text)
+
+        if resp.status_code in AGNES_RETRYABLE_CODES:
+            # POLL-429 RETRY FIX (2026-09-20): the poll endpoint has its
+            # own rate limit ("too many video status queries"), separate
+            # from the one on task creation - this used to fall straight
+            # through to resp.raise_for_status() below and kill the whole
+            # poll loop on the very first 429. Now backed off and retried
+            # exactly like a network error, sharing the same consecutive-
+            # failure counter and ceiling so the two failure modes can't
+            # combine into unlimited retries.
+            consecutive_transient_errors += 1
+            print(f"AGNES POLL transient error {resp.status_code} ({consecutive_transient_errors}/{POLL_MAX_CONSECUTIVE_TRANSIENT_ERRORS}): {resp.text}")
+            if consecutive_transient_errors >= POLL_MAX_CONSECUTIVE_TRANSIENT_ERRORS:
+                raise AgnesOverloadedError(f"Agnes poll kept returning {resp.status_code} {consecutive_transient_errors}x in a row for video_id {video_id}: {resp.text}")
+            wait = interval * consecutive_transient_errors
+            time.sleep(wait)
+            waited += wait
+            continue
+
+        consecutive_transient_errors = 0
+
         if resp.status_code >= 400:
             print(f"AGNES POLL ERROR {resp.status_code}: {resp.text}")
         resp.raise_for_status()
