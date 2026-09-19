@@ -22,7 +22,16 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: B2 preflight (fails fast, before any Agnes spend)
+        id: b2_preflight
+        continue-on-error: true
+        env:
+          B2_ENDPOINT_URL: ${{ secrets.B2_ENDPOINT_URL }}
+          B2_KEY_ID: ${{ secrets.B2_KEY_ID }}
+          B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
+        run: python scripts/b2_preflight.py
       - name: Run video generation
+        if: steps.b2_preflight.outcome == 'success'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -35,6 +44,7 @@ jobs:
           B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
         run: python scripts/video_generation.py
       - name: Verify run output
+        if: steps.b2_preflight.outcome == 'success'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -42,6 +52,11 @@ jobs:
           B2_KEY_ID: ${{ secrets.B2_KEY_ID }}
           B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
         run: python scripts/verify_run_output.py --stage video_generation
+      - name: Fail run if B2 preflight failed
+        if: steps.b2_preflight.outcome != 'success'
+        run: |
+          echo "::error::B2 preflight failed - video generation and verification were skipped this run to avoid burning Agnes credits on uploads that would fail. Check the B2 preflight step's log above for the real failure."
+          exit 1
       - name: Open issue on failure
         if: failure()
         env:
