@@ -755,7 +755,7 @@
       "functions": [
         {
           "name": "_derive_seed",
-          "line": 73,
+          "line": 62,
           "args": [
             "script_id",
             "shot_index",
@@ -767,11 +767,11 @@
             "int",
             "md5"
           ],
-          "docstring": "SEED SUPPORT (2026-09-10): Agnes's own docs confirm a seed field this"
+          "docstring": "Deterministic per-(script, shot, variant) seed so a resumed shot"
         },
         {
           "name": "download_file",
-          "line": 92,
+          "line": 71,
           "args": [
             "url",
             "out_path"
@@ -786,7 +786,7 @@
         },
         {
           "name": "upload_reference_image",
-          "line": 100,
+          "line": 79,
           "args": [
             "script_id",
             "file_name",
@@ -796,11 +796,11 @@
             "print",
             "upload_file"
           ],
-          "docstring": "Returns the B2 object KEY (not a URL) - see storage_b2.py docstring"
+          "docstring": "Returns the B2 object KEY (not a URL)."
         },
         {
           "name": "generate_character_reference",
-          "line": 113,
+          "line": 89,
           "args": [
             "script"
           ],
@@ -818,60 +818,43 @@
             "str",
             "strip"
           ],
-          "docstring": "Generates ONE reference image per script (via agnes-image-2.1-flash),"
+          "docstring": "Kept for compatibility. No longer called by the pipeline (image"
         },
         {
           "name": "extract_last_frame_url",
-          "line": 198,
+          "line": 155,
           "args": [
             "script_id",
             "shot_index",
             "local_video_path"
           ],
-          "calls": [
-            "VideoFileClip",
-            "close",
-            "fromarray",
-            "get_frame",
-            "max",
-            "print",
-            "remove",
-            "replace",
-            "save",
-            "upload_reference_image"
-          ],
-          "docstring": "Pulls the final frame of a just-generated (or already-downloaded) shot"
+          "calls": [],
+          "docstring": "Intentionally returns None: cross-shot last-frame anchoring is off,"
         },
         {
           "name": "get_continuity_anchor",
-          "line": 226,
+          "line": 161,
           "args": [
             "script",
             "video_urls"
           ],
-          "calls": [
-            "download_to_file",
-            "extract_last_frame_url",
-            "generate_character_reference",
-            "len",
-            "print",
-            "remove"
-          ],
-          "docstring": "Reconstructs the correct anchor image for the NEXT shot to generate:"
+          "calls": [],
+          "docstring": "Intentionally returns None (text-to-video only, no image anchor)."
         },
         {
           "name": "_generate_one_segment",
-          "line": 256,
+          "line": 166,
           "args": [
             "shot",
             "segment_duration",
             "out_path",
             "setting_and_characters",
-            "anchor_image_url",
-            "seed"
+            "seed",
+            "beat_index",
+            "shot_index"
           ],
           "calls": [
-            "build_agnes_prompt",
+            "build_beat_prompt",
             "create_agnes_task",
             "download_file",
             "int",
@@ -884,40 +867,8 @@
           "docstring": ""
         },
         {
-          "name": "_extract_last_frame_local",
-          "line": 282,
-          "args": [
-            "video_path"
-          ],
-          "calls": [
-            "VideoFileClip",
-            "close",
-            "fromarray",
-            "get_frame",
-            "max",
-            "replace",
-            "save"
-          ],
-          "docstring": "Extracts the last frame of a local clip file and uploads it nowhere -"
-        },
-        {
-          "name": "_upload_local_image_for_anchor",
-          "line": 296,
-          "args": [
-            "script_id",
-            "tag",
-            "png_path"
-          ],
-          "calls": [
-            "presigned_url",
-            "remove",
-            "upload_reference_image"
-          ],
-          "docstring": "Chain-extension anchors must be passed to Agnes as a real fetchable"
-        },
-        {
           "name": "generate_shot_clip",
-          "line": 309,
+          "line": 195,
           "args": [
             "shot",
             "target_duration",
@@ -930,15 +881,15 @@
           "calls": [
             "VideoFileClip",
             "_derive_seed",
-            "_extract_last_frame_local",
             "_generate_one_segment",
-            "_upload_local_image_for_anchor",
             "append",
-            "basename",
+            "beat_kind",
+            "ceil",
             "close",
             "concatenate_videoclips",
             "exists",
             "fit_clip_to_duration",
+            "max",
             "min",
             "print",
             "range",
@@ -951,7 +902,7 @@
         },
         {
           "name": "fit_clip_to_duration",
-          "line": 399,
+          "line": 257,
           "args": [
             "clip",
             "target"
