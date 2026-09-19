@@ -10,6 +10,31 @@ chain-extension logic for shots longer than one Agnes generation can
 produce, and the freeze-hold fit-to-duration fallback. Imports the Agnes
 HTTP contract from agnes_client.py and the prompt-building logic from
 prompt_builder.py rather than owning either.
+
+CHAIN-VARIATION FIX (2026-09-19): confirmed live on script e086c4f2 (30
+shots, avg 27s, max 45s) - a shot needing more than one Agnes generation
+was chained by repeating the EXACT SAME prompt (same visual_description,
+same anchor text) for every ~7s segment, each one anchored to the
+previous segment's last frame. That produced the same action repeating
+every ~7s, people vanishing/duplicating, and the shot's primary subject
+persisting into every segment even on B-roll-heavy shots. Two changes,
+both scoped to chain segments only (the FIRST/main segment of every shot
+is unchanged, so shot_type/camera_movement/framing choices made by
+shot_breakdown_stage.py are still respected exactly as before):
+  1. _generate_one_segment now accepts an optional beat_cue string,
+     appended to the prompt so segment 2, 3, 4... of the same shot each
+     get a distinct camera/framing instruction instead of an identical
+     prompt repeated verbatim.
+  2. Chain segments alternate whether they carry the previous segment's
+     image anchor forward - every other segment drops the anchor and
+     generates from the prompt text alone, which breaks the "same face
+     cloned into every 7-second slice" pattern an unbroken anchor chain
+     produces, while still giving every other segment a soft visual
+     handoff so the cuts aren't jarring.
+This is a scoped mitigation, not the full fix - see /areas/marius-
+command-center.md for the larger per-beat director plan (separate LLM
+pass to author each ~7s beat individually) that supersedes this once
+built.
 """
 
 import os
@@ -49,40 +74,28 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-# SMOOTH-EXTENSION FIX (2026-08-01): when a shot (or the final trail) needs
-# more duration than one Agnes generation can produce (MAX_CLIP_SECONDS),
-# this used to freeze the last frame for the remainder - visible as a
-# "stuck" still image, happening at every sentence-boundary pause across
-# an episode plus every single video's outro. MAX_CHAIN_SEGMENTS caps how
-# many additional REAL Agnes clips we'll chain (each anchored to the
-# previous clip's own last frame, same mechanism as cross-shot continuity)
-# to cover the overflow with real motion instead.
-#
-# CHAIN-BUDGET FIX (2026-08-23): 3 segments (~21s of overflow, ~28s total
-# per shot) was sized for short pauses, but confirmed live on the Bosnia
-# episode (script 40ffc83c, 33 shots / ~19min = ~35s per shot average) -
-# almost every shot in a real full-length episode needs MORE than 28s
-# total, so nearly every shot was hitting the chain-budget ceiling and
-# silently freeze-holding the remainder, exactly matching Zia's report of
-# "multiple freeze frames, narrator keeps speaking." Raised to 6 segments
-# (~42s of overflow, ~49s total per shot) to comfortably cover this
-# format's real average shot length with headroom, not just short pauses.
 MAX_CHAIN_SEGMENTS = 6
+
+# CHAIN-VARIATION FIX (2026-09-19): short, generic camera/framing cues
+# rotated across chain segments so segment 2/3/4... of the same shot each
+# read as a distinct beat instead of a verbatim repeat of segment 1. Kept
+# deliberately generic (no new subject/action content) so these never
+# fight the shot's own visual_description or introduce new continuity
+# problems of their own.
+CHAIN_BEAT_CUES = [
+    "camera holds a slightly wider framing on the same scene, subject and setting unchanged",
+    "camera holds a slightly closer framing on the same scene, subject and setting unchanged",
+    "camera angle shifts a few degrees to a fresh perspective on the same scene, subject and setting unchanged",
+    "camera lingers on the surrounding environment and setting rather than the main subject",
+    "camera holds steady on the same scene from a slightly different height, subject and setting unchanged",
+]
+
+
+def _chain_beat_cue(chain_index):
+    return CHAIN_BEAT_CUES[chain_index % len(CHAIN_BEAT_CUES)]
 
 
 def _derive_seed(script_id, shot_index, variant=0):
-    """
-    SEED SUPPORT (2026-09-10): Agnes's own docs confirm a seed field this
-    pipeline never sent. Deterministic per-(script, shot, variant) seed so
-    the SAME shot on a resumed run reproduces the SAME visual result
-    instead of a fresh random roll every time - important since a run can
-    be interrupted mid-shot by an overload/timeout and picked up again
-    later. variant lets chain-extension retries deliberately get a
-    DIFFERENT seed than the attempt that just failed, so a retry isn't
-    just repeating the exact same failing generation. Returns None if
-    script_id or shot_index is missing, so callers that don't have both
-    (e.g. the character-reference image call) simply omit seed as before.
-    """
     if script_id is None or shot_index is None:
         return None
     digest = hashlib.md5(f"{script_id}:{shot_index}:{variant}".encode()).hexdigest()
@@ -98,10 +111,6 @@ def download_file(url, out_path):
 
 
 def upload_reference_image(script_id, file_name, local_path):
-    """Returns the B2 object KEY (not a URL) - see storage_b2.py docstring
-    for why. Callers that need to hand this to Agnes (which requires a
-    real fetchable URL) must call storage_b2.presigned_url() on the
-    result themselves, right before the Agnes call."""
     dest = f"{script_id}/refs/{file_name}"
     try:
         return storage_b2.upload_file(dest, local_path, content_type="image/png")
@@ -111,21 +120,6 @@ def upload_reference_image(script_id, file_name, local_path):
 
 
 def generate_character_reference(script):
-    """
-    Generates ONE reference image per script (via agnes-image-2.1-flash),
-    anchored to the episode's setting_and_characters text, so every shot's
-    video call has a consistent character/setting to hold onto instead of
-    starting blind. Persists the result to scripts.character_reference_url
-    so this only ever runs once per script, even across resumed runs.
-    Returns None (and skips silently) if there's no setting_and_characters
-    text to anchor to, or if Agnes's image endpoint fails after retries -
-    the pipeline still works without it, just without the consistency
-    boost.
-
-    RE-ENABLED 2026-09-10 - called from video_generation.py's per-shot
-    loop again via get_continuity_anchor (had been dormant since
-    2026-08-18).
-    """
     script_id = script["id"]
     existing = script.get("character_reference_url")
     if existing:
@@ -196,18 +190,6 @@ def generate_character_reference(script):
 
 
 def extract_last_frame_url(script_id, shot_index, local_video_path):
-    """
-    Pulls the final frame of a just-generated (or already-downloaded) shot
-    clip and uploads it as a small PNG, so it can be passed as the "image"
-    anchor for the NEXT shot's Agnes call - this is what chains shots
-    together visually instead of each one being generated blind. Fails
-    soft (returns None) on any error, same fail-soft pattern as
-    music/SFX/captions elsewhere in this pipeline - continuity is a
-    quality improvement, not something that should ever crash a run.
-
-    RE-ENABLED 2026-09-10 - called from video_generation.py's per-shot
-    loop again (had been dormant since 2026-08-18).
-    """
     try:
         clip = VideoFileClip(local_video_path)
         frame = clip.get_frame(max(clip.duration - 1 / FRAME_RATE, 0))
@@ -224,21 +206,6 @@ def extract_last_frame_url(script_id, shot_index, local_video_path):
 
 
 def get_continuity_anchor(script, video_urls):
-    """
-    Reconstructs the correct anchor image for the NEXT shot to generate:
-    - if at least one shot is already done, downloads the most recently
-      completed clip and extracts its last frame (this is what makes
-      continuity survive across resumed runs, not just within one run)
-    - otherwise falls back to the script's character reference image
-      (generating it if it doesn't exist yet)
-
-    RE-ENABLED 2026-09-10 - called from video_generation.py's per-shot
-    loop again (had been dormant since 2026-08-18).
-
-    STORAGE MIGRATION (2026-09-02): video_urls entries are now B2 object
-    keys, not URLs (see storage_b2.py) - uses storage_b2.download_to_file
-    directly rather than an HTTP download of a stored URL.
-    """
     if video_urls:
         try:
             tmp_path = "/tmp/_anchor_source.mp4"
@@ -253,13 +220,24 @@ def get_continuity_anchor(script, video_urls):
     return generate_character_reference(script)
 
 
-def _generate_one_segment(shot, segment_duration, out_path, setting_and_characters="", anchor_image_url=None, seed=None):
+def _generate_one_segment(shot, segment_duration, out_path, setting_and_characters="", anchor_image_url=None, seed=None, beat_cue=None):
+    """
+    beat_cue (CHAIN-VARIATION FIX, 2026-09-19): optional short camera/
+    framing instruction appended to the built prompt, used only by chain-
+    extension segments 2+ of the same shot (see generate_shot_clip below)
+    so each one reads as a distinct beat instead of an identical repeat.
+    None (default) preserves the exact prior prompt/behavior - the main
+    segment of every shot, and assembly_stage.py's trail-extension call,
+    are both unaffected.
+    """
     raw_frames = int(segment_duration * FRAME_RATE)
     raw_frames = max(MIN_FRAMES, min(MAX_FRAMES, raw_frames))
     num_frames = round_to_valid_frames(raw_frames)
     num_frames = max(MIN_FRAMES, min(MAX_FRAMES, num_frames))
 
     prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=0)
+    if beat_cue:
+        prompt = f"{prompt}, {beat_cue}"
     try:
         video_id = create_agnes_task(prompt, num_frames, image_url=anchor_image_url, negative_prompt=NEGATIVE_PROMPT, seed=seed)
     except ContentPolicyRejection:
@@ -267,11 +245,15 @@ def _generate_one_segment(shot, segment_duration, out_path, setting_and_characte
               "(tier 1, image anchor also dropped this attempt)...")
         try:
             fallback_prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=1)
+            if beat_cue:
+                fallback_prompt = f"{fallback_prompt}, {beat_cue}"
             video_id = create_agnes_task(fallback_prompt, num_frames, image_url=None, negative_prompt=NEGATIVE_PROMPT, seed=seed)
         except ContentPolicyRejection:
             print("Sanitized-anchor fallback ALSO rejected - retrying once more with a fully generic, "
                   "anchor-free prompt AND no image anchor (tier 2, last resort before giving up on this shot)...")
             ultra_prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=2)
+            if beat_cue:
+                ultra_prompt = f"{ultra_prompt}, {beat_cue}"
             video_id = create_agnes_task(ultra_prompt, num_frames, image_url=None, negative_prompt=NEGATIVE_PROMPT, seed=seed)
 
     video_url = poll_agnes_task(video_id)
@@ -280,11 +262,6 @@ def _generate_one_segment(shot, segment_duration, out_path, setting_and_characte
 
 
 def _extract_last_frame_local(video_path):
-    """Extracts the last frame of a local clip file and uploads it nowhere -
-    returns a local PNG path for immediate reuse as the next Agnes anchor
-    within the same shot's chain-extension. Separate from
-    extract_last_frame_url (which uploads to storage) because chain
-    segments are purely intra-shot and never need to survive a resumed run."""
     clip = VideoFileClip(video_path)
     frame = clip.get_frame(max(clip.duration - 1 / FRAME_RATE, 0))
     clip.close()
@@ -294,11 +271,6 @@ def _extract_last_frame_local(video_path):
 
 
 def _upload_local_image_for_anchor(script_id, tag, png_path):
-    """Chain-extension anchors must be passed to Agnes as a real fetchable
-    URL, not a bare B2 key - this is the one place upload_reference_image's
-    key gets immediately presigned, since the result is used right away in
-    the same run and never persisted to the database (ephemeral use only,
-    so the 1-hour presigned URL default is more than enough)."""
     key = upload_reference_image(script_id, tag, png_path)
     os.remove(png_path)
     if not key:
@@ -326,39 +298,26 @@ def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="
         seg_duration = min(remaining, MAX_CLIP_SECONDS)
         seg_out_path = out_path.replace(".mp4", f"_chain{chain_used + 1}.mp4")
 
-        # CHAIN-RETRY FIX (2026-08-23): a single transient Agnes hiccup
-        # (momentary overload/rate-limit) used to immediately give up on
-        # the ENTIRE remaining chain and freeze-hold the rest of the shot -
-        # even though AgnesOverloadedError is, by definition, a transient
-        # condition create_agnes_task already retried AGNES_MAX_RETRIES
-        # times internally. One extra attempt at the chain-segment level
-        # (separate from that internal retry) catches the case where the
-        # segment simply landed during a bad moment, without extending
-        # runtime much - a genuine/permanent failure still falls through
-        # to the freeze-hold exactly as before.
-        # FREEZE-FRAME REDUCTION FIX (2026-08-25): raised from 2 attempts to
-        # 3, with a shorter backoff between them (10s -> 6s), directly per
-        # Zia's report that freeze-holds still show up on a minority of
-        # shots. A single retry was giving up too early on transient Agnes
-        # hiccups; a third attempt (with a faster retry cadence so it
-        # doesn't meaningfully slow down a run) lets more segments recover
-        # instead of falling through to the freeze-hold fallback below.
+        # CHAIN-VARIATION FIX (2026-09-19): every OTHER chain segment drops
+        # the previous segment's image anchor and generates from the text
+        # prompt alone (still combined with beat_cue below) - an unbroken
+        # anchor chain across 4-7 segments is exactly what was cloning the
+        # same face/framing into every ~7s slice of a long shot.
+        use_anchor_this_segment = (chain_used % 2 == 0)
+        beat_cue = _chain_beat_cue(chain_used)
+
         segment_ok = False
         last_chain_error = None
         for chain_attempt in range(3):
             try:
-                local_frame_path = _extract_last_frame_local(current_anchor_path)
-                chain_anchor_url = _upload_local_image_for_anchor(
-                    script_id or "unknown", f"chain_{os.path.basename(seg_out_path)}", local_frame_path
-                )
-                # SEED SUPPORT (2026-09-10): variant combines the chain
-                # segment number with the retry attempt number, so a
-                # chain-retry after a failed attempt deliberately gets a
-                # DIFFERENT seed than the one that just failed, instead of
-                # repeating the identical generation and likely the
-                # identical failure.
+                chain_anchor_url = None
+                if use_anchor_this_segment:
+                    local_frame_path = _extract_last_frame_local(current_anchor_path)
+                    chain_anchor_url = _upload_local_image_for_anchor(
+                        script_id or "unknown", f"chain_{os.path.basename(seg_out_path)}", local_frame_path
+                    )
                 chain_seed = _derive_seed(script_id, shot_index, variant=f"chain{chain_used + 1}-{chain_attempt}")
-                _generate_one_segment(shot, seg_duration, seg_out_path, setting_and_characters, anchor_image_url=chain_anchor_url, seed=chain_seed)
+                _generate_one_segment(shot, seg_duration, seg_out_path, setting_and_characters, anchor_image_url=chain_anchor_url, seed=chain_seed, beat_cue=beat_cue)
                 segment_ok = True
                 break
             except (ContentPolicyRejection, AgnesOverloadedError, Exception) as e:
