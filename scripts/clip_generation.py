@@ -10,9 +10,17 @@ chain-extension logic for shots longer than one Agnes generation can
 produce, and the freeze-hold fit-to-duration fallback. Imports the Agnes
 HTTP contract from agnes_client.py and the prompt-building logic from
 prompt_builder.py rather than owning either.
+
+CHAIN BEATS (2026-09-19): chain-extension segments used to repeat the exact
+same prompt/camera as segment 1, so long shots looped the same moment.
+generate_shot_clip now asks beat_director.py (fail-soft Gemini call, one per
+shot that actually needs chaining) for a distinct action/camera/shot_type
+per chain segment. If beat_director returns None for any reason, behavior
+is identical to the pre-2026-09-19 code.
 """
 
 import os
+import math
 import time
 import hashlib
 import requests
@@ -39,6 +47,7 @@ from agnes_client import (
     poll_agnes_task,
 )
 from prompt_builder import build_agnes_prompt, build_character_reference_prompt, NEGATIVE_PROMPT
+from beat_director import author_chain_beats, apply_beat_to_shot
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
@@ -236,9 +245,15 @@ def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="
     print(f"Shot needs {target_duration:.1f}s (over the ~{MAX_CLIP_SECONDS:.1f}s per-generation cap) - "
           f"chaining real continuation clips for the remaining {remaining:.1f}s instead of freezing.")
 
+    # CHAIN BEATS (2026-09-19): one fail-soft LLM call per chained shot. None
+    # means "use the old repeated-prompt behavior" - see beat_director.py.
+    chain_needed = min(MAX_CHAIN_SEGMENTS, math.ceil((remaining - 0.05) / MAX_CLIP_SECONDS))
+    beats = author_chain_beats(shot, setting_and_characters, chain_needed) if chain_needed > 0 else None
+
     while remaining > 0.05 and chain_used < MAX_CHAIN_SEGMENTS:
         seg_duration = min(remaining, MAX_CLIP_SECONDS)
         seg_out_path = out_path.replace(".mp4", f"_chain{chain_used + 1}.mp4")
+        chain_shot = apply_beat_to_shot(shot, beats[chain_used]) if beats and chain_used < len(beats) else shot
 
         segment_ok = False
         last_chain_error = None
@@ -249,7 +264,7 @@ def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="
                     script_id or "unknown", f"chain_{os.path.basename(seg_out_path)}", local_frame_path
                 )
                 chain_seed = _derive_seed(script_id, shot_index, variant=f"chain{chain_used + 1}-{chain_attempt}")
-                _generate_one_segment(shot, seg_duration, seg_out_path, setting_and_characters, anchor_image_url=chain_anchor_url, seed=chain_seed)
+                _generate_one_segment(chain_shot, seg_duration, seg_out_path, setting_and_characters, anchor_image_url=chain_anchor_url, seed=chain_seed)
                 segment_ok = True
                 break
             except (ContentPolicyRejection, AgnesOverloadedError, Exception) as e:
