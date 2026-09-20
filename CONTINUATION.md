@@ -1,3 +1,36 @@
+# Marius / Erased — Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)
+
+**Re-verify against live GitHub/Supabase before acting. Do not trust this doc at face value.**
+
+## Standing role (from Zia, 2026-09-21)
+On Marius the job is to keep the pipeline working and producing videos. Act autonomously end-to-end (diagnose, fix, push, verify, then report). Do not wait for permission on routine fixes. Pause only for a genuine blocker (workflow-file 403 that Zia must commit, or anything that spends money).
+
+## Correction to PART 4 (important — do NOT delete these files)
+PART 4 says `scripts/b2_preflight.py` and `scripts/verify_run_output.py` have no workflow. That is WRONG. Verified by grep of `.github/workflows/` on `main`: `video_generation.yml` runs `python scripts/b2_preflight.py` and `python scripts/verify_run_output.py --stage video_generation`; `script_writing.yml` runs `python scripts/verify_run_output.py --stage script_writing`. Deleting either breaks Video Generation. Both are live.
+
+## What was found and fixed (2026-09-21)
+- Supabase `iwgocbiqjjhlvkygmcir`: 12 oldest scripts all `images_generated`. `e086c4f2` is at 16/30 clips; the rest are at 0-2 of 30-34. Every `last_error` is timestamped 2026-09-19 19:16-22:13 UTC; none newer.
+- Two independent crash causes were found in those tracebacks:
+  1. Poll endpoint HTTP 429 raised out of `poll_agnes_task` (scripts `e086c4f2`, `4d32a7b4`). Already fixed by another profile on 2026-09-20 (POLL-429 RETRY FIX in `agnes_client.py`).
+  2. `create_agnes_task`'s `requests.post` had no exception handling, so a `ReadTimeout` (read timeout=60) killed the script's run (script `3c7d572f`, traceback frames `clip_generation._generate_one_segment` -> `agnes_client.create_agnes_task`). FIXED in commit `3506266`: the POST is retried like 429/5xx (20s x attempt, 4 attempts), then `AgnesOverloadedError`, which callers already handle.
+- Evidence for fix 2: (a) the traceback frames; (b) the live code had no try/except around the POST; (c) a mocked run reproduced the crash on the old code (one call, then `ReadTimeout`) and shows the new code returning after two timeouts and raising `AgnesOverloadedError` after four. Pushed file diffed identical to the tested copy.
+- Known side effect: a POST that timed out on the read side may already have created a task on Agnes (possible duplicate clip credit). Not measured.
+
+## Declutter done (2026-09-19, verified before deleting)
+Deleted `scripts/health_agent.py` (`44a862f`), `scripts/image_generation.py` (`4b2818c`), `scripts/test_narration_edgetts.py` (`4b9cbbe`), `scripts/test_narration_freellm.py` (`d117475`). Each had zero references (Python imports, workflows, `requirements.txt`, docs other than lists). After deleting, all 23 remaining scripts compile and no import points at a removed file.
+
+## NOT verified
+- Whether runs after the 2026-09-20 poll fix are progressing. No Actions-log tool. Test: re-query `video_next_index`; if `e086c4f2` is above 16 or any script reaches `video_generated`, it is working.
+- PART 3 chain beats still unverified in a real run (look for `[beat_director]` lines in the Video Generation log).
+- Fixing the crashes does not fix pace: shots over ~7s still chain 2-3 Agnes generations each.
+
+## EXACT NEXT STEPS
+1. Re-query Supabase progress (above). If flat, get one fresh run log from Zia and read where it stops.
+2. Optional, needs Zia's paste (workflow file): add an import-check step to `code_health_check.yml` (compile-only today).
+3. Research, unbuilt: a free-LLM fallback chain for `llm_client.py`. Ranking found: Gemini 3.5 Flash-Lite, then Gemini 3.1 Flash-Lite, then Groq `openai/gpt-oss-120b` (daily token caps bind first: this is the invisible cap that stalled Marius in Aug), then Mistral Experiment (data-training opt-in), then NVIDIA NIM (free endpoints are for development/evaluation only). Cerebras is now a finite trial. Not built; needs keys as GitHub secrets.
+
+---
+
 # Marius / Erased — Continuation Notes (2026-09-19 PART 4, SKILLS + DECLUTTER, read this section FIRST)
 
 **Claude picking this up: this section is newest. Re-verify against live GitHub/Supabase before acting — do not trust this doc at face value.**
@@ -5,15 +38,15 @@
 ## What happened this session
 - Built 3 Atlas Frame custom skills (not repo files — Claude custom skills, uploaded per-profile in Claude.ai settings): `atlas-debug-protocol` (verify-live/reproduce-by-execution/two-angle debugging standard + known-bug catalog), `atlas-session-handoff` (this handoff format + cross-profile continuity), `atlas-code-delivery` (push policy, 403 fallback, Zia's exact paste-formatting rules). Handed to Zia as `.skill` files to upload to each profile individually (no org-wide sharing tier).
 - Ran a declutter pass on `aliwaziri10/marius-command-center`. Findings:
-  - `scripts/image_generation.py` — PLAYBOOK.md's "still exists as dead code" note is now STALE; the file is not in the repo. No action needed, but PLAYBOOK.md's known-gotchas section still says it exists — worth a PLAYBOOK.md correction next session.
-  - `scripts/b2_preflight.py` and `scripts/verify_run_output.py` — no matching workflow, no import found via code search. Likely manual/dev-run tools, not proven dead. NOT deleted — deletion without confirming they're truly unused would violate the debug-protocol two-angle-proof standard. If Zia confirms these are never run, delete them next session.
+  - `scripts/image_generation.py` — deleted 2026-09-19 (`4b2818c`). PLAYBOOK.md corrected 2026-09-21.
+  - `scripts/b2_preflight.py` and `scripts/verify_run_output.py` — CORRECTED 2026-09-21: these ARE run by workflows (`video_generation.yml`, `script_writing.yml`). The original note here ("no matching workflow") was wrong. Do NOT delete them.
   - `scripts/narration.py` vs `scripts/narration_stage.py` — confusingly similar names but BOTH are live and different: `narration.py` is the actual TTS/audio-generation stage (run by `narration.yml`); `narration_stage.py` is a text-generation helper module (`generate_narration()`) imported by `script_writing.py`. Not clutter — just a naming collision worth flagging to Zia, not fixing (renaming risks breaking imports for no functional gain).
   - `code_health_check.yml` only runs `py_compile`, which would NOT have caught the 2026-09-19 scene-by-scene import break. A real fix (adding an import-check step) touches a workflow file → 403 → needs Zia's paste. NOT done this session — flagging as a real open item, not built.
 
 ## EXACT NEXT STEPS for whoever picks this up
 1. Continue the chain-beats verification from PART 3 above (unchanged, still open) — this session did not touch that thread.
-2. If Zia confirms `b2_preflight.py`/`verify_run_output.py` are unused, delete them and re-verify nothing imports them broke (`py_compile` + a repo-wide import check).
-3. Optional: correct PLAYBOOK.md's stale `image_generation.py` reference.
+2. (Withdrawn 2026-09-21: `b2_preflight.py`/`verify_run_output.py` are live. Do not delete.)
+3. (Done 2026-09-21: PLAYBOOK.md's stale `image_generation.py` reference corrected.)
 4. Optional, needs Zia's paste (workflow file): add an import-check step to `code_health_check.yml` so a cross-file break like the 2026-09-19 incident gets caught automatically next time.
 
 ## Where the next profile should look
@@ -99,8 +132,8 @@ specific facts first, then act.**
 
 Nearly 24 hours of **zero Supabase activity** from ANY Marius workflow
 (not just Video Generation) between `2026-09-18 21:11` and whenever the
-53-minute run above actually started, is not yet explained. Two
-live hypotheses, NEITHER confirmed:
+53-minute run above actually started, is not yet explained. Two live
+hypotheses, NEITHER confirmed:
 1. Each `Video Generation` run is genuinely just slow because of chain-
    extension (multiple full Agnes generate+poll cycles per shot before
    the first `save_progress` call) — not stuck, just legitimately taking
