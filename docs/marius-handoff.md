@@ -1,5 +1,5 @@
 # Marius Command Center — Handoff Doc
-Last updated: 2026-09-19 (IST) — full rewrite, prior content was stale since 2026-08-29.
+Last updated: 2026-09-21 — scripts list and session log refreshed (full rewrite was 2026-09-19).
 Re-verify against live data before trusting anything below — this doc lags reality
 by definition. If something here contradicts live Supabase/GitHub state, live state wins.
 
@@ -73,21 +73,24 @@ trend signals — see below) → `script_writing` (orchestrates `llm_client.py` 
 ("Erased From History").
 
 Housekeeping workflows: `health_check`, `stall_monitor`, `update_status`,
-`cleanup_dead_storage`, `code_health_check`, `codemap`, `thumbnail_generation`,
-`dependency_graph`.
+`cleanup_dead_storage`, `code_health_check`, `codemap`, `thumbnail_generation`.
+(`dependency_graph` no longer exists as a workflow; removed from this list 2026-09-21.)
 
-## Current `scripts/` files (2026-09-19, confirmed live via GitHub listing)
+## Current `scripts/` files (2026-09-21, confirmed live via a clone of `main`)
 
-Pipeline path: `agnes_client.py`, `assembly_stage.py`, `clip_generation.py`,
-`health_agent.py`, `health_check.py`, `llm_client.py`, `narration.py`,
-`narration_stage.py`, `prompt_builder.py`, `quality_checker.py`,
-`script_writing.py`, `shot_breakdown_stage.py`, `stall_monitor.py`,
-`storage_b2.py`, `thumbnail_generation.py`, `topic_research.py`,
-`trend_research.py`, `update_status.py`, `verify_run_output.py`,
-`video_generation.py`, `youtube_upload.py`, `cleanup_dead_storage.py`.
+All 23 are live: `agnes_client.py`, `assembly_stage.py`, `b2_preflight.py`
+(run by `video_generation.yml`), `beat_director.py`, `clip_generation.py`,
+`cleanup_dead_storage.py`, `health_check.py`, `llm_client.py`,
+`narration.py`, `narration_stage.py`, `prompt_builder.py`,
+`quality_checker.py`, `script_writing.py`, `shot_breakdown_stage.py`,
+`stall_monitor.py`, `storage_b2.py`, `thumbnail_generation.py`,
+`topic_research.py`, `trend_research.py`, `update_status.py`,
+`verify_run_output.py` (run by `script_writing.yml` and
+`video_generation.yml`), `video_generation.py`, `youtube_upload.py`.
 
-Legacy/test, not in the live pipeline path (confirm before touching):
-`image_generation.py`, `test_narration_edgetts.py`, `test_narration_freellm.py`.
+Deleted 2026-09-19 after confirming zero references: `health_agent.py`,
+`image_generation.py`, `test_narration_edgetts.py`,
+`test_narration_freellm.py`.
 
 ## Storage: Backblaze B2 (migrated 2026-09-02, still current)
 
@@ -110,6 +113,16 @@ never assume shared quota or shared anything with Nova's Supabase project.
 
 ## Session log (most recent first — keep this section, don't delete old
 entries; trim only once it gets unwieldy)
+
+### 2026-09-21 — Agnes create-task ReadTimeout crash fixed; declutter
+`create_agnes_task`'s `requests.post` had no exception handling, so a
+`ReadTimeout` killed the script's run (confirmed in script `3c7d572f`'s
+`last_error` traceback; commit `3506266`). Reproduced with a mock on the
+old code, verified on the new. The poll-429 crash was fixed separately on
+2026-09-20. All `last_error` values in Supabase date from 2026-09-19;
+whether runs since then progress is NOT yet verified (see
+`CONTINUATION.md` PART 5). Four unreferenced scripts were deleted (list
+above).
 
 ### 2026-09-19 — Trend grounding was completely dead since creation
 `trend_signals` table had **zero rows, ever**, since it was created

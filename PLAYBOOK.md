@@ -1,6 +1,6 @@
 # Marius Playbook (rarely changes — read alongside STATUS.md)
 
-**LATEST HANDOFF (read first): `CONTINUATION.md`, PART 3 at the top (2026-09-19, chain beats).**
+**LATEST HANDOFF (read first): `CONTINUATION.md`, the newest PART at the top.**
 
 Repo: https://github.com/aliwaziri10/marius-command-center
 Supabase (LIVE project as of 2026-09-19, verified by recent rows): https://supabase.com/dashboard/project/iwgocbiqjjhlvkygmcir
@@ -17,7 +17,7 @@ just because it's written down.**
 
 ## Pipeline order
 Topic Research -> Script Writing -> Narration -> Video Generation -> YouTube Upload.
-Narration generates the audio AND advances the script straight to `images_generated` - there is no separate Image Generation stage in the live pipeline. `scripts/image_generation.py` still exists as a file/workflow in the repo but is dead code - do not run it for new scripts.
+Narration generates the audio AND advances the script straight to `images_generated` - there is no separate Image Generation stage in the live pipeline. `scripts/image_generation.py` was dead code and was deleted on 2026-09-19.
 Video Generation includes clip generation AND final assembly in one script (video_generation.py) - no separate Assembly stage.
 Check STATUS.md for which stage the latest script is on, then help with the NEXT stage only.
 
