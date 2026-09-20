@@ -33,6 +33,7 @@ jobs:
       - name: Run video generation
         if: steps.b2_preflight.outcome == 'success'
         env:
+          PYTHONUNBUFFERED: "1"
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           AGNES_API_KEY: ${{ secrets.AGNES_API_KEY }}
