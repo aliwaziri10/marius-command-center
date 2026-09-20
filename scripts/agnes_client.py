@@ -48,6 +48,11 @@ allowed retry budget), instead of raising immediately. Backoff now grows
 with each consecutive miss (10s, 20s, 30s...) instead of a flat interval,
 since a flat retry pace was itself partly what was triggering "too many
 status queries" back-to-back.
+
+CREATE-TIMEOUT CRASH FIX (2026-09-21): create_agnes_task's requests.post had
+no exception handling (same class as the poll fixes above). A ReadTimeout
+on task creation killed the script's run; confirmed live in script
+3c7d572f's last_error traceback. Now retried like retryable HTTP codes.
 """
 
 import os
@@ -185,12 +190,31 @@ def create_agnes_task(prompt, num_frames, image_url=None, negative_prompt=None, 
         if seed is not None:
             payload["seed"] = seed
 
-        resp = requests.post(
-            f"{AGNES_BASE}/videos",
-            headers=AGNES_HEADERS,
-            json=payload,
-            timeout=60,
-        )
+        try:
+            resp = requests.post(
+                f"{AGNES_BASE}/videos",
+                headers=AGNES_HEADERS,
+                json=payload,
+                timeout=60,
+            )
+        except requests.exceptions.RequestException as e:
+            # CREATE-TIMEOUT CRASH FIX (2026-09-21): same bug class as the
+            # 2026-09-18 poll fix, on the task-CREATION call. This POST had
+            # no try/except, so a slow/dropped Agnes response
+            # (ReadTimeout, read timeout=60) propagated straight out of
+            # create_agnes_task -> _generate_one_segment -> process_script
+            # to main()'s per-script catch-all and killed that script's
+            # progress for the run. Confirmed live: script 3c7d572f
+            # last_error traceback ends at create_agnes_task's
+            # requests.post with ReadTimeout. Now retried like the
+            # 429/5xx codes below; AgnesOverloadedError after
+            # AGNES_MAX_RETRIES, which callers already handle.
+            last_error_text = f"{e.__class__.__name__}: {e}"
+            wait = 20 * (attempt + 1)
+            print(f"AGNES create network error (attempt {attempt + 1}/{AGNES_MAX_RETRIES}): {last_error_text}")
+            print(f"Retrying in {wait}s...")
+            time.sleep(wait)
+            continue
 
         if resp.status_code == 400 and "content_policy_violation" in resp.text:
             raise ContentPolicyRejection(resp.text)
