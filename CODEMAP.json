@@ -1281,13 +1281,29 @@
       "path": "scripts/narration.py",
       "functions": [
         {
+          "name": "_merge_short_segments",
+          "line": 93,
+          "args": [
+            "segments"
+          ],
+          "calls": [
+            "append",
+            "len",
+            "split",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
           "name": "split_into_segments",
-          "line": 82,
+          "line": 106,
           "args": [
             "narration_text"
           ],
           "calls": [
+            "_merge_short_segments",
             "append",
+            "endswith",
             "group",
             "len",
             "lower",
@@ -1299,7 +1315,7 @@
         },
         {
           "name": "_max_plausible_duration",
-          "line": 108,
+          "line": 135,
           "args": [
             "text"
           ],
@@ -1312,7 +1328,7 @@
         },
         {
           "name": "_synthesize_edge",
-          "line": 113,
+          "line": 140,
           "args": [
             "text",
             "out_path"
@@ -1325,7 +1341,7 @@
         },
         {
           "name": "synthesize_sentence",
-          "line": 118,
+          "line": 145,
           "args": [
             "text",
             "tmp_path"
@@ -1344,7 +1360,7 @@
         },
         {
           "name": "synthesize_with_pauses",
-          "line": 151,
+          "line": 178,
           "args": [
             "narration_text"
           ],
@@ -1361,7 +1377,7 @@
         },
         {
           "name": "_assign_shots_to_sentences",
-          "line": 169,
+          "line": 196,
           "args": [
             "sentences",
             "shot_list"
@@ -1380,7 +1396,7 @@
         },
         {
           "name": "synthesize_per_sentence_with_shot_durations",
-          "line": 217,
+          "line": 244,
           "args": [
             "narration_text",
             "shot_list"
@@ -1402,7 +1418,7 @@
         },
         {
           "name": "narrate_one_script",
-          "line": 261,
+          "line": 288,
           "args": [
             "supabase",
             "script"
@@ -1430,7 +1446,7 @@
         },
         {
           "name": "main",
-          "line": 316,
+          "line": 343,
           "args": [],
           "calls": [
             "create_client",
