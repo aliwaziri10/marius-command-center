@@ -24,12 +24,12 @@ VOICE = "en-US-GuyNeural"
 # Speech rate passed directly to edge-tts per sentence. Edge TTS supports a
 # native rate parameter, so no separate ffmpeg atempo pass is needed here
 # (that was only required for Chatterbox, which has no rate control).
-RATE = "-5%"
+RATE = "+6%"  # NARRATION PACING FIX (2026-10-08): was -5%, reported as too slow
 
 # Pause after EVERY sentence, per Zia's explicit instruction - not just
 # paragraph breaks. 1-2s per pause.
-PAUSE_SECONDS_MIN = 1.0
-PAUSE_SECONDS_MAX = 2.0
+PAUSE_SECONDS_MIN = 0.35  # NARRATION PACING FIX (2026-10-08): was 1.0-2.0s after every sentence
+PAUSE_SECONDS_MAX = 0.5
 
 # STUTTER/DUPLICATE GUARD: carried over from prior engines. Sanity-checks a
 # synthesized sentence's duration against a rough expected speaking pace for
@@ -79,6 +79,30 @@ _ABBREVIATIONS = {
 }
 
 
+# NARRATION PACING FIX (2026-10-08): Zia reported narration on both
+# channels was too slow, paused too often and sometimes "did not make
+# sense". Causes found in the code: a 1-2s silence after EVERY sentence
+# (including 2-3 word fragments like "Not once." that belong to the
+# sentence before them), a sub-100% speaking rate, and ellipses treated as
+# sentence ends. Short fragments are now merged into the neighbouring
+# sentence so they are spoken in one natural breath with no pause, and an
+# ellipsis no longer ends a segment.
+MIN_WORDS_PER_SEGMENT = 5
+
+
+def _merge_short_segments(segments):
+    merged = []
+    for seg in segments:
+        if merged and len(seg.split()) < MIN_WORDS_PER_SEGMENT:
+            merged[-1] = f"{merged[-1]} {seg}".strip()
+        else:
+            merged.append(seg)
+    if len(merged) > 1 and len(merged[0].split()) < MIN_WORDS_PER_SEGMENT:
+        merged[1] = f"{merged[0]} {merged[1]}".strip()
+        merged = merged[1:]
+    return merged
+
+
 def split_into_segments(narration_text):
     """Splits narration into one segment per real SENTENCE, so a pause gets
     inserted only at genuine sentence boundaries - not after abbreviations,
@@ -93,6 +117,8 @@ def split_into_segments(narration_text):
     buffer = ""
     for piece in raw_pieces:
         buffer = f"{buffer} {piece}".strip() if buffer else piece
+        if buffer.endswith("...") or buffer.endswith("\u2026"):
+            continue  # an ellipsis is a trailing-off beat, not a sentence end
         match = re.search(r"([A-Za-z]+)\.$", buffer)
         if match:
             word = match.group(1).lower()
@@ -102,7 +128,8 @@ def split_into_segments(narration_text):
         buffer = ""
     if buffer.strip():
         segments.append(buffer.strip())
-    return [s for s in segments if s] or [narration_text.strip()]
+    segments = [s for s in segments if s] or [narration_text.strip()]
+    return _merge_short_segments(segments)
 
 
 def _max_plausible_duration(text):
