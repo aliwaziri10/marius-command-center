@@ -2203,7 +2203,7 @@
       "functions": [
         {
           "name": "_client_config",
-          "line": 127,
+          "line": 135,
           "args": [],
           "calls": [
             "Config"
@@ -2212,7 +2212,7 @@
         },
         {
           "name": "_new_client",
-          "line": 143,
+          "line": 151,
           "args": [],
           "calls": [
             "_client_config",
@@ -2222,7 +2222,7 @@
         },
         {
           "name": "_get_client",
-          "line": 156,
+          "line": 164,
           "args": [],
           "calls": [
             "_new_client"
@@ -2231,7 +2231,7 @@
         },
         {
           "name": "upload_bytes",
-          "line": 163,
+          "line": 171,
           "args": [
             "object_key",
             "file_bytes",
@@ -2250,7 +2250,7 @@
         },
         {
           "name": "upload_file",
-          "line": 196,
+          "line": 204,
           "args": [
             "object_key",
             "local_path",
@@ -2264,21 +2264,70 @@
           "docstring": ""
         },
         {
+          "name": "_region_from_endpoint",
+          "line": 209,
+          "args": [],
+          "calls": [
+            "len",
+            "replace",
+            "split"
+          ],
+          "docstring": "Parses the B2 region (e.g. us-west-004) out of an endpoint host like"
+        },
+        {
+          "name": "_presign_config",
+          "line": 220,
+          "args": [
+            "addressing"
+          ],
+          "calls": [
+            "Config"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_presign_clients",
+          "line": 232,
+          "args": [],
+          "calls": [
+            "_get_client",
+            "_presign_config",
+            "_region_from_endpoint",
+            "append",
+            "client"
+          ],
+          "docstring": "Candidate clients for presigning, best first. PRESIGN-REGION FIX"
+        },
+        {
+          "name": "_url_is_fetchable",
+          "line": 257,
+          "args": [
+            "url"
+          ],
+          "calls": [
+            "get",
+            "str"
+          ],
+          "docstring": "Fetches 1 byte of the presigned URL exactly the way Agnes will."
+        },
+        {
           "name": "presigned_url",
-          "line": 201,
+          "line": 269,
           "args": [
             "object_key",
             "expires_in"
           ],
           "calls": [
-            "_get_client",
-            "generate_presigned_url"
+            "_presign_clients",
+            "_url_is_fetchable",
+            "generate_presigned_url",
+            "print"
           ],
-          "docstring": "Generates a fresh, short-lived presigned GET URL for object_key."
+          "docstring": "Generates a fresh, short-lived presigned GET URL for object_key and"
         },
         {
           "name": "download_to_file",
-          "line": 214,
+          "line": 291,
           "args": [
             "object_key",
             "local_path"
@@ -2291,7 +2340,7 @@
         },
         {
           "name": "object_exists",
-          "line": 223,
+          "line": 300,
           "args": [
             "object_key"
           ],
@@ -2303,7 +2352,7 @@
         },
         {
           "name": "object_size",
-          "line": 236,
+          "line": 313,
           "args": [
             "object_key"
           ],
@@ -2316,7 +2365,7 @@
         },
         {
           "name": "delete_object",
-          "line": 256,
+          "line": 333,
           "args": [
             "object_key"
           ],
