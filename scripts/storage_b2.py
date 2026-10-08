@@ -89,11 +89,19 @@ request_checksum_calculation / response_checksum_validation to
 on older botocore that does not know those options. If a live run (or
 scripts/b2_preflight.py) still fails 4/4 with this in place, revert
 nothing - it is harmless - and treat this hypothesis as ruled out.
+
+PRESIGN-REGION FIX (2026-10-08) - Agnes failed every shot-2+ anchor with
+"Download image URL failed: 403" (66 scripts stalled). Cause (strongly
+indicated, verify with the presign probe in b2_preflight.py): presigned
+URLs were signed for the wrong region. presigned_url() now signs with the
+region parsed from B2_ENDPOINT_URL, fetches 1 byte to prove the URL works,
+and returns None (no anchor) rather than a URL that Agnes would reject.
 """
 
 import time
 import os
 import boto3
+import requests
 from botocore.client import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
@@ -198,17 +206,86 @@ def upload_file(object_key, local_path, content_type="application/octet-stream")
         return upload_bytes(object_key, f.read(), content_type=content_type)
 
 
+def _region_from_endpoint():
+    """Parses the B2 region (e.g. us-west-004) out of an endpoint host like
+    s3.us-west-004.backblazeb2.com. Returns None if the host does not match
+    that pattern (then the default, region-less client is used as before)."""
+    host = B2_ENDPOINT_URL.replace("https://", "").replace("http://", "").split("/")[0]
+    parts = host.split(".")
+    if len(parts) >= 4 and parts[0] == "s3" and parts[-2] == "backblazeb2":
+        return parts[1]
+    return None
+
+
+def _presign_config(addressing):
+    try:
+        return Config(
+            signature_version="s3v4",
+            s3={"addressing_style": addressing},
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
+        )
+    except TypeError:
+        return Config(signature_version="s3v4", s3={"addressing_style": addressing})
+
+
+def _presign_clients():
+    """Candidate clients for presigning, best first. PRESIGN-REGION FIX
+    (2026-10-08): the shared client never sets region_name, so botocore
+    signs presigned URLs for us-east-1. Header-signed calls (upload/head/
+    download) survive that because botocore's S3 region redirector
+    corrects the region after B2's first error response; a presigned URL
+    is never retried, so it carries the wrong region and B2 answers 403 -
+    exactly what Agnes reported ('Download image URL failed: 403') on
+    every shot-2+ anchor image since 2026-09-21."""
+    region = _region_from_endpoint()
+    clients = []
+    if region:
+        for addressing in ("path", "virtual"):
+            clients.append(boto3.client(
+                "s3",
+                endpoint_url=f"https://{B2_ENDPOINT_URL}",
+                aws_access_key_id=B2_KEY_ID,
+                aws_secret_access_key=B2_APPLICATION_KEY,
+                region_name=region,
+                config=_presign_config(addressing),
+            ))
+    clients.append(_get_client())
+    return clients
+
+
+def _url_is_fetchable(url):
+    """Fetches 1 byte of the presigned URL exactly the way Agnes will.
+    Returns (ok, detail)."""
+    try:
+        r = requests.get(url, headers={"Range": "bytes=0-0"}, timeout=20)
+    except requests.exceptions.RequestException as e:
+        return False, f"request error: {e}"
+    if r.status_code in (200, 206):
+        return True, str(r.status_code)
+    return False, f"HTTP {r.status_code}: {r.text[:300]}"
+
+
 def presigned_url(object_key, expires_in=PRESIGNED_URL_EXPIRY_SECONDS):
-    """Generates a fresh, short-lived presigned GET URL for object_key.
-    Call this immediately before the URL is actually needed (e.g. right
-    before passing it to Agnes, or right before this run downloads the
-    object itself) - never store the result anywhere persistent."""
-    client = _get_client()
-    return client.generate_presigned_url(
-        "get_object",
-        Params={"Bucket": B2_BUCKET_NAME, "Key": object_key},
-        ExpiresIn=expires_in,
-    )
+    """Generates a fresh, short-lived presigned GET URL for object_key and
+    PROVES it is fetchable (PRESIGN-REGION FIX, 2026-10-08) by fetching 1
+    byte of it before returning it. Tries region-correct path-style, then
+    virtual-style, then the legacy region-less client. Returns None if no
+    variant works (the real B2 error is printed) - callers pass None to
+    Agnes as 'no image anchor', so the shot still generates instead of
+    the whole script stalling. Never store the result anywhere persistent."""
+    for client in _presign_clients():
+        url = client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": B2_BUCKET_NAME, "Key": object_key},
+            ExpiresIn=expires_in,
+        )
+        ok, detail = _url_is_fetchable(url)
+        if ok:
+            return url
+        print(f"B2 presigned URL for {object_key!r} not fetchable ({detail}) - trying next variant")
+    print(f"::warning::B2 presigned URL for {object_key!r} failed every variant - continuing WITHOUT an image anchor for this shot")
+    return None
 
 
 def download_to_file(object_key, local_path):
