@@ -59,6 +59,8 @@ from agnes_client import (
     poll_agnes_task,
 )
 from prompt_builder import build_agnes_prompt, build_character_reference_prompt, NEGATIVE_PROMPT
+from prompt_focus import focus_anchor, no_people_clause  # PROTAGONIST-EVERYWHERE FIX (2026-10-09)
+import clip_qa  # CLIP QA (2026-10-09)
 from beat_director import author_chain_beats, apply_beat_to_shot
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
@@ -200,13 +202,15 @@ def get_continuity_anchor(script, video_urls):
     return generate_character_reference(script)
 
 
-def _generate_one_segment(shot, segment_duration, out_path, setting_and_characters="", anchor_image_url=None, seed=None):
+def _generate_one_segment_raw(shot, segment_duration, out_path, setting_and_characters="", anchor_image_url=None, seed=None, extra_prompt=""):
     raw_frames = int(segment_duration * FRAME_RATE)
     raw_frames = max(MIN_FRAMES, min(MAX_FRAMES, raw_frames))
     num_frames = round_to_valid_frames(raw_frames)
     num_frames = max(MIN_FRAMES, min(MAX_FRAMES, num_frames))
 
     prompt = build_agnes_prompt(shot, setting_and_characters, fallback_level=0)
+    if extra_prompt:
+        prompt = f"{prompt}, {extra_prompt}"
     try:
         video_id = create_agnes_task(prompt, num_frames, image_url=anchor_image_url, negative_prompt=NEGATIVE_PROMPT, seed=seed)
     except ContentPolicyRejection:
@@ -223,6 +227,40 @@ def _generate_one_segment(shot, segment_duration, out_path, setting_and_characte
 
     video_url = poll_agnes_task(video_id)
     download_file(video_url, out_path)
+    return out_path
+
+
+def _generate_one_segment(shot, segment_duration, out_path, setting_and_characters="", anchor_image_url=None, seed=None):
+    """PROTAGONIST-EVERYWHERE FIX + CLIP QA (2026-10-09), Zia's report:
+    protagonist in ~95% of shots, faces morphing into other people, waxy
+    skin. (1) The protagonist's description is only sent with shots that
+    actually feature them (prompt_focus.py) and shots with no people say so.
+    (2) After each clip is generated, clip_qa.py samples 4 frames and asks
+    Gemini vision whether a face changed into another person, bodies
+    melted/merged, or skin looks waxy; a failing clip is regenerated with a
+    different seed, up to CLIP_QA_MAX_REDO times (default 1 - every redo
+    spends Agnes credits). The last attempt is always accepted so an episode
+    can never be blocked by the checker. Fails open on any QA error."""
+    focused_anchor = focus_anchor(shot, setting_and_characters)
+    extra_prompt = no_people_clause(shot, setting_and_characters)
+    redo_budget = clip_qa.max_redo()
+
+    for qa_attempt in range(redo_budget + 1):
+        attempt_seed = seed
+        if isinstance(seed, int) and qa_attempt > 0:
+            attempt_seed = seed + 7919 * qa_attempt
+        _generate_one_segment_raw(shot, segment_duration, out_path, focused_anchor,
+                                  anchor_image_url=anchor_image_url, seed=attempt_seed,
+                                  extra_prompt=extra_prompt)
+        verdict = clip_qa.check_clip(out_path, shot, setting_and_characters)
+        if verdict["ok"]:
+            return out_path
+        if qa_attempt < redo_budget:
+            print(f"[clip_qa] clip rejected ({verdict['reason']}) - regenerating with a different seed "
+                  f"(redo {qa_attempt + 1}/{redo_budget}).")
+        else:
+            print(f"[clip_qa] clip still flagged after {redo_budget} redo(s) ({verdict['reason']}) - "
+                  f"accepting the last attempt rather than blocking the episode.")
     return out_path
 
 
