@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 25,
+  "file_count": 26,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -1669,6 +1669,86 @@
             "strip"
           ],
           "docstring": ""
+        }
+      ],
+      "env_vars": [],
+      "tables": []
+    },
+    {
+      "path": "scripts/prompt_focus.py",
+      "functions": [
+        {
+          "name": "protagonist_name",
+          "line": 44,
+          "args": [
+            "anchor"
+          ],
+          "calls": [
+            "group",
+            "search",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "visual_has_people",
+          "line": 49,
+          "args": [
+            "visual"
+          ],
+          "calls": [
+            "bool",
+            "search"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "shot_features_protagonist",
+          "line": 53,
+          "args": [
+            "shot",
+            "anchor"
+          ],
+          "calls": [
+            "get",
+            "join",
+            "lower",
+            "protagonist_name"
+          ],
+          "docstring": "True if this shot should carry the protagonist's description. True"
+        },
+        {
+          "name": "focus_anchor",
+          "line": 66,
+          "args": [
+            "shot",
+            "anchor"
+          ],
+          "calls": [
+            "append",
+            "join",
+            "lower",
+            "protagonist_name",
+            "shot_features_protagonist",
+            "split",
+            "strip"
+          ],
+          "docstring": "Anchor to send with this shot: unchanged if the shot features the"
+        },
+        {
+          "name": "no_people_clause",
+          "line": 86,
+          "args": [
+            "shot",
+            "anchor"
+          ],
+          "calls": [
+            "get",
+            "shot_features_protagonist",
+            "strip",
+            "visual_has_people"
+          ],
+          "docstring": "The 'no people in frame' clause, only for shots that clearly have no"
         }
       ],
       "env_vars": [],
