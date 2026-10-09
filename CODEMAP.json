@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 26,
+  "file_count": 27,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -8,6 +8,9 @@
     "B2_BUCKET_NAME",
     "B2_ENDPOINT_URL",
     "B2_KEY_ID",
+    "CLIP_QA_ENABLED",
+    "CLIP_QA_MAX_CALLS_PER_RUN",
+    "CLIP_QA_MAX_REDO",
     "DELETE_ORPHANS",
     "DRY_RUN",
     "EXPECTED_YOUTUBE_CHANNEL_TITLE",
@@ -1139,6 +1142,118 @@
       "tables": [
         "scripts"
       ]
+    },
+    {
+      "path": "scripts/clip_qa.py",
+      "functions": [
+        {
+          "name": "enabled",
+          "line": 43,
+          "args": [],
+          "calls": [
+            "bool",
+            "get",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "max_redo",
+          "line": 47,
+          "args": [],
+          "calls": [
+            "enabled",
+            "get",
+            "int",
+            "max"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_max_calls",
+          "line": 54,
+          "args": [],
+          "calls": [
+            "get",
+            "int"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "shot_needs_check",
+          "line": 61,
+          "args": [
+            "shot",
+            "anchor"
+          ],
+          "calls": [
+            "bool",
+            "get",
+            "lower",
+            "protagonist_name",
+            "strip",
+            "visual_has_people"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_extract_frames_b64",
+          "line": 68,
+          "args": [
+            "video_path"
+          ],
+          "calls": [
+            "BytesIO",
+            "VideoFileClip",
+            "append",
+            "b64encode",
+            "close",
+            "convert",
+            "decode",
+            "fromarray",
+            "get_frame",
+            "getvalue",
+            "int",
+            "max",
+            "min",
+            "resize",
+            "save"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "check_clip",
+          "line": 100,
+          "args": [
+            "video_path",
+            "shot",
+            "anchor"
+          ],
+          "calls": [
+            "_extract_frames_b64",
+            "_max_calls",
+            "enabled",
+            "get",
+            "join",
+            "json",
+            "loads",
+            "post",
+            "print",
+            "replace",
+            "shot_needs_check",
+            "str",
+            "strip"
+          ],
+          "docstring": "Returns {\"ok\": bool, \"checked\": bool, \"reason\": str}. Never raises."
+        }
+      ],
+      "env_vars": [
+        "CLIP_QA_ENABLED",
+        "CLIP_QA_MAX_CALLS_PER_RUN",
+        "CLIP_QA_MAX_REDO",
+        "GEMINI_API_KEY"
+      ],
+      "tables": []
     },
     {
       "path": "scripts/health_check.py",
