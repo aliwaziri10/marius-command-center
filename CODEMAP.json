@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 24,
+  "file_count": 25,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -8,6 +8,7 @@
     "B2_BUCKET_NAME",
     "B2_ENDPOINT_URL",
     "B2_KEY_ID",
+    "DELETE_ORPHANS",
     "DRY_RUN",
     "EXPECTED_YOUTUBE_CHANNEL_TITLE",
     "FREESOUND_API_KEY",
@@ -791,6 +792,74 @@
         "GEMINI_API_KEY"
       ],
       "tables": []
+    },
+    {
+      "path": "scripts/cleanup_b2_uploaded.py",
+      "functions": [
+        {
+          "name": "fetch_script_ids",
+          "line": 30,
+          "args": [],
+          "calls": [
+            "add",
+            "get",
+            "json",
+            "len",
+            "raise_for_status",
+            "set"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "list_bucket",
+          "line": 49,
+          "args": [],
+          "calls": [
+            "_get_client",
+            "get",
+            "get_paginator",
+            "paginate"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "gb",
+          "line": 57,
+          "args": [
+            "n"
+          ],
+          "calls": [],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 61,
+          "args": [],
+          "calls": [
+            "_get_client",
+            "any",
+            "append",
+            "delete_objects",
+            "fetch_script_ids",
+            "gb",
+            "get",
+            "len",
+            "list_bucket",
+            "print",
+            "range"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "DELETE_ORPHANS",
+        "DRY_RUN",
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": [
+        "scripts"
+      ]
     },
     {
       "path": "scripts/cleanup_dead_storage.py",
