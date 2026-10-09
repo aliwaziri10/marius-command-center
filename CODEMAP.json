@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 27,
+  "file_count": 28,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -19,6 +19,7 @@
     "HF_TOKEN",
     "SUPABASE_SECRET_KEY",
     "SUPABASE_URL",
+    "TITLE_GATE_ENABLED",
     "X",
     "YOUTUBE_CLIENT_ID",
     "YOUTUBE_CLIENT_SECRET",
@@ -2900,6 +2901,92 @@
         "YOUTUBE_CLIENT_ID",
         "YOUTUBE_CLIENT_SECRET",
         "YOUTUBE_REFRESH_TOKEN"
+      ],
+      "tables": []
+    },
+    {
+      "path": "scripts/title_gate.py",
+      "functions": [
+        {
+          "name": "_words",
+          "line": 38,
+          "args": [
+            "t"
+          ],
+          "calls": [
+            "findall",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "lint",
+          "line": 42,
+          "args": [
+            "title",
+            "thumb"
+          ],
+          "calls": [
+            "_words",
+            "append",
+            "endswith",
+            "findall",
+            "isupper",
+            "join",
+            "len",
+            "max",
+            "min",
+            "set",
+            "sorted",
+            "split",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_ask_gemini_for_titles",
+          "line": 78,
+          "args": [
+            "topic_title",
+            "hook_text",
+            "narration_text"
+          ],
+          "calls": [
+            "get",
+            "json",
+            "loads",
+            "post",
+            "print",
+            "replace",
+            "str",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "optimize_title",
+          "line": 111,
+          "args": [
+            "topic_title",
+            "hook_text",
+            "narration_text"
+          ],
+          "calls": [
+            "_ask_gemini_for_titles",
+            "all",
+            "get",
+            "len",
+            "lint",
+            "max",
+            "print",
+            "strip"
+          ],
+          "docstring": "Returns the title to upload with. Never raises."
+        }
+      ],
+      "env_vars": [
+        "GEMINI_API_KEY",
+        "TITLE_GATE_ENABLED"
       ],
       "tables": []
     },
