@@ -92,9 +92,36 @@ queue for the next scheduled run once the rate limit window has likely
 reset. No change to any per-shot retry/backoff/timing logic already in
 agnes_client.py or clip_generation.py - this only changes how main()
 reacts to the case where retries there are already exhausted.
+
+FINISH-ONE-VIDEO + SELF-HEALING + RUN REPORT (2026-10-10): three changes,
+all aimed at "at least one video goes up every day":
+  (1) get_ready_scripts() now orders by MOST PROGRESS FIRST
+      (video_next_index desc, then oldest), not oldest first. The video
+      closest to done gets the shot budget first, so videos actually
+      finish and upload instead of the oldest/stuck one holding the line.
+  (2) recover_stalled_scripts() runs at the start of every run: up to
+      MAX_STALL_RECOVERIES_PER_RUN scripts parked as 'video_stalled' are
+      put back to 'images_generated' once STALL_COOLDOWN_HOURS have passed
+      since their last recorded error. Before this, a stalled script
+      stayed parked forever until someone reset it by hand (the 2026-09-10
+      to 2026-09-20 anchor-URL bug parked dozens of scripts this way and
+      the code fix alone never un-parked them). A script that fails again
+      is simply re-parked with a fresh last_error_at, so the cost of a
+      genuinely broken script is one failed attempt per cooldown window.
+  (3) RUN REPORT: every run now prints a plain-language report (what
+      progressed, which script failed, at which shot, the real error) and
+      appends it to the GitHub Actions run summary page
+      ($GITHUB_STEP_SUMMARY) so the fault is visible without digging
+      through logs. Real faults (content flagged, stalled, assembly
+      failed, unexpected crash) are also saved to scripts.last_error. If a
+      run makes ZERO progress and hit at least one real fault, the run
+      exits non-zero so the existing failed-run alert/issue fires with the
+      report attached; rate limits and Supabase timeouts are reported but
+      are NOT treated as faults (they clear on their own).
 """
 
 import os
+import sys
 import json
 import time
 import traceback
@@ -114,15 +141,106 @@ CANDIDATE_POOL_SIZE = 15      # raised from 5 (2026-07-25) so every currently-st
 CLIP_VERIFY_RETRIES = 3
 CLIP_VERIFY_RETRY_WAIT = 5
 
+STALL_COOLDOWN_HOURS = 6              # a video_stalled script is retried only after this long
+MAX_STALL_RECOVERIES_PER_RUN = 3      # how many parked scripts get put back in the queue per run
+
+# RUN REPORT (2026-10-10): collected while the run executes, written out at
+# the end by write_run_report(). "faults" are real problems a person should
+# know about; "notes" are expected/transient conditions (rate limits, infra
+# timeouts) that are reported but never fail the run.
+RUN_LOG = {"progress": {}, "faults": [], "notes": []}
+
+
+def report_fault(script_id, kind, detail):
+    RUN_LOG["faults"].append({"script_id": script_id, "kind": kind, "detail": str(detail)[:600]})
+
+
+def report_note(text):
+    RUN_LOG["notes"].append(str(text)[:400])
+
 
 def get_ready_scripts(limit=CANDIDATE_POOL_SIZE):
+    # FINISH-ONE-VIDEO (2026-10-10): most progress first, then oldest.
     resp = retryable_request(
         "GET",
-        f"{SUPABASE_URL}/rest/v1/scripts?status=eq.images_generated&order=created_at.asc&limit={limit}",
+        f"{SUPABASE_URL}/rest/v1/scripts?status=eq.images_generated&order=video_next_index.desc.nullslast,created_at.asc&limit={limit}",
         headers=HEADERS,
         timeout=30,
     )
     return resp.json()
+
+
+def recover_stalled_scripts():
+    """SELF-HEALING (2026-10-10): puts up to MAX_STALL_RECOVERIES_PER_RUN
+    scripts parked as 'video_stalled' back to 'images_generated' once
+    STALL_COOLDOWN_HOURS have passed since their last recorded error.
+    Non-fatal: any failure here is logged and the run continues."""
+    cutoff = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - STALL_COOLDOWN_HOURS * 3600))
+    try:
+        resp = retryable_request(
+            "GET",
+            f"{SUPABASE_URL}/rest/v1/scripts?status=eq.video_stalled"
+            f"&or=(last_error_at.is.null,last_error_at.lt.{cutoff})"
+            f"&select=id&order=last_error_at.asc.nullsfirst&limit={MAX_STALL_RECOVERIES_PER_RUN}",
+            headers=HEADERS,
+            timeout=30,
+        )
+        stalled = resp.json()
+    except Exception as e:
+        print(f"Could not look for stalled scripts to recover (non-fatal): {e}")
+        report_note(f"Could not check stalled scripts this run: {e}")
+        return
+
+    for row in stalled:
+        try:
+            retryable_request(
+                "PATCH",
+                f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{row['id']}&status=eq.video_stalled",
+                headers=HEADERS,
+                json={"status": "images_generated"},
+                timeout=30,
+            )
+            print(f"Self-heal: script {row['id']} was video_stalled and past its {STALL_COOLDOWN_HOURS}h cooldown - put back in the queue.")
+            report_note(f"Self-heal: script {row['id']} put back in the queue from video_stalled.")
+        except Exception as e:
+            print(f"Could not recover stalled script {row['id']} (non-fatal): {e}")
+
+
+def write_run_report():
+    """RUN REPORT (2026-10-10): prints a plain report and appends it to the
+    GitHub Actions run summary page. Returns True if this run should be
+    marked failed (zero progress AND at least one real fault)."""
+    total_shots = sum(RUN_LOG["progress"].values())
+    lines = ["## Marius - Video Generation run report", ""]
+    lines.append(f"- Run finished: {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())}")
+    lines.append(f"- Shots generated this run: {total_shots}")
+    if RUN_LOG["progress"]:
+        for sid, n in RUN_LOG["progress"].items():
+            lines.append(f"  - script {sid}: {n} shot(s)")
+    lines.append("")
+    if RUN_LOG["faults"]:
+        lines.append("### FAULTS (need attention)")
+        for f in RUN_LOG["faults"]:
+            lines.append(f"- script {f['script_id']} - {f['kind']}: {f['detail']}")
+        lines.append("")
+    else:
+        lines.append("No faults this run.")
+        lines.append("")
+    if RUN_LOG["notes"]:
+        lines.append("### Notes (not faults)")
+        for n in RUN_LOG["notes"]:
+            lines.append(f"- {n}")
+        lines.append("")
+    report = "\n".join(lines)
+    print("\n" + report)
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        try:
+            with open(summary_path, "a") as f:
+                f.write(report + "\n")
+        except Exception as e:
+            print(f"Could not write run summary page (non-fatal): {e}")
+    return total_shots == 0 and len(RUN_LOG["faults"]) > 0
 
 
 def download_file(url, out_path):
@@ -210,6 +328,9 @@ def save_progress(script_id, video_urls, next_index):
 
 
 def mark_content_flagged(script_id, shot_index, reason):
+    # RUN REPORT (2026-10-10): the reason is now also saved to last_error
+    # and reported, so a flagged script's cause is visible without logs.
+    record_error(script_id, f"ContentPolicyRejection on shot {shot_index + 1}: {reason}")
     retryable_request(
         "PATCH",
         f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{script_id}",
@@ -217,6 +338,7 @@ def mark_content_flagged(script_id, shot_index, reason):
         json={"status": "content_flagged"},
         timeout=30,
     )
+    report_fault(script_id, "content_flagged", f"shot {shot_index + 1} rejected by Agnes content policy: {reason}")
     print(f"Script {script_id} marked content_flagged (shot {shot_index + 1}) - will be skipped by future runs until manually reset. Reason: {reason}")
 
 
@@ -230,9 +352,9 @@ def mark_video_stalled(script_id, shot_index, reason):
     queries status=images_generated), so the same broken shot stops being
     retried identically every run. The real Agnes response body is
     persisted to last_error via record_error so the actual cause is
-    visible directly in Supabase - reset status back to 'images_generated'
-    manually once the underlying issue (bad prompt field, payload bug,
-    etc.) is understood/fixed, same workflow as content_flagged.
+    visible directly in Supabase. SELF-HEALING (2026-10-10): recover_
+    stalled_scripts() now puts these back in the queue automatically after
+    STALL_COOLDOWN_HOURS instead of waiting for a manual reset.
     """
     record_error(script_id, f"AgnesBadRequestError on shot {shot_index + 1}: {reason}")
     retryable_request(
@@ -242,7 +364,8 @@ def mark_video_stalled(script_id, shot_index, reason):
         json={"status": "video_stalled"},
         timeout=30,
     )
-    print(f"Script {script_id} marked video_stalled (shot {shot_index + 1}) - will be skipped by future runs until manually reset. Reason: {reason}")
+    report_fault(script_id, "video_stalled", f"shot {shot_index + 1} got a non-content-policy Agnes 400: {reason}")
+    print(f"Script {script_id} marked video_stalled (shot {shot_index + 1}) - will be retried automatically after {STALL_COOLDOWN_HOURS}h. Reason: {reason}")
 
 
 def mark_video_generated(script_id, video_url=None, video_chunk_urls=None, audio_stats=None):
@@ -354,15 +477,14 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
                 print(f"Rejected visual_description: {shot.get('visual_description', '')!r}")
                 print(f"FIX: reword shot_list[{i}].visual_description for script {script_id} in the "
                       f"scripts table, then reset status to 'images_generated' to resume from exactly "
-                      f"this shot. Moving on to the next-oldest eligible candidate for now.")
+                      f"this shot. Moving on to the next eligible candidate for now.")
                 return shots_used
             except AgnesBadRequestError as e:
                 mark_video_stalled(script_id, i, str(e))
                 print(f"Non-content-policy 400 on shot {i+1}/{total_shots} - not a transient/overload "
-                      f"error, so it will not resolve itself on retry. FIX: inspect scripts.last_error "
-                      f"for the real Agnes response body, fix the underlying request/payload issue, then "
-                      f"reset status to 'images_generated' to resume from exactly this shot. Moving on to "
-                      f"the next-oldest eligible candidate for now.")
+                      f"error. It will be retried automatically after the {STALL_COOLDOWN_HOURS}h cooldown; "
+                      f"inspect scripts.last_error for the real Agnes response body. Moving on to "
+                      f"the next eligible candidate for now.")
                 return shots_used
             except AgnesOverloadedError as e:
                 print(f"Agnes appears overloaded (upstream load saturated) on shot {i+1}/{total_shots} after all retries: {e}")
@@ -444,11 +566,12 @@ def process_script(script, shot_limit=CLIP_BATCH_LIMIT):
             error_text = traceback.format_exc()
             print(f"Assembly FAILED for script {script_id} - recording error and moving on: {e}")
             record_error(script_id, error_text)
+            report_fault(script_id, "assembly_failed", f"{type(e).__name__}: {e}")
 
     return shots_used
 
 
-def main():
+def run():
     # INFRA-CRASH FIX (2026-09-14): see module docstring - this was the
     # one remaining unguarded Supabase call in the whole file. A timeout
     # here (confirmed recurring on this project's free-tier Postgres)
@@ -457,15 +580,19 @@ def main():
     # code bug. Treated as an ordinary infra failure now: log and return
     # so this run exits 0, exactly like get_pending_topics() in
     # script_writing.py was already fixed to do on 2026-09-13.
+    recover_stalled_scripts()
+
     try:
         candidates = get_ready_scripts(CANDIDATE_POOL_SIZE)
     except RuntimeError as e:
         print(f"Infra failure fetching ready scripts (Supabase likely timed out) - no candidates could "
               f"even be listed this run. Not a code bug - next scheduled run will retry. Detail: {e}")
+        report_note(f"Supabase timed out while listing scripts - nothing could run this time, will retry next run. Detail: {e}")
         return
 
     if not candidates:
         print("No scripts with images ready for video generation. Nothing to do.")
+        report_note("No scripts with images were ready for video generation.")
         return
 
     remaining_budget = CLIP_BATCH_LIMIT
@@ -494,6 +621,7 @@ def main():
                   f"({e}). Trying the remaining {len(candidates) - candidates.index(script) - 1} "
                   f"candidate(s) would very likely hit the identical limit. Next scheduled run will "
                   f"retry the full queue.")
+            report_note(f"Agnes rate limit / overload hit on script {script['id']} - run stopped early, will retry next run. Detail: {e}")
             return
         except Exception as e:
             # VERIFIER-GATE FIX (2026-08-22): a crash ANYWHERE inside
@@ -505,19 +633,35 @@ def main():
             error_text = traceback.format_exc()
             print(f"Unexpected error processing script {script['id']} - recording error and moving to next candidate: {e}")
             record_error(script['id'], error_text)
+            report_fault(script['id'], "unexpected_error", f"{type(e).__name__}: {e}")
             shots_used = 0
 
         if shots_used > 0:
             any_progress = True
+            RUN_LOG["progress"][script['id']] = RUN_LOG["progress"].get(script['id'], 0) + shots_used
             remaining_budget -= shots_used
             print(f"Script {script['id']} used {shots_used} shot(s) this run - {remaining_budget} left in this run's shared budget.")
         else:
-            print(f"No progress on script {script['id']} this run (overloaded, content-flagged, or already "
+            print(f"No progress on script {script['id']} this run (overloaded, content-flagged, stalled, or already "
                   f"fully assembled) - trying the next candidate with the same remaining budget.")
 
     if not any_progress:
         print(f"No progress possible on any of the {len(candidates)} candidate scripts this run "
               f"(all stalled or not ready) - next scheduled run will retry.")
+
+
+def main():
+    try:
+        run()
+    finally:
+        should_fail = write_run_report()
+    if should_fail:
+        # RUN REPORT (2026-10-10): zero progress AND a real fault -> mark the
+        # run failed so the existing failed-run alert fires with the report
+        # on the run summary page. Rate limits / Supabase timeouts never
+        # reach here (they are notes, not faults).
+        print("Run made no progress and hit at least one real fault - exiting non-zero so the failure is flagged.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
