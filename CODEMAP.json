@@ -16,6 +16,7 @@
     "EXPECTED_YOUTUBE_CHANNEL_TITLE",
     "FREESOUND_API_KEY",
     "GEMINI_API_KEY",
+    "GITHUB_STEP_SUMMARY",
     "HF_TOKEN",
     "SUPABASE_SECRET_KEY",
     "SUPABASE_URL",
@@ -3323,8 +3324,34 @@
       "path": "scripts/video_generation.py",
       "functions": [
         {
+          "name": "report_fault",
+          "line": 154,
+          "args": [
+            "script_id",
+            "kind",
+            "detail"
+          ],
+          "calls": [
+            "append",
+            "str"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "report_note",
+          "line": 158,
+          "args": [
+            "text"
+          ],
+          "calls": [
+            "append",
+            "str"
+          ],
+          "docstring": ""
+        },
+        {
           "name": "get_ready_scripts",
-          "line": 118,
+          "line": 162,
           "args": [
             "limit"
           ],
@@ -3335,8 +3362,43 @@
           "docstring": ""
         },
         {
+          "name": "recover_stalled_scripts",
+          "line": 173,
+          "args": [],
+          "calls": [
+            "gmtime",
+            "json",
+            "print",
+            "report_note",
+            "retryable_request",
+            "strftime",
+            "time"
+          ],
+          "docstring": "SELF-HEALING (2026-10-10): puts up to MAX_STALL_RECOVERIES_PER_RUN"
+        },
+        {
+          "name": "write_run_report",
+          "line": 209,
+          "args": [],
+          "calls": [
+            "append",
+            "get",
+            "gmtime",
+            "items",
+            "join",
+            "len",
+            "open",
+            "print",
+            "strftime",
+            "sum",
+            "values",
+            "write"
+          ],
+          "docstring": "RUN REPORT (2026-10-10): prints a plain report and appends it to the"
+        },
+        {
           "name": "download_file",
-          "line": 128,
+          "line": 246,
           "args": [
             "url",
             "out_path"
@@ -3351,7 +3413,7 @@
         },
         {
           "name": "record_error",
-          "line": 137,
+          "line": 255,
           "args": [
             "script_id",
             "error_text"
@@ -3366,7 +3428,7 @@
         },
         {
           "name": "clear_error",
-          "line": 161,
+          "line": 279,
           "args": [
             "script_id"
           ],
@@ -3378,7 +3440,7 @@
         },
         {
           "name": "compute_shot_durations",
-          "line": 176,
+          "line": 294,
           "args": [
             "shot_list",
             "total_duration"
@@ -3393,7 +3455,7 @@
         },
         {
           "name": "get_shot_durations",
-          "line": 182,
+          "line": 300,
           "args": [
             "script",
             "shot_list",
@@ -3412,7 +3474,7 @@
         },
         {
           "name": "upload_clip",
-          "line": 195,
+          "line": 313,
           "args": [
             "script_id",
             "index",
@@ -3425,7 +3487,7 @@
         },
         {
           "name": "save_progress",
-          "line": 202,
+          "line": 320,
           "args": [
             "script_id",
             "video_urls",
@@ -3438,21 +3500,7 @@
         },
         {
           "name": "mark_content_flagged",
-          "line": 212,
-          "args": [
-            "script_id",
-            "shot_index",
-            "reason"
-          ],
-          "calls": [
-            "print",
-            "retryable_request"
-          ],
-          "docstring": ""
-        },
-        {
-          "name": "mark_video_stalled",
-          "line": 223,
+          "line": 330,
           "args": [
             "script_id",
             "shot_index",
@@ -3461,13 +3509,30 @@
           "calls": [
             "print",
             "record_error",
+            "report_fault",
+            "retryable_request"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "mark_video_stalled",
+          "line": 345,
+          "args": [
+            "script_id",
+            "shot_index",
+            "reason"
+          ],
+          "calls": [
+            "print",
+            "record_error",
+            "report_fault",
             "retryable_request"
           ],
           "docstring": "STALL FIX (2026-09-02): companion to mark_content_flagged, but for a"
         },
         {
           "name": "mark_video_generated",
-          "line": 248,
+          "line": 371,
           "args": [
             "script_id",
             "video_url",
@@ -3482,7 +3547,7 @@
         },
         {
           "name": "process_script",
-          "line": 271,
+          "line": 394,
           "args": [
             "script",
             "shot_limit"
@@ -3513,31 +3578,52 @@
             "range",
             "record_error",
             "remove",
+            "report_fault",
             "save_progress",
             "sleep",
             "str",
+            "type",
             "upload_clip",
             "upload_video"
           ],
           "docstring": ""
         },
         {
-          "name": "main",
-          "line": 451,
+          "name": "run",
+          "line": 574,
           "args": [],
           "calls": [
             "format_exc",
+            "get",
             "get_ready_scripts",
             "index",
             "len",
             "print",
             "process_script",
-            "record_error"
+            "record_error",
+            "recover_stalled_scripts",
+            "report_fault",
+            "report_note",
+            "type"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 653,
+          "args": [],
+          "calls": [
+            "exit",
+            "print",
+            "run",
+            "write_run_report"
           ],
           "docstring": ""
         }
       ],
-      "env_vars": [],
+      "env_vars": [
+        "GITHUB_STEP_SUMMARY"
+      ],
       "tables": [
         "scripts"
       ]
