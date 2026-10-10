@@ -71,6 +71,7 @@ import os
 import requests
 from moviepy import VideoFileClip, concatenate_videoclips
 import storage_b2
+from title_gate import optimize_title  # TITLE GATE (2026-10-09)
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
@@ -383,7 +384,13 @@ def main():
         print("EXPECTED_YOUTUBE_CHANNEL_TITLE not set - skipping hard verification, "
               "proceeding based on channel title logged above only.")
 
-    title = get_topic_title(script["topic_id"])
+    # TITLE GATE (2026-10-09): every live title followed one label template
+    # ("The Quarantine Clerk of the 1908 Messina Port") with no hook. The
+    # gate lints the topic title against the thumbnail hook text and, only
+    # if Gemini offers a clearly better one, uploads with that instead.
+    # Fails safe to the topic title - see title_gate.py.
+    topic_title = get_topic_title(script["topic_id"])
+    title = optimize_title(topic_title, script.get("hook_text"), script.get("narration_text"))
     description = build_description(script.get("narration_text", ""))
 
     youtube_id = upload_to_youtube(access_token, video_path, title, description)
