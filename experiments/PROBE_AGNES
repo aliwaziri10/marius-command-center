@@ -1,1 +1,0 @@
-Presence of this file makes scripts/experiments/run.py send ONE Agnes latency probe per run (no polling). Claude deletes it after the first measurement.
