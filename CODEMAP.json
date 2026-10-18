@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 28,
+  "file_count": 29,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -18,6 +18,9 @@
     "GEMINI_API_KEY",
     "GITHUB_STEP_SUMMARY",
     "HF_TOKEN",
+    "PIXABAY_API_KEY",
+    "STOCK_FALLBACK_AGNES_TRIES",
+    "STOCK_GENERIC_QUERIES",
     "SUPABASE_SECRET_KEY",
     "SUPABASE_URL",
     "TITLE_GATE_ENABLED",
@@ -2516,6 +2519,231 @@
       "env_vars": [
         "SUPABASE_SECRET_KEY",
         "SUPABASE_URL"
+      ],
+      "tables": []
+    },
+    {
+      "path": "scripts/stock_fallback.py",
+      "functions": [
+        {
+          "name": "is_enabled",
+          "line": 56,
+          "args": [],
+          "calls": [
+            "bool",
+            "get",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "configure_agnes_wait",
+          "line": 60,
+          "args": [],
+          "calls": [
+            "get",
+            "int",
+            "is_enabled",
+            "max",
+            "print"
+          ],
+          "docstring": "When the fallback is enabled there is no point waiting ~16 minutes per"
+        },
+        {
+          "name": "mark_agnes_down",
+          "line": 74,
+          "args": [],
+          "calls": [
+            "print"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "should_skip_agnes",
+          "line": 82,
+          "args": [],
+          "calls": [
+            "is_enabled"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_ffmpeg",
+          "line": 86,
+          "args": [],
+          "calls": [
+            "get_ffmpeg_exe",
+            "which"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_keywords",
+          "line": 94,
+          "args": [
+            "shot"
+          ],
+          "calls": [
+            "add",
+            "append",
+            "findall",
+            "get",
+            "len",
+            "lower",
+            "set"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_generic_queries",
+          "line": 106,
+          "args": [],
+          "calls": [
+            "get",
+            "split",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_query_ladder",
+          "line": 115,
+          "args": [
+            "shot",
+            "script_id",
+            "shot_index"
+          ],
+          "calls": [
+            "_generic_queries",
+            "_keywords",
+            "append",
+            "encode",
+            "hexdigest",
+            "int",
+            "join",
+            "len",
+            "md5"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_search",
+          "line": 130,
+          "args": [
+            "query"
+          ],
+          "calls": [
+            "get",
+            "json",
+            "print",
+            "range",
+            "sleep",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_pick_file",
+          "line": 158,
+          "args": [
+            "hit"
+          ],
+          "calls": [
+            "append",
+            "get"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_download",
+          "line": 172,
+          "args": [
+            "url",
+            "path"
+          ],
+          "calls": [
+            "get",
+            "iter_content",
+            "open",
+            "raise_for_status",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_normalize",
+          "line": 182,
+          "args": [
+            "src",
+            "dst",
+            "seconds"
+          ],
+          "calls": [
+            "_ffmpeg",
+            "run"
+          ],
+          "docstring": "Scale and crop to 1920x1080 at 24 fps, no audio, exactly `seconds` long."
+        },
+        {
+          "name": "_concat",
+          "line": 192,
+          "args": [
+            "parts",
+            "dst"
+          ],
+          "calls": [
+            "_ffmpeg",
+            "abspath",
+            "open",
+            "remove",
+            "run",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "make_stock_clip",
+          "line": 203,
+          "args": [
+            "shot",
+            "target_duration",
+            "out_path",
+            "script_id",
+            "shot_index"
+          ],
+          "calls": [
+            "_concat",
+            "_download",
+            "_normalize",
+            "_pick_file",
+            "_query_ladder",
+            "_search",
+            "add",
+            "append",
+            "copyfile",
+            "encode",
+            "exists",
+            "extend",
+            "float",
+            "get",
+            "hexdigest",
+            "int",
+            "is_enabled",
+            "len",
+            "md5",
+            "min",
+            "print",
+            "remove",
+            "replace",
+            "sleep"
+          ],
+          "docstring": "Write a stock clip of exactly target_duration seconds to out_path."
+        }
+      ],
+      "env_vars": [
+        "PIXABAY_API_KEY",
+        "STOCK_FALLBACK_AGNES_TRIES",
+        "STOCK_GENERIC_QUERIES"
       ],
       "tables": []
     },
