@@ -59,14 +59,18 @@ def is_enabled():
 
 def configure_agnes_wait():
     """When the fallback is enabled there is no point waiting ~16 minutes per
-    shot for Agnes' queue. Wait a short time (default 2 tries x 120 s) and let
-    the fallback take over. Does nothing if the fallback is not enabled."""
+    shot for Agnes' queue. Try twice with ONE 60 s wait in between (about one
+    minute total), then let the fallback take over. Tunable with
+    STOCK_FALLBACK_AGNES_TRIES (1 = no wait at all) and
+    STOCK_FALLBACK_AGNES_WAIT_SECONDS. Does nothing if the fallback is off."""
     if not is_enabled():
         return
     try:
         import agnes_client
         tries = int(os.environ.get("STOCK_FALLBACK_AGNES_TRIES", "2"))
+        wait = int(os.environ.get("STOCK_FALLBACK_AGNES_WAIT_SECONDS", "60"))
         agnes_client.AGNES_QUEUE_FULL_MAX_ATTEMPTS = max(1, tries)
+        agnes_client.AGNES_QUEUE_FULL_WAIT_SECONDS = max(1, wait)
     except Exception as e:
         print(f"[stock_fallback] could not shorten Agnes queue wait: {e}")
 
