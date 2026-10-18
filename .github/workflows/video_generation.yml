@@ -69,4 +69,4 @@ jobs:
             --repo "${{ github.repository }}" \
             --title "Video Generation workflow failed - run #${{ github.run_number }}" \
             --body "The Video Generation workflow failed on $(date -u +%Y-%m-%dT%H:%M:%SZ).
-          Run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_number }}"
+          Run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
