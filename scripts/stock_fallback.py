@@ -28,7 +28,7 @@ import requests
 
 PIXABAY_VIDEO_API = "https://pixabay.com/api/videos/"
 OUT_W, OUT_H, OUT_FPS = 1920, 1080, 24
-MAX_CLIPS_PER_SHOT = 5
+MAX_CLIPS_PER_SHOT = 10
 MIN_USEFUL_CLIP_SECONDS = 3
 
 # Used only when a shot's own words find nothing. Picked to suit a
@@ -50,7 +50,11 @@ visible person people man men woman women figure figures
 """.split())
 
 _used_ids = set()
-_agnes_down = False
+_stock_scripts = set()
+
+
+class StockOnlyError(Exception):
+    """Raised when a video that is already in stock mode cannot get a stock clip."""
 
 
 def is_enabled():
@@ -75,16 +79,55 @@ def configure_agnes_wait():
         print(f"[stock_fallback] could not shorten Agnes queue wait: {e}")
 
 
-def mark_agnes_down():
-    global _agnes_down
-    if not _agnes_down:
-        print("[stock_fallback] Agnes queue full - remaining shots in this run use stock footage "
-              "(Agnes is tried again on the next run).")
-    _agnes_down = True
+def _sb():
+    url = os.environ.get("SUPABASE_URL", "").rstrip("/")
+    key = os.environ.get("SUPABASE_SECRET_KEY", "")
+    if not url or not key:
+        return None, None
+    return url, {"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"}
 
 
-def should_skip_agnes():
-    return is_enabled() and _agnes_down
+def script_is_stock(script_id):
+    """True once this video has started using stock footage. Stays True across
+    runs (saved in scripts.clip_source), so one video is never a mix of
+    Agnes clips and stock clips from that point on."""
+    if not script_id:
+        return False
+    if script_id in _stock_scripts:
+        return True
+    try:
+        url, headers = _sb()
+        if not url:
+            return False
+        r = requests.get(f"{url}/rest/v1/scripts?id=eq.{script_id}&select=clip_source",
+                         headers=headers, timeout=20)
+        if r.status_code == 200:
+            rows = r.json()
+            if rows and rows[0].get("clip_source") == "stock":
+                _stock_scripts.add(script_id)
+                return True
+    except Exception as e:
+        print(f"[stock_fallback] could not read stock mode for script {script_id}: {e}")
+    return False
+
+
+def mark_script_stock(script_id):
+    if not script_id:
+        return
+    if script_id not in _stock_scripts:
+        print(f"[stock_fallback] script {script_id} is now STOCK-ONLY: every remaining shot of this "
+              f"video uses stock footage and Agnes is not used again for it.")
+    _stock_scripts.add(script_id)
+    try:
+        url, headers = _sb()
+        if not url:
+            return
+        r = requests.patch(f"{url}/rest/v1/scripts?id=eq.{script_id}", headers=headers,
+                           json={"clip_source": "stock"}, timeout=20)
+        if r.status_code >= 300:
+            print(f"[stock_fallback] could not save stock mode ({r.status_code}): {r.text[:150]}")
+    except Exception as e:
+        print(f"[stock_fallback] could not save stock mode for script {script_id}: {e}")
 
 
 def _ffmpeg():
@@ -204,6 +247,39 @@ def _concat(parts, dst):
     os.remove(list_path)
 
 
+def _probe_duration(path):
+    """Real length of a video file in seconds (None if it cannot be read)."""
+    try:
+        p = subprocess.run([_ffmpeg(), "-i", path], capture_output=True, text=True, timeout=60)
+        m = re.search(r"Duration: (\d+):(\d+):(\d+(?:\.\d+)?)", p.stderr)
+        if not m:
+            return None
+        h, mi, sec = m.groups()
+        return int(h) * 3600 + int(mi) * 60 + float(sec)
+    except Exception:
+        return None
+
+
+def _pad_to(path, target, actual):
+    """Hold the last frame so the file is exactly `target` seconds long."""
+    tmp = path + ".pad.mp4"
+    extra = max(target - actual, 0.0) + 0.05
+    cmd = [_ffmpeg(), "-y", "-loglevel", "error", "-i", path,
+           "-vf", f"tpad=stop_mode=clone:stop_duration={extra:.3f}", "-an",
+           "-t", f"{target:.3f}", "-c:v", "libx264", "-preset", "veryfast",
+           "-crf", "23", "-pix_fmt", "yuv420p", tmp]
+    subprocess.run(cmd, check=True, timeout=600)
+    os.replace(tmp, path)
+
+
+def require_stock_clip(shot, target_duration, out_path, script_id=None, shot_index=None):
+    """For a video already in stock mode: make the stock clip or raise. Never Agnes."""
+    if make_stock_clip(shot, target_duration, out_path, script_id, shot_index):
+        return out_path
+    raise StockOnlyError(f"stock footage could not be fetched for shot {shot_index} of a stock-only video "
+                         f"(Pixabay unreachable or nothing found) - Agnes is not used mid-video; will retry next run")
+
+
 def make_stock_clip(shot, target_duration, out_path, script_id=None, shot_index=None):
     """Write a stock clip of exactly target_duration seconds to out_path.
     Returns True on success, False on any problem (caller then behaves as before)."""
@@ -214,7 +290,9 @@ def make_stock_clip(shot, target_duration, out_path, script_id=None, shot_index=
         remaining = float(target_duration)
         parts = []
         piece_no = 0
-        for query in _query_ladder(shot, script_id, shot_index):
+        ladder = _query_ladder(shot, script_id, shot_index)
+        ladder += [g for g in _generic_queries() if g not in ladder]
+        for query in ladder:
             if remaining <= 0.05 or piece_no >= MAX_CLIPS_PER_SHOT:
                 break
             hits = [h for h in _search(query)
@@ -246,16 +324,23 @@ def make_stock_clip(shot, target_duration, out_path, script_id=None, shot_index=
                 piece_no += 1
             time.sleep(0.8)
 
-        if not parts or remaining > 0.5:
-            print(f"[stock_fallback] could not fill {target_duration:.1f}s for shot {shot_index} "
-                  f"(short by {remaining:.1f}s) - leaving it to the normal pipeline.")
+        if not parts:
+            print(f"[stock_fallback] found no stock footage at all for shot {shot_index}.")
             return False
 
         if len(parts) == 1:
             shutil.copyfile(parts[0], out_path)
         else:
             _concat(parts, out_path)
-        print(f"[stock_fallback] shot {shot_index}: stock footage used ({len(parts)} clip(s), {target_duration:.1f}s).")
+        # Safety net: trust the real file length, not Pixabay's stated length.
+        actual = _probe_duration(out_path)
+        if actual is not None and actual < float(target_duration) - 0.3:
+            print(f"[stock_fallback] shot {shot_index}: clip was only {actual:.1f}s for a {target_duration:.1f}s shot "
+                  f"- holding the last frame for the remaining {float(target_duration) - actual:.1f}s.")
+            _pad_to(out_path, float(target_duration), actual)
+            actual = _probe_duration(out_path)
+        print(f"[stock_fallback] shot {shot_index}: stock footage used ({len(parts)} clip(s), "
+              f"{target_duration:.1f}s wanted, {actual if actual is not None else 0:.1f}s real).")
         return True
     except Exception as e:
         print(f"[stock_fallback] failed for shot {shot_index}: {e}")

@@ -286,12 +286,18 @@ def _upload_local_image_for_anchor(script_id, tag, png_path):
 
 def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="", anchor_image_url=None, script_id=None, shot_index=None):
     # STOCK FALLBACK (2026-10-18): Agnes has had a full queue since ~2026-10-10.
-    # Once Agnes has failed in this run, skip it and use a real stock clip.
-    # Every branch here is fail-soft: with no PIXABAY_API_KEY, or if stock
-    # fetching fails, the code below runs exactly as before.
-    if stock_fallback.should_skip_agnes():
-        if stock_fallback.make_stock_clip(shot, target_duration, out_path, script_id, shot_index):
-            return out_path
+    # Agnes is always tried first. Only if its queue stays full does this
+    # shot (and then the rest of the same video) use a real stock clip.
+    # With no PIXABAY_API_KEY this code runs exactly as before.
+    # STOCK-ONLY RULE (2026-10-18): once a video has started on stock footage,
+    # every remaining shot of that video is stock too - Agnes is never mixed
+    # back in mid-video, even across runs.
+    if stock_fallback.is_enabled() and stock_fallback.script_is_stock(script_id):
+        try:
+            return stock_fallback.require_stock_clip(shot, target_duration, out_path, script_id, shot_index)
+        except stock_fallback.StockOnlyError as e:
+            print(f"[stock_fallback] {e}")
+            raise AgnesOverloadedError(str(e))  # reuse the existing graceful stop-and-resume handling
 
     capped_duration = min(target_duration, MAX_CLIP_SECONDS)
     main_seed = _derive_seed(script_id, shot_index, variant=0)
@@ -299,7 +305,7 @@ def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="
         _generate_one_segment(shot, capped_duration, out_path, setting_and_characters, anchor_image_url=anchor_image_url, seed=main_seed)
     except AgnesOverloadedError:
         if stock_fallback.is_enabled() and stock_fallback.make_stock_clip(shot, target_duration, out_path, script_id, shot_index):
-            stock_fallback.mark_agnes_down()
+            stock_fallback.mark_script_stock(script_id)
             return out_path
         raise
 
