@@ -1,0 +1,40 @@
+name: Fallback chain experiments
+on:
+  push:
+    branches: [fallback-chain]
+  workflow_dispatch:
+concurrency:
+  group: fallback-experiments
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  experiments:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the fallback-chain branch
+        uses: actions/checkout@v4
+        with:
+          ref: fallback-chain
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install requests
+        run: pip install requests
+      - name: Run experiments
+        env:
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          AGNES_API_KEY: ${{ secrets.AGNES_API_KEY }}
+        run: python scripts/experiments/run.py
+      - name: Commit results to the branch
+        if: always()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add experiments/RESULTS.md experiments/CALL_LOG.md
+          git diff --cached --quiet || git commit -m "experiment results (run ${{ github.run_id }})"
+          git pull --rebase origin fallback-chain
+          git push origin HEAD:fallback-chain
