@@ -20,6 +20,7 @@
     "HF_TOKEN",
     "PIXABAY_API_KEY",
     "STOCK_FALLBACK_AGNES_TRIES",
+    "STOCK_FALLBACK_AGNES_WAIT_SECONDS",
     "STOCK_GENERIC_QUERIES",
     "SUPABASE_SECRET_KEY",
     "SUPABASE_URL",
@@ -2555,7 +2556,7 @@
         },
         {
           "name": "mark_agnes_down",
-          "line": 74,
+          "line": 78,
           "args": [],
           "calls": [
             "print"
@@ -2564,7 +2565,7 @@
         },
         {
           "name": "should_skip_agnes",
-          "line": 82,
+          "line": 86,
           "args": [],
           "calls": [
             "is_enabled"
@@ -2573,7 +2574,7 @@
         },
         {
           "name": "_ffmpeg",
-          "line": 86,
+          "line": 90,
           "args": [],
           "calls": [
             "get_ffmpeg_exe",
@@ -2583,7 +2584,7 @@
         },
         {
           "name": "_keywords",
-          "line": 94,
+          "line": 98,
           "args": [
             "shot"
           ],
@@ -2600,7 +2601,7 @@
         },
         {
           "name": "_generic_queries",
-          "line": 106,
+          "line": 110,
           "args": [],
           "calls": [
             "get",
@@ -2611,7 +2612,7 @@
         },
         {
           "name": "_query_ladder",
-          "line": 115,
+          "line": 119,
           "args": [
             "shot",
             "script_id",
@@ -2632,7 +2633,7 @@
         },
         {
           "name": "_search",
-          "line": 130,
+          "line": 134,
           "args": [
             "query"
           ],
@@ -2648,7 +2649,7 @@
         },
         {
           "name": "_pick_file",
-          "line": 158,
+          "line": 162,
           "args": [
             "hit"
           ],
@@ -2660,7 +2661,7 @@
         },
         {
           "name": "_download",
-          "line": 172,
+          "line": 176,
           "args": [
             "url",
             "path"
@@ -2676,7 +2677,7 @@
         },
         {
           "name": "_normalize",
-          "line": 182,
+          "line": 186,
           "args": [
             "src",
             "dst",
@@ -2690,7 +2691,7 @@
         },
         {
           "name": "_concat",
-          "line": 192,
+          "line": 196,
           "args": [
             "parts",
             "dst"
@@ -2707,7 +2708,7 @@
         },
         {
           "name": "make_stock_clip",
-          "line": 203,
+          "line": 207,
           "args": [
             "shot",
             "target_duration",
@@ -2747,6 +2748,7 @@
       "env_vars": [
         "PIXABAY_API_KEY",
         "STOCK_FALLBACK_AGNES_TRIES",
+        "STOCK_FALLBACK_AGNES_WAIT_SECONDS",
         "STOCK_GENERIC_QUERIES"
       ],
       "tables": []
