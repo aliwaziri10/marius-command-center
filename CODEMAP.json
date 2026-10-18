@@ -938,7 +938,7 @@
       "functions": [
         {
           "name": "_derive_seed",
-          "line": 78,
+          "line": 81,
           "args": [
             "script_id",
             "shot_index",
@@ -954,7 +954,7 @@
         },
         {
           "name": "download_file",
-          "line": 85,
+          "line": 88,
           "args": [
             "url",
             "out_path"
@@ -969,7 +969,7 @@
         },
         {
           "name": "upload_reference_image",
-          "line": 93,
+          "line": 96,
           "args": [
             "script_id",
             "file_name",
@@ -983,7 +983,7 @@
         },
         {
           "name": "generate_character_reference",
-          "line": 102,
+          "line": 105,
           "args": [
             "script"
           ],
@@ -1005,7 +1005,7 @@
         },
         {
           "name": "extract_last_frame_url",
-          "line": 172,
+          "line": 175,
           "args": [
             "script_id",
             "shot_index",
@@ -1028,7 +1028,7 @@
         },
         {
           "name": "get_continuity_anchor",
-          "line": 190,
+          "line": 193,
           "args": [
             "script",
             "video_urls"
@@ -1045,7 +1045,7 @@
         },
         {
           "name": "_generate_one_segment_raw",
-          "line": 205,
+          "line": 208,
           "args": [
             "shot",
             "segment_duration",
@@ -1070,7 +1070,7 @@
         },
         {
           "name": "_generate_one_segment",
-          "line": 233,
+          "line": 236,
           "args": [
             "shot",
             "segment_duration",
@@ -1093,7 +1093,7 @@
         },
         {
           "name": "_extract_last_frame_local",
-          "line": 267,
+          "line": 270,
           "args": [
             "video_path"
           ],
@@ -1110,7 +1110,7 @@
         },
         {
           "name": "_upload_local_image_for_anchor",
-          "line": 276,
+          "line": 279,
           "args": [
             "script_id",
             "tag",
@@ -1125,7 +1125,7 @@
         },
         {
           "name": "generate_shot_clip",
-          "line": 284,
+          "line": 287,
           "args": [
             "shot",
             "target_duration",
@@ -1150,12 +1150,16 @@
             "concatenate_videoclips",
             "exists",
             "fit_clip_to_duration",
+            "is_enabled",
             "len",
+            "make_stock_clip",
+            "mark_agnes_down",
             "min",
             "print",
             "range",
             "remove",
             "replace",
+            "should_skip_agnes",
             "sleep",
             "write_videofile"
           ],
@@ -1163,7 +1167,7 @@
         },
         {
           "name": "fit_clip_to_duration",
-          "line": 357,
+          "line": 374,
           "args": [
             "clip",
             "target"
