@@ -180,7 +180,7 @@
       "functions": [
         {
           "name": "round_to_valid_frames",
-          "line": 136,
+          "line": 86,
           "args": [
             "num_frames"
           ],
@@ -191,8 +191,22 @@
           "docstring": ""
         },
         {
+          "name": "seconds_for_frames",
+          "line": 93,
+          "args": [
+            "num_frames"
+          ],
+          "calls": [
+            "ceil",
+            "max",
+            "min",
+            "str"
+          ],
+          "docstring": "Frames -> whole seconds for Flash, rounded up, clamped to 4..12."
+        },
+        {
           "name": "create_agnes_task",
-          "line": 148,
+          "line": 99,
           "args": [
             "prompt",
             "num_frames",
@@ -204,19 +218,20 @@
             "AgnesBadRequestError",
             "AgnesOverloadedError",
             "ContentPolicyRejection",
+            "RuntimeError",
             "get",
             "json",
             "post",
             "print",
             "raise_for_status",
-            "range",
+            "seconds_for_frames",
             "sleep"
           ],
-          "docstring": "NEGATIVE_PROMPT SUPPORT (2026-09-08): Agnes's own docs confirm a"
+          "docstring": "Create a Flash video task and return its video_id."
         },
         {
           "name": "extract_video_url",
-          "line": 248,
+          "line": 180,
           "args": [
             "data"
           ],
@@ -231,7 +246,7 @@
         },
         {
           "name": "poll_agnes_task",
-          "line": 259,
+          "line": 191,
           "args": [
             "video_id",
             "max_wait",
