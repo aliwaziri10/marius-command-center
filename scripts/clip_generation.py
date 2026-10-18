@@ -62,6 +62,9 @@ from prompt_builder import build_agnes_prompt, build_character_reference_prompt,
 from prompt_focus import focus_anchor, no_people_clause  # PROTAGONIST-EVERYWHERE FIX (2026-10-09)
 import clip_qa  # CLIP QA (2026-10-09)
 from beat_director import author_chain_beats, apply_beat_to_shot
+import stock_fallback  # STOCK FALLBACK (2026-10-18)
+
+stock_fallback.configure_agnes_wait()  # no-op unless PIXABAY_API_KEY is set
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
@@ -282,9 +285,23 @@ def _upload_local_image_for_anchor(script_id, tag, png_path):
 
 
 def generate_shot_clip(shot, target_duration, out_path, setting_and_characters="", anchor_image_url=None, script_id=None, shot_index=None):
+    # STOCK FALLBACK (2026-10-18): Agnes has had a full queue since ~2026-10-10.
+    # Once Agnes has failed in this run, skip it and use a real stock clip.
+    # Every branch here is fail-soft: with no PIXABAY_API_KEY, or if stock
+    # fetching fails, the code below runs exactly as before.
+    if stock_fallback.should_skip_agnes():
+        if stock_fallback.make_stock_clip(shot, target_duration, out_path, script_id, shot_index):
+            return out_path
+
     capped_duration = min(target_duration, MAX_CLIP_SECONDS)
     main_seed = _derive_seed(script_id, shot_index, variant=0)
-    _generate_one_segment(shot, capped_duration, out_path, setting_and_characters, anchor_image_url=anchor_image_url, seed=main_seed)
+    try:
+        _generate_one_segment(shot, capped_duration, out_path, setting_and_characters, anchor_image_url=anchor_image_url, seed=main_seed)
+    except AgnesOverloadedError:
+        if stock_fallback.is_enabled() and stock_fallback.make_stock_clip(shot, target_duration, out_path, script_id, shot_index):
+            stock_fallback.mark_agnes_down()
+            return out_path
+        raise
 
     if target_duration <= MAX_CLIP_SECONDS:
         return out_path
