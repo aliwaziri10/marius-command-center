@@ -1,8 +1,8 @@
 # Fallback-chain experiment results
 
-- Run: https://github.com/aliwaziri10/marius-command-center/actions/runs/39128247942
-- Commit: f0183833e6b44ffd0b0f8caa10a7da42d1b07a41
-- Time: 2026-10-18 12:40:23 UTC
+- Run: https://github.com/aliwaziri10/marius-command-center/actions/runs/39128344567
+- Commit: 76a93f86649f29f03f3e8fc8556e6430c97aedb7
+- Time: 2026-10-18 12:41:42 UTC
 
 | Source | Result |
 |---|---|
@@ -11,19 +11,19 @@
 | NASA Image and Video Library | PASS |
 | Internet Archive | PASS |
 | Wikimedia Commons | PASS |
-| Agnes quick check | PASS |
+| Agnes quick check | SKIPPED |
 
 ## Pixabay video: PASS
 
 - short keywords: q='ocean waves' HTTP 200, totalHits=500, returned=3, rate-limit headers {'X-RateLimit-Limit': '100', 'X-RateLimit-Remaining': '99', 'X-RateLimit-Reset': '60'}
-- long prompt-like: q='Wide cinematic shot of ancient stone ruins at golden hour, slow drone push in, dust in the air, no p' HTTP 200, totalHits=500, returned=3, rate-limit headers {'X-RateLimit-Limit': '100', 'X-RateLimit-Remaining': '98', 'X-RateLimit-Reset': '59'}
+- long prompt-like: q='Wide cinematic shot of ancient stone ruins at golden hour, slow drone push in, dust in the air, no p' HTTP 200, totalHits=500, returned=3, rate-limit headers {'X-RateLimit-Limit': '100', 'X-RateLimit-Remaining': '98', 'X-RateLimit-Reset': '60'}
 - first hit id=283533 duration=40s small=960x540
 - CREDIT: Video by BlenderTimer on Pixabay, https://pixabay.com/videos/id-283533/ (Pixabay Content Licence, https://pixabay.com/service/license-summary/)
 - file check HTTP 200, content-type video/mp4, first bytes read 1024
 
 Raw excerpt:
 ```
-{"total":16986,"totalHits":500,"hits":[{"id":283533,"pageURL":"https://pixabay.com/videos/id-283533/","type":"film","tags":"wave, breaking, sea, ocean, water, coast, slow motion, slowmo","duration":40,"videos":{"large":{"url":"https://cdn.pixabay.com/video/2025/06/03/283533_large.mp4","width":1920,"height":1080,"size":38263129,"thumbnail":"https://
+{"total":17033,"totalHits":500,"hits":[{"id":283533,"pageURL":"https://pixabay.com/videos/id-283533/","type":"film","tags":"wave, breaking, sea, ocean, water, coast, slow motion, slowmo","duration":40,"videos":{"large":{"url":"https://cdn.pixabay.com/video/2025/06/03/283533_large.mp4","width":1920,"height":1080,"size":38263129,"thumbnail":"https://
 ```
 
 ## Pexels video (optional): SKIPPED
@@ -53,7 +53,7 @@ Raw excerpt:
 
 Raw excerpt:
 ```
-{"responseHeader":{"status":0,"QTime":33,"params":{"query":"collection:prelinger AND mediatype:movies","qin":"collection:prelinger AND mediatype:movies","fields":"identifier,title,licenseurl","wt":"json","sort":"downloads desc","rows":3,"start":0}},"response":{"numFound":10461,"start":0,"docs":[{"identifier":"AboutBan1935","licenseurl":"http://crea
+{"responseHeader":{"status":0,"QTime":17,"params":{"query":"collection:prelinger AND mediatype:movies","qin":"collection:prelinger AND mediatype:movies","fields":"identifier,title,licenseurl","wt":"json","sort":"downloads desc","rows":3,"start":0}},"response":{"numFound":10461,"start":0,"docs":[{"identifier":"AboutBan1935","licenseurl":"http://crea
 ```
 
 ## Wikimedia Commons: PASS
@@ -68,12 +68,6 @@ Raw excerpt:
 {"batchcomplete":true,"continue":{"gsroffset":3,"continue":"gsroffset||"},"query":{"pages":[{"pageid":125913691,"ns":6,"title":"File:Mount Merapi Landscape.webm","index":3,"imagerepository":"local","imageinfo":[{"size":69448331,"width":1920,"height":1080,"duration":60.488,"url":"https://upload.wikimedia.org/wikipedia/commons/4/45/Mount_Merapi_Lands
 ```
 
-## Agnes quick check: PASS
+## Agnes quick check: SKIPPED
 
-- POST /v1/videos answered HTTP 503 in 0.32s, queue_full=True
-- no polling was done (this is only a latency and availability check)
-
-Raw excerpt:
-```
-{"code":"video_queue_full","message":"video queue is full, please retry later (request id: 20261018124023243575316fNXN5oEW)","data":null}
-```
+- experiments/PROBE_AGNES not present, no probe sent
