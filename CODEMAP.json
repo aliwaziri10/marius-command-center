@@ -2535,7 +2535,7 @@
       "functions": [
         {
           "name": "is_enabled",
-          "line": 60,
+          "line": 70,
           "args": [],
           "calls": [
             "bool",
@@ -2546,7 +2546,7 @@
         },
         {
           "name": "configure_agnes_wait",
-          "line": 64,
+          "line": 74,
           "args": [],
           "calls": [
             "get",
@@ -2559,7 +2559,7 @@
         },
         {
           "name": "_sb",
-          "line": 82,
+          "line": 92,
           "args": [],
           "calls": [
             "get",
@@ -2569,7 +2569,7 @@
         },
         {
           "name": "script_is_stock",
-          "line": 90,
+          "line": 100,
           "args": [
             "script_id"
           ],
@@ -2584,7 +2584,7 @@
         },
         {
           "name": "mark_script_stock",
-          "line": 114,
+          "line": 124,
           "args": [
             "script_id"
           ],
@@ -2598,7 +2598,7 @@
         },
         {
           "name": "_ffmpeg",
-          "line": 133,
+          "line": 143,
           "args": [],
           "calls": [
             "get_ffmpeg_exe",
@@ -2608,7 +2608,7 @@
         },
         {
           "name": "_keywords",
-          "line": 141,
+          "line": 151,
           "args": [
             "shot"
           ],
@@ -2625,7 +2625,7 @@
         },
         {
           "name": "_generic_queries",
-          "line": 153,
+          "line": 163,
           "args": [],
           "calls": [
             "get",
@@ -2636,7 +2636,7 @@
         },
         {
           "name": "_query_ladder",
-          "line": 162,
+          "line": 172,
           "args": [
             "shot",
             "script_id",
@@ -2657,7 +2657,7 @@
         },
         {
           "name": "_search",
-          "line": 177,
+          "line": 187,
           "args": [
             "query"
           ],
@@ -2673,7 +2673,7 @@
         },
         {
           "name": "_pick_file",
-          "line": 205,
+          "line": 215,
           "args": [
             "hit"
           ],
@@ -2685,7 +2685,7 @@
         },
         {
           "name": "_download",
-          "line": 219,
+          "line": 229,
           "args": [
             "url",
             "path"
@@ -2701,7 +2701,7 @@
         },
         {
           "name": "_normalize",
-          "line": 229,
+          "line": 239,
           "args": [
             "src",
             "dst",
@@ -2711,11 +2711,11 @@
             "_ffmpeg",
             "run"
           ],
-          "docstring": "Scale and crop to 1920x1080 at 24 fps, no audio, exactly `seconds` long."
+          "docstring": "Scale and crop to 1920x1080 at 24 fps, no audio, at most `seconds` long."
         },
         {
           "name": "_concat",
-          "line": 239,
+          "line": 249,
           "args": [
             "parts",
             "dst"
@@ -2732,7 +2732,7 @@
         },
         {
           "name": "_probe_duration",
-          "line": 250,
+          "line": 260,
           "args": [
             "path"
           ],
@@ -2747,8 +2747,29 @@
           "docstring": "Real length of a video file in seconds (None if it cannot be read)."
         },
         {
+          "name": "_loop_fill",
+          "line": 273,
+          "args": [
+            "parts",
+            "target",
+            "dst"
+          ],
+          "calls": [
+            "RuntimeError",
+            "_concat",
+            "_ffmpeg",
+            "_probe_duration",
+            "append",
+            "len",
+            "remove",
+            "run",
+            "sum"
+          ],
+          "docstring": "Keep playing the cut pieces again (new cuts, no frozen frame) until the"
+        },
+        {
           "name": "_pad_to",
-          "line": 263,
+          "line": 299,
           "args": [
             "path",
             "target",
@@ -2760,11 +2781,11 @@
             "replace",
             "run"
           ],
-          "docstring": "Hold the last frame so the file is exactly `target` seconds long."
+          "docstring": "Last resort: hold the last frame so the file is exactly `target` seconds long."
         },
         {
           "name": "require_stock_clip",
-          "line": 275,
+          "line": 311,
           "args": [
             "shot",
             "target_duration",
@@ -2780,7 +2801,7 @@
         },
         {
           "name": "make_stock_clip",
-          "line": 283,
+          "line": 319,
           "args": [
             "shot",
             "target_duration",
@@ -2792,6 +2813,7 @@
             "_concat",
             "_download",
             "_generic_queries",
+            "_loop_fill",
             "_normalize",
             "_pad_to",
             "_pick_file",
