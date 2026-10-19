@@ -15,6 +15,15 @@ did before this file existed.
 Stock footage is a backup, not an equal: it will not match each shot as
 precisely as an AI clip.
 
+2026-10-19 FREEZE FIX: the Dieppe video froze on one frame for ~20 s inside a
+27 s shot. Causes fixed here: (1) the time still needed was reduced by
+Pixabay's STATED clip length instead of the REAL length of the file cut, so a
+short file looked "long enough" and the gap was silently covered by a frozen
+last frame; (2) at most 10 pieces per shot was too few for the 50-76 s shots;
+(3) when footage still falls short, the pieces are now looped (new cuts keep
+playing) instead of holding one frozen frame. Each piece is also capped at
+MAX_PIECE_SECONDS so the picture cuts every few seconds.
+
 Pixabay API: https://pixabay.com/api/docs/  (about 100 requests per 60 s).
 """
 
@@ -28,8 +37,9 @@ import requests
 
 PIXABAY_VIDEO_API = "https://pixabay.com/api/videos/"
 OUT_W, OUT_H, OUT_FPS = 1920, 1080, 24
-MAX_CLIPS_PER_SHOT = 10
+MAX_CLIPS_PER_SHOT = 40
 MIN_USEFUL_CLIP_SECONDS = 3
+MAX_PIECE_SECONDS = 7.0
 
 # Used only when a shot's own words find nothing. Picked to suit a
 # real-history documentary look (Erased). Override with STOCK_GENERIC_QUERIES
@@ -227,7 +237,7 @@ def _download(url, path):
 
 
 def _normalize(src, dst, seconds):
-    """Scale and crop to 1920x1080 at 24 fps, no audio, exactly `seconds` long."""
+    """Scale and crop to 1920x1080 at 24 fps, no audio, at most `seconds` long."""
     vf = (f"scale={OUT_W}:{OUT_H}:force_original_aspect_ratio=increase,"
           f"crop={OUT_W}:{OUT_H},fps={OUT_FPS},setsar=1")
     cmd = [_ffmpeg(), "-y", "-loglevel", "error", "-i", src, "-vf", vf, "-an",
@@ -260,8 +270,34 @@ def _probe_duration(path):
         return None
 
 
+def _loop_fill(parts, target, dst):
+    """Keep playing the cut pieces again (new cuts, no frozen frame) until the
+    file is `target` seconds long."""
+    lengths = [(_probe_duration(p) or 0.0) for p in parts]
+    if sum(lengths) < 0.5:
+        raise RuntimeError("no usable pieces to loop")
+    seq, acc, i = [], 0.0, 0
+    while acc < target + 0.2 and len(seq) < 600:
+        idx = i % len(parts)
+        i += 1
+        if lengths[idx] <= 0.05:
+            continue
+        seq.append(parts[idx])
+        acc += lengths[idx]
+    tmp = dst + ".loop_raw.mp4"
+    _concat(seq, tmp)
+    cmd = [_ffmpeg(), "-y", "-loglevel", "error", "-i", tmp, "-an",
+           "-t", f"{target:.3f}", "-c:v", "libx264", "-preset", "veryfast",
+           "-crf", "23", "-pix_fmt", "yuv420p", dst]
+    subprocess.run(cmd, check=True, timeout=900)
+    try:
+        os.remove(tmp)
+    except OSError:
+        pass
+
+
 def _pad_to(path, target, actual):
-    """Hold the last frame so the file is exactly `target` seconds long."""
+    """Last resort: hold the last frame so the file is exactly `target` seconds long."""
     tmp = path + ".pad.mp4"
     extra = max(target - actual, 0.0) + 0.05
     cmd = [_ffmpeg(), "-y", "-loglevel", "error", "-i", path,
@@ -287,7 +323,8 @@ def make_stock_clip(shot, target_duration, out_path, script_id=None, shot_index=
         return False
     work = []
     try:
-        remaining = float(target_duration)
+        target = float(target_duration)
+        remaining = target
         parts = []
         piece_no = 0
         ladder = _query_ladder(shot, script_id, shot_index)
@@ -313,14 +350,18 @@ def make_stock_clip(shot, target_duration, out_path, script_id=None, shot_index=
                 work.extend([raw, norm])
                 try:
                     _download(url, raw)
-                    use = min(remaining, float(hit.get("duration") or remaining))
+                    use = min(remaining, float(hit.get("duration") or remaining), MAX_PIECE_SECONDS)
                     _normalize(raw, norm, use)
+                    real = _probe_duration(norm)
                 except Exception as e:
                     print(f"[stock_fallback] clip {hit.get('id')} failed, trying another: {e}")
                     continue
+                if real is None or real < 0.5:
+                    print(f"[stock_fallback] clip {hit.get('id')} gave no usable footage, trying another.")
+                    continue
                 _used_ids.add(hit.get("id"))
                 parts.append(norm)
-                remaining -= use
+                remaining -= real
                 piece_no += 1
             time.sleep(0.8)
 
@@ -332,15 +373,20 @@ def make_stock_clip(shot, target_duration, out_path, script_id=None, shot_index=
             shutil.copyfile(parts[0], out_path)
         else:
             _concat(parts, out_path)
+
         # Safety net: trust the real file length, not Pixabay's stated length.
         actual = _probe_duration(out_path)
-        if actual is not None and actual < float(target_duration) - 0.3:
-            print(f"[stock_fallback] shot {shot_index}: clip was only {actual:.1f}s for a {target_duration:.1f}s shot "
-                  f"- holding the last frame for the remaining {float(target_duration) - actual:.1f}s.")
-            _pad_to(out_path, float(target_duration), actual)
+        if actual is not None and actual < target - 0.3:
+            print(f"[stock_fallback] shot {shot_index}: only {actual:.1f}s of new footage for a {target:.1f}s shot "
+                  f"- looping the cuts for the remaining {target - actual:.1f}s (no frozen frame).")
+            try:
+                _loop_fill(parts, target, out_path)
+            except Exception as e:
+                print(f"[stock_fallback] loop fill failed ({e}) - holding last frame instead.")
+                _pad_to(out_path, target, actual)
             actual = _probe_duration(out_path)
         print(f"[stock_fallback] shot {shot_index}: stock footage used ({len(parts)} clip(s), "
-              f"{target_duration:.1f}s wanted, {actual if actual is not None else 0:.1f}s real).")
+              f"{target:.1f}s wanted, {actual if actual is not None else 0:.1f}s real).")
         return True
     except Exception as e:
         print(f"[stock_fallback] failed for shot {shot_index}: {e}")
