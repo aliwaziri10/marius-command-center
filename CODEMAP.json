@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 29,
+  "file_count": 31,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -18,6 +18,10 @@
     "GEMINI_API_KEY",
     "GITHUB_STEP_SUMMARY",
     "HF_TOKEN",
+    "KAGGLE_API_TOKEN",
+    "KAGGLE_KEY",
+    "KAGGLE_TEST_MAX_MINUTES",
+    "KAGGLE_USERNAME",
     "PIXABAY_API_KEY",
     "STOCK_FALLBACK_AGNES_TRIES",
     "STOCK_FALLBACK_AGNES_WAIT_SECONDS",
@@ -1391,6 +1395,155 @@
       "env_vars": [
         "SUPABASE_SECRET_KEY",
         "SUPABASE_URL"
+      ],
+      "tables": []
+    },
+    {
+      "path": "scripts/kaggle_video_test/kernel.py",
+      "functions": [
+        {
+          "name": "save_report",
+          "line": 21,
+          "args": [],
+          "calls": [
+            "dump",
+            "join",
+            "open"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "run",
+          "line": 26,
+          "args": [
+            "cmd"
+          ],
+          "calls": [
+            "run"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "free",
+          "line": 44,
+          "args": [],
+          "calls": [
+            "collect",
+            "empty_cache",
+            "is_available"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "attempt",
+          "line": 50,
+          "args": [
+            "name",
+            "fn"
+          ],
+          "calls": [
+            "append",
+            "dumps",
+            "fn",
+            "format_exc",
+            "free",
+            "is_available",
+            "max_memory_allocated",
+            "print",
+            "round",
+            "save_report",
+            "str",
+            "time",
+            "type",
+            "update"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "wan",
+          "line": 69,
+          "args": [],
+          "calls": [
+            "enable_model_cpu_offload",
+            "export_to_video",
+            "from_pretrained",
+            "join",
+            "pipe",
+            "round",
+            "time"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "ltx",
+          "line": 87,
+          "args": [],
+          "calls": [
+            "enable_model_cpu_offload",
+            "export_to_video",
+            "from_pretrained",
+            "join",
+            "pipe",
+            "round",
+            "time"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [],
+      "tables": []
+    },
+    {
+      "path": "scripts/kaggle_video_test/run_test.py",
+      "functions": [
+        {
+          "name": "sh",
+          "line": 19,
+          "args": [
+            "cmd",
+            "check"
+          ],
+          "calls": [
+            "exit",
+            "print",
+            "run",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 28,
+          "args": [],
+          "calls": [
+            "copy",
+            "dump",
+            "endswith",
+            "exists",
+            "exit",
+            "get",
+            "getcwd",
+            "join",
+            "listdir",
+            "lower",
+            "makedirs",
+            "open",
+            "print",
+            "read",
+            "rmtree",
+            "sh",
+            "sleep",
+            "strip",
+            "time"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "KAGGLE_API_TOKEN",
+        "KAGGLE_KEY",
+        "KAGGLE_TEST_MAX_MINUTES",
+        "KAGGLE_USERNAME"
       ],
       "tables": []
     },
