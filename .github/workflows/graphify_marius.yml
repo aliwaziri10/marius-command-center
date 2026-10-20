@@ -2,9 +2,17 @@ name: Graphify Marius
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "**.py"
 
 permissions:
   contents: write
+
+concurrency:
+  group: graphify-marius
+  cancel-in-progress: false
 
 jobs:
   graph:
@@ -42,6 +50,6 @@ jobs:
             echo "No graph changes"
           else
             git commit -m "Update graphify code map"
-            git pull --rebase origin main
-            git push origin main
+            git pull --rebase origin ${{ github.ref_name }}
+            git push origin ${{ github.ref_name }}
           fi
