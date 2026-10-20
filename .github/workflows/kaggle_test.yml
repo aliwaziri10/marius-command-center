@@ -21,8 +21,28 @@ jobs:
       - name: Install Kaggle tool
         run: pip install kaggle
 
+      - name: Set up Kaggle login
+        run: |
+          mkdir -p ~/.kaggle
+          echo "Username: $KAGGLE_USERNAME"
+          echo "KAGGLE_API_TOKEN raw length: ${#KAGGLE_API_TOKEN}"
+          echo "KAGGLE_KEY raw length: ${#KAGGLE_KEY}"
+          if [ -n "$KAGGLE_API_TOKEN" ]; then
+            printf '%s' "$KAGGLE_API_TOKEN" | tr -d '[:space:]' > ~/.kaggle/access_token
+            chmod 600 ~/.kaggle/access_token
+            echo "access_token file length: $(wc -c < ~/.kaggle/access_token)"
+          fi
+          if [ -n "$KAGGLE_KEY" ]; then
+            CLEAN_KEY="$(printf '%s' "$KAGGLE_KEY" | tr -d '[:space:]')"
+            printf '{"username":"%s","key":"%s"}' "$KAGGLE_USERNAME" "$CLEAN_KEY" > ~/.kaggle/kaggle.json
+            chmod 600 ~/.kaggle/kaggle.json
+            echo "kaggle.json written"
+          fi
+
       - name: Run Kaggle video test
         run: |
+          export KAGGLE_API_TOKEN="$(printf '%s' "$KAGGLE_API_TOKEN" | tr -d '[:space:]')"
+          export KAGGLE_KEY="$(printf '%s' "$KAGGLE_KEY" | tr -d '[:space:]')"
           [ -z "$KAGGLE_KEY" ] && unset KAGGLE_KEY
           [ -z "$KAGGLE_API_TOKEN" ] && unset KAGGLE_API_TOKEN
           python scripts/kaggle_video_test/run_test.py
