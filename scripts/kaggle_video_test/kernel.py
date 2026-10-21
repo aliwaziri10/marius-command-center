@@ -35,6 +35,13 @@ r = run("pip install -q -U diffusers transformers accelerate ftfy imageio imagei
 REPORT["pip_returncode"] = r.returncode
 if r.returncode != 0:
     REPORT["pip_error"] = r.stderr[-800:]
+
+# Fix: newer diffusers imports torchao.quantization.FqnToConfig (needs torchao >= 0.15)
+# whenever torchao is installed. We do no quantization, so remove torchao entirely.
+REPORT["torchao_before"] = run("pip show torchao | grep -i '^version'").stdout.strip() or "not installed"
+u = run("pip uninstall -y torchao")
+REPORT["torchao_uninstall_returncode"] = u.returncode
+REPORT["versions"] = run("pip list 2>/dev/null | grep -iE '^(torch|diffusers|transformers|accelerate) '").stdout.strip()
 save_report()
 
 import torch  # noqa: E402
