@@ -1559,7 +1559,7 @@
       "file_type": "code",
       "norm_label": "attempt()",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L50"
+      "source_location": "L57"
     },
     {
       "id": "scripts_kaggle_video_test_kernel_free",
@@ -1571,7 +1571,7 @@
       "file_type": "code",
       "norm_label": "free()",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L44"
+      "source_location": "L51"
     },
     {
       "id": "scripts_kaggle_video_test_kernel_ltx",
@@ -1583,7 +1583,7 @@
       "file_type": "code",
       "norm_label": "ltx()",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L87"
+      "source_location": "L94"
     },
     {
       "id": "scripts_kaggle_video_test_kernel_run",
@@ -1619,7 +1619,7 @@
       "file_type": "code",
       "norm_label": "wan()",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L69"
+      "source_location": "L76"
     },
     {
       "id": "scripts_kaggle_video_test_run_test_main",
@@ -5783,6 +5783,7 @@
     {
       "id": "math",
       "label": "math",
+      "_origin": "semantic",
       "community": 1,
       "community_name": "clip_generation.py",
       "external": true,
@@ -5794,6 +5795,7 @@
     {
       "id": "ast",
       "label": "ast",
+      "_origin": "semantic",
       "community": 11,
       "community_name": "generate_codemap.py",
       "external": true,
@@ -5805,6 +5807,7 @@
     {
       "id": "botocore_client",
       "label": "botocore_client",
+      "_origin": "semantic",
       "community": 12,
       "community_name": "storage_b2.py",
       "external": true,
@@ -5816,6 +5819,7 @@
     {
       "id": "botocore_exceptions",
       "label": "botocore_exceptions",
+      "_origin": "semantic",
       "community": 12,
       "community_name": "storage_b2.py",
       "external": true,
@@ -5827,6 +5831,7 @@
     {
       "id": "boto3",
       "label": "boto3",
+      "_origin": "semantic",
       "community": 18,
       "community_name": "b2_preflight.py",
       "external": true,
@@ -5838,6 +5843,7 @@
     {
       "id": "botocore",
       "label": "botocore",
+      "_origin": "semantic",
       "community": 18,
       "community_name": "b2_preflight.py",
       "external": true,
@@ -5849,6 +5855,7 @@
     {
       "id": "base64",
       "label": "base64",
+      "_origin": "semantic",
       "community": 2,
       "community_name": "assembly_stage.py",
       "external": true,
@@ -5860,6 +5867,7 @@
     {
       "id": "io",
       "label": "io",
+      "_origin": "semantic",
       "community": 2,
       "community_name": "assembly_stage.py",
       "external": true,
@@ -5871,6 +5879,7 @@
     {
       "id": "moviepy",
       "label": "moviepy",
+      "_origin": "semantic",
       "community": 2,
       "community_name": "assembly_stage.py",
       "external": true,
@@ -5882,6 +5891,7 @@
     {
       "id": "moviepy_audio_fx",
       "label": "moviepy_audio_fx",
+      "_origin": "semantic",
       "community": 2,
       "community_name": "assembly_stage.py",
       "external": true,
@@ -5893,6 +5903,7 @@
     {
       "id": "moviepy_video_fx",
       "label": "moviepy_video_fx",
+      "_origin": "semantic",
       "community": 2,
       "community_name": "assembly_stage.py",
       "external": true,
@@ -5904,6 +5915,7 @@
     {
       "id": "numpy",
       "label": "numpy",
+      "_origin": "semantic",
       "community": 2,
       "community_name": "assembly_stage.py",
       "external": true,
@@ -5915,6 +5927,7 @@
     {
       "id": "pil",
       "label": "pil",
+      "_origin": "semantic",
       "community": 2,
       "community_name": "assembly_stage.py",
       "external": true,
@@ -5926,6 +5939,7 @@
     {
       "id": "argparse",
       "label": "argparse",
+      "_origin": "semantic",
       "community": 3,
       "community_name": "json",
       "external": true,
@@ -5937,6 +5951,7 @@
     {
       "id": "datetime",
       "label": "datetime",
+      "_origin": "semantic",
       "community": 3,
       "community_name": "json",
       "external": true,
@@ -5948,6 +5963,7 @@
     {
       "id": "diffusers_utils",
       "label": "diffusers_utils",
+      "_origin": "semantic",
       "community": 3,
       "community_name": "json",
       "external": true,
@@ -5959,6 +5975,7 @@
     {
       "id": "gc",
       "label": "gc",
+      "_origin": "semantic",
       "community": 3,
       "community_name": "json",
       "external": true,
@@ -5970,6 +5987,7 @@
     {
       "id": "json",
       "label": "json",
+      "_origin": "semantic",
       "community": 3,
       "community_name": "json",
       "external": true,
@@ -5981,6 +5999,7 @@
     {
       "id": "sys",
       "label": "sys",
+      "_origin": "semantic",
       "community": 3,
       "community_name": "json",
       "external": true,
@@ -5992,6 +6011,7 @@
     {
       "id": "torch",
       "label": "torch",
+      "_origin": "semantic",
       "community": 3,
       "community_name": "json",
       "external": true,
@@ -6003,6 +6023,7 @@
     {
       "id": "collections",
       "label": "collections",
+      "_origin": "semantic",
       "community": 4,
       "community_name": "shot_breakdown_stage.py",
       "external": true,
@@ -6014,6 +6035,7 @@
     {
       "id": "hashlib",
       "label": "hashlib",
+      "_origin": "semantic",
       "community": 5,
       "community_name": "os",
       "external": true,
@@ -6025,6 +6047,7 @@
     {
       "id": "os",
       "label": "os",
+      "_origin": "semantic",
       "community": 5,
       "community_name": "os",
       "external": true,
@@ -6036,6 +6059,7 @@
     {
       "id": "shutil",
       "label": "shutil",
+      "_origin": "semantic",
       "community": 5,
       "community_name": "os",
       "external": true,
@@ -6047,6 +6071,7 @@
     {
       "id": "subprocess",
       "label": "subprocess",
+      "_origin": "semantic",
       "community": 5,
       "community_name": "os",
       "external": true,
@@ -6058,6 +6083,7 @@
     {
       "id": "time",
       "label": "time",
+      "_origin": "semantic",
       "community": 6,
       "community_name": "video_generation.py",
       "external": true,
@@ -6069,6 +6095,7 @@
     {
       "id": "traceback",
       "label": "traceback",
+      "_origin": "semantic",
       "community": 6,
       "community_name": "video_generation.py",
       "external": true,
@@ -6080,6 +6107,7 @@
     {
       "id": "re",
       "label": "re",
+      "_origin": "semantic",
       "community": 7,
       "community_name": "re",
       "external": true,
@@ -6091,6 +6119,7 @@
     {
       "id": "asyncio",
       "label": "asyncio",
+      "_origin": "semantic",
       "community": 8,
       "community_name": "narration.py",
       "external": true,
@@ -6102,6 +6131,7 @@
     {
       "id": "edge_tts",
       "label": "edge_tts",
+      "_origin": "semantic",
       "community": 8,
       "community_name": "narration.py",
       "external": true,
@@ -6113,6 +6143,7 @@
     {
       "id": "pydub",
       "label": "pydub",
+      "_origin": "semantic",
       "community": 8,
       "community_name": "narration.py",
       "external": true,
@@ -6124,6 +6155,7 @@
     {
       "id": "pydub_effects",
       "label": "pydub_effects",
+      "_origin": "semantic",
       "community": 8,
       "community_name": "narration.py",
       "external": true,
@@ -6135,6 +6167,7 @@
     {
       "id": "supabase",
       "label": "supabase",
+      "_origin": "semantic",
       "community": 8,
       "community_name": "narration.py",
       "external": true,
@@ -6146,6 +6179,7 @@
     {
       "id": "requests",
       "label": "requests",
+      "_origin": "semantic",
       "community": 9,
       "community_name": "requests",
       "external": true,
@@ -7713,7 +7747,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L51",
+      "source_location": "L58",
       "weight": 1.0
     },
     {
@@ -7725,7 +7759,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L59",
+      "source_location": "L66",
       "weight": 1.0
     },
     {
@@ -7737,7 +7771,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L64",
+      "source_location": "L71",
       "weight": 1.0
     },
     {
@@ -7749,7 +7783,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L65",
+      "source_location": "L72",
       "weight": 1.0
     },
     {
@@ -7761,7 +7795,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L66",
+      "source_location": "L73",
       "weight": 1.0
     },
     {
@@ -7773,7 +7807,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L45",
+      "source_location": "L52",
       "weight": 1.0
     },
     {
@@ -7785,7 +7819,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L89",
+      "source_location": "L96",
       "weight": 1.0
     },
     {
@@ -7821,7 +7855,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L72",
+      "source_location": "L79",
       "weight": 1.0
     },
     {
@@ -12105,7 +12139,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L40",
+      "source_location": "L47",
       "weight": 1.0
     },
     {
@@ -13545,7 +13579,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L41",
+      "source_location": "L48",
       "weight": 1.0
     },
     {
@@ -15579,7 +15613,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L44",
+      "source_location": "L51",
       "weight": 1.0
     },
     {
@@ -15590,7 +15624,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L50",
+      "source_location": "L57",
       "weight": 1.0
     },
     {
@@ -15601,7 +15635,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L69",
+      "source_location": "L76",
       "weight": 1.0
     },
     {
@@ -15612,7 +15646,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L87",
+      "source_location": "L94",
       "weight": 1.0
     },
     {
@@ -19349,5 +19383,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "52ff10e03263c8ba8f77aeaaa456b4e6696a5025"
+  "built_at_commit": "50007e6df8e47dbe898d85966fdc10c81615b0f3"
 }
