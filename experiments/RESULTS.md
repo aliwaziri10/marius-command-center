@@ -1,8 +1,8 @@
 # Fallback-chain experiment results
 
-- Run: https://github.com/aliwaziri10/marius-command-center/actions/runs/39128382109
-- Commit: 9c720a2330e94975f55b57ba02d36fdef88046dd
-- Time: 2026-10-18 12:42:13 UTC
+- Run: https://github.com/aliwaziri10/marius-command-center/actions/runs/39664375472
+- Commit: e91501fb3b6d2545591e06447d6ff3f353ccdeec
+- Time: 2026-10-21 19:45:31 UTC
 
 | Source | Result |
 |---|---|
@@ -23,7 +23,7 @@
 
 Raw excerpt:
 ```
-{"total":17033,"totalHits":500,"hits":[{"id":283533,"pageURL":"https://pixabay.com/videos/id-283533/","type":"film","tags":"wave, breaking, sea, ocean, water, coast, slow motion, slowmo","duration":40,"videos":{"large":{"url":"https://cdn.pixabay.com/video/2025/06/03/283533_large.mp4","width":1920,"height":1080,"size":38263129,"thumbnail":"https://
+{"total":17145,"totalHits":500,"hits":[{"id":283533,"pageURL":"https://pixabay.com/videos/id-283533/","type":"film","tags":"wave, breaking, sea, ocean, water, coast, slow motion, slowmo","duration":40,"videos":{"large":{"url":"https://cdn.pixabay.com/video/2025/06/03/283533_large.mp4","width":1920,"height":1080,"size":38263129,"thumbnail":"https://
 ```
 
 ## Pexels video (optional): SKIPPED
@@ -53,7 +53,7 @@ Raw excerpt:
 
 Raw excerpt:
 ```
-{"responseHeader":{"status":0,"QTime":33,"params":{"query":"collection:prelinger AND mediatype:movies","qin":"collection:prelinger AND mediatype:movies","fields":"identifier,title,licenseurl","wt":"json","sort":"downloads desc","rows":3,"start":0}},"response":{"numFound":10461,"start":0,"docs":[{"identifier":"AboutBan1935","licenseurl":"http://crea
+{"responseHeader":{"status":0,"QTime":21,"params":{"query":"collection:prelinger AND mediatype:movies","qin":"collection:prelinger AND mediatype:movies","fields":"identifier,title,licenseurl","wt":"json","sort":"downloads desc","rows":3,"start":0}},"response":{"numFound":10461,"start":0,"docs":[{"identifier":"AboutBan1935","licenseurl":"http://crea
 ```
 
 ## Wikimedia Commons: PASS
