@@ -1425,7 +1425,7 @@
         },
         {
           "name": "free",
-          "line": 44,
+          "line": 51,
           "args": [],
           "calls": [
             "collect",
@@ -1436,7 +1436,7 @@
         },
         {
           "name": "attempt",
-          "line": 50,
+          "line": 57,
           "args": [
             "name",
             "fn"
@@ -1461,7 +1461,7 @@
         },
         {
           "name": "wan",
-          "line": 69,
+          "line": 76,
           "args": [],
           "calls": [
             "enable_model_cpu_offload",
@@ -1476,7 +1476,7 @@
         },
         {
           "name": "ltx",
-          "line": 87,
+          "line": 94,
           "args": [],
           "calls": [
             "enable_model_cpu_offload",
