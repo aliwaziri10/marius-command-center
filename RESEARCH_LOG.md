@@ -35,3 +35,18 @@ Run: https://github.com/aliwaziri10/marius-command-center/actions/runs/391282479
 ### Next hypothesis
 
 A stock clip can be fitted to 1280x720 and the exact shot duration, with no black frames or frozen stretches, using moviepy and ffmpeg inside an Actions run. Test next: build scripts/stock_fallback.py, then a standalone test of about 25 minutes made only from stock clips plus Edge TTS narration, run in Actions.
+
+## Loop 2, 2026-10-22: is there a better free AI-clip fallback than Kaggle?
+
+Hypothesis: a free hosted video API would give more footage per day than Kaggle's free GPU.
+
+Kaggle measurement (VERIFIED, from the run log Zia pasted, run https://github.com/aliwaziri10/marius-command-center/actions/runs/39632032160): 2 x Tesla T4. Wan2.2-TI2V-5B made 49 frames at 832x480 in 1542.7 s (load 250.5 s). LTX-Video made 97 frames at 704x480 in 702.2 s (load 253.3 s). Whole run about 48 minutes. Both clips downloaded. Clip quality NOT viewed by Claude. At LTX speed that is about 20 s of footage per GPU hour if 24 fps (fps not confirmed), so Kaggle cannot carry a daily 25 minute video. The 30 free GPU hours per week figure is UNVERIFIED.
+
+Candidate: CogVideoX-Flash on the China platform bigmodel.cn.
+- Primary source, official model overview https://docs.bigmodel.cn/cn/guide/start/model-overview lists CogVideoX-Flash as a free model (text and image input, AI sound effects, up to 10 s, up to 4K, 60 fps). This is the docs saying so, NOT an executed test: UNVERIFIED in practice.
+- Secondary only (leads): the free tier is exposed only on the China platform and z.ai sells only paid models (dev.to article); free requests are queued at lower priority and rate limited at peak (dev.to, a third party MCP readme); clips are short and lower fidelity than top paid models (dev.to).
+- UNVERIFIED and possibly a blocker: whether an account and key can be made without Chinese real-name verification (a third party readme says real-name verification is done 'as the platform requires'; the official Batch API FAQ says real-name verification is required for the Batch API). The brief says to discard anything needing an identity check Zia cannot pass.
+- UNVERIFIED: commercial use terms of the free tier (a reference site says 'conditional').
+- Rejected: third party gateways that resell the free tier with their own 'free key' (unknown terms, key trust). Also rejected by the brief: Hugging Face and every credit or trial based video tool.
+
+Result: CogVideoX-Flash is the best candidate found, but nothing is proven. Only Zia can test sign up (identity check question). Plan stays: Agnes, then CogVideoX-Flash only if a key can be obtained, then stock footage, then still image zoom. Kaggle stays a rare extra for a few special shots, not a daily source.
