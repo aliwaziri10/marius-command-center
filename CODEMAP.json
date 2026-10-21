@@ -1403,7 +1403,7 @@
       "functions": [
         {
           "name": "save_report",
-          "line": 21,
+          "line": 23,
           "args": [],
           "calls": [
             "dump",
@@ -1414,7 +1414,7 @@
         },
         {
           "name": "run",
-          "line": 26,
+          "line": 28,
           "args": [
             "cmd"
           ],
@@ -1425,7 +1425,7 @@
         },
         {
           "name": "free",
-          "line": 51,
+          "line": 54,
           "args": [],
           "calls": [
             "collect",
@@ -1435,57 +1435,85 @@
           "docstring": ""
         },
         {
-          "name": "attempt",
-          "line": 57,
+          "name": "try_model",
+          "line": 60,
           "args": [
             "name",
-            "fn"
+            "load_fn",
+            "call_fn",
+            "rungs",
+            "out_name"
           ],
           "calls": [
             "append",
+            "call_fn",
             "dumps",
-            "fn",
+            "export_to_video",
             "format_exc",
             "free",
-            "is_available",
+            "get",
+            "join",
+            "load_fn",
             "max_memory_allocated",
             "print",
+            "reset_peak_memory_stats",
             "round",
             "save_report",
             "str",
             "time",
-            "type",
-            "update"
+            "type"
+          ],
+          "docstring": "Load once, then try each (width, height, frames) rung until one makes a clip."
+        },
+        {
+          "name": "load_wan",
+          "line": 107,
+          "args": [],
+          "calls": [
+            "enable_sequential_cpu_offload",
+            "enable_tiling",
+            "from_pretrained",
+            "print"
           ],
           "docstring": ""
         },
         {
-          "name": "wan",
-          "line": 76,
-          "args": [],
-          "calls": [
-            "enable_model_cpu_offload",
-            "export_to_video",
-            "from_pretrained",
-            "join",
+          "name": "call_wan",
+          "line": 120,
+          "args": [
             "pipe",
-            "round",
-            "time"
+            "w",
+            "h",
+            "f"
+          ],
+          "calls": [
+            "pipe"
           ],
           "docstring": ""
         },
         {
-          "name": "ltx",
-          "line": 94,
+          "name": "load_ltx",
+          "line": 125,
           "args": [],
           "calls": [
-            "enable_model_cpu_offload",
-            "export_to_video",
+            "enable_sequential_cpu_offload",
+            "enable_tiling",
             "from_pretrained",
-            "join",
+            "print"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "call_ltx",
+          "line": 136,
+          "args": [
             "pipe",
-            "round",
-            "time"
+            "w",
+            "h",
+            "f"
+          ],
+          "calls": [
+            "pipe"
           ],
           "docstring": ""
         }
