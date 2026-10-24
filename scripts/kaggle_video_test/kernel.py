@@ -1,30 +1,35 @@
 """
-Runs ON KAGGLE (free GPU). TEST 2 (2026-10-24): LTX-Video 2B 0.9.6-DISTILLED.
-Goal: measure real speed/quality of the fast distilled model (8 steps, no guidance) and test
-image-to-video chaining (continue a clip from its last frame). Writes clips + report.json.
+Runs ON KAGGLE (free GPU). TEST 3 (2026-10-24): LTX-Video 2B 0.9.8-DISTILLED (newer than 0.9.6).
+Same prompts style as test 2 plus a face close-up and a no-people landscape, sequential offload
+(model offload ran out of memory last time). Also fixes the image-to-video chain test.
 Nothing here touches Marius, Supabase or Backblaze.
 """
 import os
 import gc
 import json
 import time
+import inspect
 import traceback
 import subprocess
 
 OUT = "/kaggle/working"
-REPORT = {"started": time.strftime("%Y-%m-%d %H:%M:%S"), "test": "ltx-2b-0.9.6-distilled", "steps": []}
+REPORT = {"started": time.strftime("%Y-%m-%d %H:%M:%S"), "test": "ltx-2b-0.9.8-distilled", "steps": []}
 
-CKPT = "https://huggingface.co/Lightricks/LTX-Video/ltxv-2b-0.9.6-distilled-04-25.safetensors"
+CKPT = "https://huggingface.co/Lightricks/LTX-Video/ltxv-2b-0.9.8-distilled.safetensors"
 BASE_REPO = "Lightricks/LTX-Video"
 W, H, FRAMES, STEPS, FPS = 704, 480, 97, 8, 24
 
 PROMPTS = [
-    ("harbour", "A small wooden pilot boat moving slowly through calm harbour water at dawn, light fog over the stone quay, "
-                "vivid saturated color, warm golden light, cinematic, sharp detail, slow camera push-in"),
-    ("market", "Medieval market square at midday, merchants and townspeople walking and trading between stalls, "
-               "rich saturated colors, natural sunlight, shallow depth of field, cinematic, camera follows slowly"),
     ("craftsman", "Close-up of an old craftsman's hands carving a wooden figure in a workshop, warm lamplight, "
                   "wood shavings falling, vivid saturated color, shallow depth of field, cinematic"),
+    ("market", "Medieval market square at midday, merchants and townspeople walking and trading between stalls, "
+               "rich saturated colors, natural sunlight, shallow depth of field, cinematic, camera follows slowly"),
+    ("fisherman_face", "Close-up portrait of a weathered elderly fisherman with a grey beard, wind in his hair, "
+                       "looking out to sea, clear detailed face, natural daylight, vivid saturated color, cinematic"),
+    ("harbour", "A small wooden pilot boat moving slowly through calm harbour water at dawn, light fog over the stone quay, "
+                "vivid saturated color, warm golden light, cinematic, sharp detail, slow camera push-in"),
+    ("valley", "Wide aerial shot of a green mountain valley at sunrise, a river winding through it, light mist, "
+               "vivid saturated color, golden light, cinematic, slow camera drift forward"),
 ]
 CHAIN_PROMPT = ("The pilot boat keeps gliding forward as the fog slowly lifts, same harbour, "
                 "vivid saturated color, warm golden light, cinematic")
@@ -63,49 +68,37 @@ def free():
         torch.cuda.empty_cache()
 
 
-def load(mode):
-    """Two loading routes (A: full single file, B: transformer+vae from single file, rest from base repo)."""
+def load():
     t = time.time()
-    pipe, how, errs = None, None, []
     try:
-        pipe = LTXPipeline.from_single_file(CKPT, torch_dtype=torch.bfloat16)
-        how = "A: LTXPipeline.from_single_file"
-    except Exception as e:
-        errs.append("A failed: " + (type(e).__name__ + ": " + str(e))[:400])
+        from diffusers import LTXVideoTransformer3DModel, AutoencoderKLLTXVideo
+        tr = LTXVideoTransformer3DModel.from_single_file(CKPT, torch_dtype=torch.bfloat16)
+        vae = AutoencoderKLLTXVideo.from_single_file(CKPT, torch_dtype=torch.bfloat16)
+        pipe = LTXPipeline.from_pretrained(BASE_REPO, transformer=tr, vae=vae, torch_dtype=torch.bfloat16)
         try:
-            from diffusers import LTXVideoTransformer3DModel, AutoencoderKLLTXVideo
-            tr = LTXVideoTransformer3DModel.from_single_file(CKPT, torch_dtype=torch.bfloat16)
-            vae = AutoencoderKLLTXVideo.from_single_file(CKPT, torch_dtype=torch.bfloat16)
-            pipe = LTXPipeline.from_pretrained(BASE_REPO, transformer=tr, vae=vae, torch_dtype=torch.bfloat16)
-            how = "B: transformer+vae single file, rest from base repo"
-        except Exception as e2:
-            errs.append("B failed: " + (type(e2).__name__ + ": " + str(e2))[:400])
-            errs.append(traceback.format_exc()[-800:])
-    if pipe is None:
-        log({"step": "load", "mode": mode, "ok": False, "errors": errs})
-        return None
-    try:
-        pipe.vae.enable_tiling()
-    except Exception:
-        pass
-    if mode == "model":
-        pipe.enable_model_cpu_offload()
-    else:
+            pipe.vae.enable_tiling()
+        except Exception:
+            pass
         pipe.enable_sequential_cpu_offload()
-    log({"step": "load", "mode": mode, "ok": True, "how": how, "seconds": round(time.time() - t, 1), "errors": errs})
-    return pipe
+        log({"step": "load", "ok": True, "seconds": round(time.time() - t, 1)})
+        return pipe
+    except Exception as e:
+        log({"step": "load", "ok": False, "error": (type(e).__name__ + ": " + str(e))[:500],
+             "trace": traceback.format_exc()[-900:]})
+        return None
 
 
-def gen(pipe, prompt, seed, image=None):
+def call(pipe, prompt, seed, image=None):
     kw = dict(prompt=prompt, width=W, height=H, num_frames=FRAMES, num_inference_steps=STEPS,
-              guidance_scale=1.0, generator=torch.Generator().manual_seed(seed))
+              guidance_scale=1.0, decode_timestep=0.05, decode_noise_scale=0.025,
+              generator=torch.Generator().manual_seed(seed))
     if image is not None:
         kw["image"] = image
         kw["image_cond_noise_scale"] = 0.025
-    try:
-        return pipe(decode_timestep=0.05, decode_noise_scale=0.025, **kw).frames[0]
-    except TypeError:
-        return pipe(**kw).frames[0]
+    allowed = set(inspect.signature(pipe.__call__).parameters)
+    dropped = [k for k in kw if k not in allowed]
+    kw = {k: v for k, v in kw.items() if k in allowed}
+    return pipe(**kw).frames[0], dropped
 
 
 def timed(name, pipe, prompt, seed, image=None):
@@ -113,13 +106,14 @@ def timed(name, pipe, prompt, seed, image=None):
     torch.cuda.reset_peak_memory_stats()
     t = time.time()
     try:
-        frames = gen(pipe, prompt, seed, image)
+        frames, dropped = call(pipe, prompt, seed, image)
         step["generate_seconds"] = round(time.time() - t, 1)
-        path = os.path.join(OUT, f"ltxd_{name}.mp4")
+        path = os.path.join(OUT, f"ltx098_{name}.mp4")
         export_to_video(frames, path, fps=FPS)
         step["file"] = path
         step["clip_seconds"] = round(len(frames) / FPS, 2)
         step["ok"] = True
+        step["dropped_args"] = dropped
         step["peak_vram_gb"] = round(torch.cuda.max_memory_allocated() / 1e9, 2)
         log(step)
         return frames
@@ -131,27 +125,20 @@ def timed(name, pipe, prompt, seed, image=None):
         return None
 
 
-pipe, first_frames = None, None
-for mode in ("model", "sequential"):
-    pipe = load(mode)
-    if pipe is None:
-        break
-    first_frames = timed(f"{PROMPTS[0][0]}_{mode}", pipe, PROMPTS[0][1], 1)
-    if first_frames is not None:
-        break
-    del pipe
-    pipe = None
-    free()
-
-if pipe is not None and first_frames is not None:
-    for i, (name, prompt) in enumerate(PROMPTS[1:], start=2):
-        timed(name, pipe, prompt, i)
-    try:
-        i2v = LTXImageToVideoPipeline(**pipe.components)
-        timed("chain_from_harbour", i2v, CHAIN_PROMPT, 9, image=first_frames[-1])
-    except Exception as e:
-        log({"step": "chain_setup", "ok": False, "error": (type(e).__name__ + ": " + str(e))[:400],
-             "trace": traceback.format_exc()[-800:]})
+pipe = load()
+if pipe is not None:
+    harbour = None
+    for i, (name, prompt) in enumerate(PROMPTS, start=1):
+        frames = timed(name, pipe, prompt, i)
+        if name == "harbour":
+            harbour = frames
+    if harbour is not None:
+        try:
+            i2v = LTXImageToVideoPipeline(**pipe.components)
+            timed("chain_from_harbour", i2v, CHAIN_PROMPT, 9, image=harbour[-1])
+        except Exception as e:
+            log({"step": "chain_setup", "ok": False, "error": (type(e).__name__ + ": " + str(e))[:400],
+                 "trace": traceback.format_exc()[-800:]})
 
 REPORT["finished"] = time.strftime("%Y-%m-%d %H:%M:%S")
 save()
