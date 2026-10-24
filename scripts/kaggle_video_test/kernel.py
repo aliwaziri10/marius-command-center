@@ -1,12 +1,10 @@
 """
-Runs ON KAGGLE (free GPU). One-time TEST: can an open-source video model make a clip here?
-Tries Wan 2.2 (5B) first, then LTX-Video. Writes test clip(s) + report.json to /kaggle/working.
-Each model is loaded once with sequential CPU offload (lowest VRAM), then tried at a ladder of
-sizes: original size first, smaller size only if that runs out of memory.
+Runs ON KAGGLE (free GPU). TEST 2 (2026-10-24): LTX-Video 2B 0.9.6-DISTILLED.
+Goal: measure real speed/quality of the fast distilled model (8 steps, no guidance) and test
+image-to-video chaining (continue a clip from its last frame). Writes clips + report.json.
 Nothing here touches Marius, Supabase or Backblaze.
 """
 import os
-import sys
 import gc
 import json
 import time
@@ -14,13 +12,25 @@ import traceback
 import subprocess
 
 OUT = "/kaggle/working"
-REPORT = {"started": time.strftime("%Y-%m-%d %H:%M:%S"), "gpu": None, "attempts": []}
-PROMPT = ("A grey 1942 harbour at dawn, a small wooden pilot boat moving slowly through calm water, "
-          "fog over the quay, period accurate, natural light, cinematic documentary look, no text")
-NEGATIVE = "text, watermark, modern objects, cars, drones, blurry, distorted, extra limbs"
+REPORT = {"started": time.strftime("%Y-%m-%d %H:%M:%S"), "test": "ltx-2b-0.9.6-distilled", "steps": []}
+
+CKPT = "https://huggingface.co/Lightricks/LTX-Video/ltxv-2b-0.9.6-distilled-04-25.safetensors"
+BASE_REPO = "Lightricks/LTX-Video"
+W, H, FRAMES, STEPS, FPS = 704, 480, 97, 8, 24
+
+PROMPTS = [
+    ("harbour", "A small wooden pilot boat moving slowly through calm harbour water at dawn, light fog over the stone quay, "
+                "vivid saturated color, warm golden light, cinematic, sharp detail, slow camera push-in"),
+    ("market", "Medieval market square at midday, merchants and townspeople walking and trading between stalls, "
+               "rich saturated colors, natural sunlight, shallow depth of field, cinematic, camera follows slowly"),
+    ("craftsman", "Close-up of an old craftsman's hands carving a wooden figure in a workshop, warm lamplight, "
+                  "wood shavings falling, vivid saturated color, shallow depth of field, cinematic"),
+]
+CHAIN_PROMPT = ("The pilot boat keeps gliding forward as the fog slowly lifts, same harbour, "
+                "vivid saturated color, warm golden light, cinematic")
 
 
-def save_report():
+def save():
     with open(os.path.join(OUT, "report.json"), "w") as f:
         json.dump(REPORT, f, indent=2)
 
@@ -29,25 +39,21 @@ def run(cmd):
     return subprocess.run(cmd, shell=True, capture_output=True, text=True)
 
 
-REPORT["gpu"] = run("nvidia-smi --query-gpu=name,memory.total --format=csv,noheader").stdout.strip()
-print("GPU:", REPORT["gpu"])
-save_report()
+def log(step):
+    REPORT["steps"].append(step)
+    save()
+    print(json.dumps(step, indent=2))
 
+
+REPORT["gpu"] = run("nvidia-smi --query-gpu=name,memory.total --format=csv,noheader").stdout.strip()
 r = run("pip install -q -U diffusers transformers accelerate ftfy imageio imageio-ffmpeg sentencepiece protobuf")
 REPORT["pip_returncode"] = r.returncode
-if r.returncode != 0:
-    REPORT["pip_error"] = r.stderr[-800:]
-
-# Newer diffusers imports torchao.quantization.FqnToConfig (needs torchao >= 0.15) whenever
-# torchao is installed. We do no quantization, so remove torchao entirely.
-REPORT["torchao_before"] = run("pip show torchao | grep -i '^version'").stdout.strip() or "not installed"
-u = run("pip uninstall -y torchao")
-REPORT["torchao_uninstall_returncode"] = u.returncode
+run("pip uninstall -y torchao")
 REPORT["versions"] = run("pip list 2>/dev/null | grep -iE '^(torch|diffusers|transformers|accelerate) '").stdout.strip()
-REPORT["cpu_ram"] = run("free -g | head -2").stdout.strip()
-save_report()
+save()
 
 import torch  # noqa: E402
+from diffusers import LTXPipeline, LTXImageToVideoPipeline  # noqa: E402
 from diffusers.utils import export_to_video  # noqa: E402
 
 
@@ -57,93 +63,96 @@ def free():
         torch.cuda.empty_cache()
 
 
-def try_model(name, load_fn, call_fn, rungs, out_name):
-    """Load once, then try each (width, height, frames) rung until one makes a clip."""
-    entry = {"model": name, "ok": False, "rungs": []}
-    t0 = time.time()
+def load(mode):
+    """Two loading routes (A: full single file, B: transformer+vae from single file, rest from base repo)."""
+    t = time.time()
+    pipe, how, errs = None, None, []
     try:
-        t = time.time()
-        pipe = load_fn()
-        entry["load_seconds"] = round(time.time() - t, 1)
+        pipe = LTXPipeline.from_single_file(CKPT, torch_dtype=torch.bfloat16)
+        how = "A: LTXPipeline.from_single_file"
     except Exception as e:
-        entry["error"] = (type(e).__name__ + ": " + str(e))[:500]
-        entry["trace"] = traceback.format_exc()[-1200:]
-        entry["seconds_total"] = round(time.time() - t0, 1)
-        REPORT["attempts"].append(entry)
-        save_report()
-        free()
-        print(json.dumps(entry, indent=2))
-        return
-    for (w, h, f) in rungs:
-        rung = {"width": w, "height": h, "frames": f, "ok": False}
-        torch.cuda.reset_peak_memory_stats()
+        errs.append("A failed: " + (type(e).__name__ + ": " + str(e))[:400])
         try:
-            t = time.time()
-            frames = call_fn(pipe, w, h, f)
-            rung["generate_seconds"] = round(time.time() - t, 1)
-            path = os.path.join(OUT, out_name)
-            export_to_video(frames, path, fps=24)
-            rung["file"] = path
-            rung["ok"] = True
-            entry["ok"] = True
-        except Exception as e:
-            rung["error"] = (type(e).__name__ + ": " + str(e))[:400]
-            rung["trace"] = traceback.format_exc()[-800:]
-        rung["peak_vram_gb"] = round(torch.cuda.max_memory_allocated() / 1e9, 2)
-        entry["rungs"].append(rung)
-        REPORT["attempts"] = [a for a in REPORT["attempts"] if a.get("model") != name] + [entry]
-        save_report()
+            from diffusers import LTXVideoTransformer3DModel, AutoencoderKLLTXVideo
+            tr = LTXVideoTransformer3DModel.from_single_file(CKPT, torch_dtype=torch.bfloat16)
+            vae = AutoencoderKLLTXVideo.from_single_file(CKPT, torch_dtype=torch.bfloat16)
+            pipe = LTXPipeline.from_pretrained(BASE_REPO, transformer=tr, vae=vae, torch_dtype=torch.bfloat16)
+            how = "B: transformer+vae single file, rest from base repo"
+        except Exception as e2:
+            errs.append("B failed: " + (type(e2).__name__ + ": " + str(e2))[:400])
+            errs.append(traceback.format_exc()[-800:])
+    if pipe is None:
+        log({"step": "load", "mode": mode, "ok": False, "errors": errs})
+        return None
+    try:
+        pipe.vae.enable_tiling()
+    except Exception:
+        pass
+    if mode == "model":
+        pipe.enable_model_cpu_offload()
+    else:
+        pipe.enable_sequential_cpu_offload()
+    log({"step": "load", "mode": mode, "ok": True, "how": how, "seconds": round(time.time() - t, 1), "errors": errs})
+    return pipe
+
+
+def gen(pipe, prompt, seed, image=None):
+    kw = dict(prompt=prompt, width=W, height=H, num_frames=FRAMES, num_inference_steps=STEPS,
+              guidance_scale=1.0, generator=torch.Generator().manual_seed(seed))
+    if image is not None:
+        kw["image"] = image
+        kw["image_cond_noise_scale"] = 0.025
+    try:
+        return pipe(decode_timestep=0.05, decode_noise_scale=0.025, **kw).frames[0]
+    except TypeError:
+        return pipe(**kw).frames[0]
+
+
+def timed(name, pipe, prompt, seed, image=None):
+    step = {"step": name, "ok": False}
+    torch.cuda.reset_peak_memory_stats()
+    t = time.time()
+    try:
+        frames = gen(pipe, prompt, seed, image)
+        step["generate_seconds"] = round(time.time() - t, 1)
+        path = os.path.join(OUT, f"ltxd_{name}.mp4")
+        export_to_video(frames, path, fps=FPS)
+        step["file"] = path
+        step["clip_seconds"] = round(len(frames) / FPS, 2)
+        step["ok"] = True
+        step["peak_vram_gb"] = round(torch.cuda.max_memory_allocated() / 1e9, 2)
+        log(step)
+        return frames
+    except Exception as e:
+        step["error"] = (type(e).__name__ + ": " + str(e))[:400]
+        step["trace"] = traceback.format_exc()[-800:]
+        log(step)
         free()
-        if rung["ok"]:
-            break
-    entry["seconds_total"] = round(time.time() - t0, 1)
-    REPORT["attempts"] = [a for a in REPORT["attempts"] if a.get("model") != name] + [entry]
-    save_report()
-    print(json.dumps(entry, indent=2))
+        return None
+
+
+pipe, first_frames = None, None
+for mode in ("model", "sequential"):
+    pipe = load(mode)
+    if pipe is None:
+        break
+    first_frames = timed(f"{PROMPTS[0][0]}_{mode}", pipe, PROMPTS[0][1], 1)
+    if first_frames is not None:
+        break
     del pipe
+    pipe = None
     free()
 
-
-def load_wan():
-    from diffusers import AutoencoderKLWan, WanPipeline
-    model = "Wan-AI/Wan2.2-TI2V-5B-Diffusers"
-    vae = AutoencoderKLWan.from_pretrained(model, subfolder="vae", torch_dtype=torch.float32)
-    pipe = WanPipeline.from_pretrained(model, vae=vae, torch_dtype=torch.bfloat16)
+if pipe is not None and first_frames is not None:
+    for i, (name, prompt) in enumerate(PROMPTS[1:], start=2):
+        timed(name, pipe, prompt, i)
     try:
-        pipe.vae.enable_tiling()
+        i2v = LTXImageToVideoPipeline(**pipe.components)
+        timed("chain_from_harbour", i2v, CHAIN_PROMPT, 9, image=first_frames[-1])
     except Exception as e:
-        print("vae tiling not available:", e)
-    pipe.enable_sequential_cpu_offload()  # do NOT move the pipe to cuda first
-    return pipe
-
-
-def call_wan(pipe, w, h, f):
-    return pipe(prompt=PROMPT, negative_prompt=NEGATIVE, height=h, width=w,
-                num_frames=f, guidance_scale=5.0, num_inference_steps=20).frames[0]
-
-
-def load_ltx():
-    from diffusers import LTXPipeline
-    pipe = LTXPipeline.from_pretrained("Lightricks/LTX-Video", torch_dtype=torch.bfloat16)
-    try:
-        pipe.vae.enable_tiling()
-    except Exception as e:
-        print("vae tiling not available:", e)
-    pipe.enable_sequential_cpu_offload()  # do NOT move the pipe to cuda first
-    return pipe
-
-
-def call_ltx(pipe, w, h, f):
-    return pipe(prompt=PROMPT, negative_prompt=NEGATIVE, width=w, height=h,
-                num_frames=f, num_inference_steps=30).frames[0]
-
-
-# (width, height, frames): original size first, smaller fallback second
-try_model("Wan2.2-TI2V-5B", load_wan, call_wan,
-          [(832, 480, 49), (640, 352, 33)], "test_wan22_5b.mp4")
-try_model("LTX-Video", load_ltx, call_ltx,
-          [(704, 480, 97), (512, 320, 49)], "test_ltx_video.mp4")
+        log({"step": "chain_setup", "ok": False, "error": (type(e).__name__ + ": " + str(e))[:400],
+             "trace": traceback.format_exc()[-800:]})
 
 REPORT["finished"] = time.strftime("%Y-%m-%d %H:%M:%S")
-save_report()
+save()
 print("DONE")
