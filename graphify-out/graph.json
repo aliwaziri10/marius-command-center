@@ -554,16 +554,16 @@
       "source_location": "L88"
     },
     {
-      "id": "scripts_clip_generation_extract_last_frame_local",
-      "label": "_extract_last_frame_local()",
+      "id": "scripts_clip_generation_extract_last_frame_url",
+      "label": "extract_last_frame_url()",
       "_callable": true,
       "_origin": "ast",
       "community": 1,
       "community_name": "clip_generation.py",
       "file_type": "code",
-      "norm_label": "_extract_last_frame_local()",
+      "norm_label": "extract_last_frame_url()",
       "source_file": "scripts/clip_generation.py",
-      "source_location": "L270"
+      "source_location": "L175"
     },
     {
       "id": "scripts_clip_generation_fit_clip_to_duration",
@@ -576,6 +576,18 @@
       "norm_label": "fit_clip_to_duration()",
       "source_file": "scripts/clip_generation.py",
       "source_location": "L380"
+    },
+    {
+      "id": "scripts_clip_generation_generate_character_reference",
+      "label": "generate_character_reference()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "clip_generation.py",
+      "file_type": "code",
+      "norm_label": "generate_character_reference()",
+      "source_file": "scripts/clip_generation.py",
+      "source_location": "L105"
     },
     {
       "id": "scripts_clip_generation_generate_one_segment",
@@ -614,6 +626,18 @@
       "source_location": "L287"
     },
     {
+      "id": "scripts_clip_generation_get_continuity_anchor",
+      "label": "get_continuity_anchor()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "clip_generation.py",
+      "file_type": "code",
+      "norm_label": "get_continuity_anchor()",
+      "source_file": "scripts/clip_generation.py",
+      "source_location": "L193"
+    },
+    {
       "id": "scripts_clip_generation_upload_local_image_for_anchor",
       "label": "_upload_local_image_for_anchor()",
       "_callable": true,
@@ -636,6 +660,30 @@
       "norm_label": "upload_reference_image()",
       "source_file": "scripts/clip_generation.py",
       "source_location": "L96"
+    },
+    {
+      "id": "scripts_prompt_builder_build_character_reference_prompt",
+      "label": "build_character_reference_prompt()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "clip_generation.py",
+      "file_type": "code",
+      "norm_label": "build_character_reference_prompt()",
+      "source_file": "scripts/prompt_builder.py",
+      "source_location": "L324"
+    },
+    {
+      "id": "scripts_storage_b2_presigned_url",
+      "label": "presigned_url()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "clip_generation.py",
+      "file_type": "code",
+      "norm_label": "presigned_url()",
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L269"
     },
     {
       "id": "scripts_thumbnail_generation_derive_hook_text",
@@ -1058,18 +1106,6 @@
       "source_location": "L220"
     },
     {
-      "id": "scripts_storage_b2_presigned_url",
-      "label": "presigned_url()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 13,
-      "community_name": "storage_b2.py",
-      "file_type": "code",
-      "norm_label": "presigned_url()",
-      "source_file": "scripts/storage_b2.py",
-      "source_location": "L269"
-    },
-    {
       "id": "scripts_storage_b2_region_from_endpoint",
       "label": "_region_from_endpoint()",
       "_callable": true,
@@ -1478,6 +1514,30 @@
       "source_location": "L474"
     },
     {
+      "id": "scripts_clip_generation_extract_last_frame_local",
+      "label": "_extract_last_frame_local()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "assembly_stage.py",
+      "file_type": "code",
+      "norm_label": "_extract_last_frame_local()",
+      "source_file": "scripts/clip_generation.py",
+      "source_location": "L270"
+    },
+    {
+      "id": "scripts_kaggle_video_test_kernel_call",
+      "label": "call()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 3,
+      "community_name": "json",
+      "file_type": "code",
+      "norm_label": "call()",
+      "source_file": "scripts/kaggle_video_test/kernel.py",
+      "source_location": "L91"
+    },
+    {
       "id": "scripts_kaggle_video_test_kernel_free",
       "label": "free()",
       "_callable": true,
@@ -1487,19 +1547,7 @@
       "file_type": "code",
       "norm_label": "free()",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L60"
-    },
-    {
-      "id": "scripts_kaggle_video_test_kernel_gen",
-      "label": "gen()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "json",
-      "file_type": "code",
-      "norm_label": "gen()",
-      "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L99"
+      "source_location": "L65"
     },
     {
       "id": "scripts_kaggle_video_test_kernel_load",
@@ -1511,7 +1559,7 @@
       "file_type": "code",
       "norm_label": "load()",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L66"
+      "source_location": "L71"
     },
     {
       "id": "scripts_kaggle_video_test_kernel_log",
@@ -1523,7 +1571,7 @@
       "file_type": "code",
       "norm_label": "log()",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L42"
+      "source_location": "L47"
     },
     {
       "id": "scripts_kaggle_video_test_kernel_run",
@@ -1535,7 +1583,7 @@
       "file_type": "code",
       "norm_label": "run()",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L38"
+      "source_location": "L43"
     },
     {
       "id": "scripts_kaggle_video_test_kernel_save",
@@ -1547,7 +1595,7 @@
       "file_type": "code",
       "norm_label": "save()",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L33"
+      "source_location": "L38"
     },
     {
       "id": "scripts_kaggle_video_test_kernel_timed",
@@ -1559,7 +1607,7 @@
       "file_type": "code",
       "norm_label": "timed()",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L111"
+      "source_location": "L104"
     },
     {
       "id": "scripts_verify_run_output_check_b2_key_alive",
@@ -1934,18 +1982,6 @@
       "source_location": "L385"
     },
     {
-      "id": "scripts_shot_breakdown_stage_split_narration_into_chunks",
-      "label": "split_narration_into_chunks()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "shot_breakdown_stage.py",
-      "file_type": "code",
-      "norm_label": "split_narration_into_chunks()",
-      "source_file": "scripts/shot_breakdown_stage.py",
-      "source_location": "L355"
-    },
-    {
       "id": "scripts_shot_breakdown_stage_validate_and_normalize_shot_response",
       "label": "validate_and_normalize_shot_response()",
       "_callable": true,
@@ -1980,78 +2016,6 @@
       "norm_label": "main()",
       "source_file": "scripts/cleanup_dead_storage.py",
       "source_location": "L79"
-    },
-    {
-      "id": "scripts_health_check_check_generation_failed_backlog",
-      "label": "check_generation_failed_backlog()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "os",
-      "file_type": "code",
-      "norm_label": "check_generation_failed_backlog()",
-      "source_file": "scripts/health_check.py",
-      "source_location": "L116"
-    },
-    {
-      "id": "scripts_health_check_check_stale_scripts",
-      "label": "check_stale_scripts()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "os",
-      "file_type": "code",
-      "norm_label": "check_stale_scripts()",
-      "source_file": "scripts/health_check.py",
-      "source_location": "L70"
-    },
-    {
-      "id": "scripts_health_check_check_stuck_scripts",
-      "label": "check_stuck_scripts()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "os",
-      "file_type": "code",
-      "norm_label": "check_stuck_scripts()",
-      "source_file": "scripts/health_check.py",
-      "source_location": "L85"
-    },
-    {
-      "id": "scripts_health_check_hours_since",
-      "label": "hours_since()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "os",
-      "file_type": "code",
-      "norm_label": "hours_since()",
-      "source_file": "scripts/health_check.py",
-      "source_location": "L65"
-    },
-    {
-      "id": "scripts_health_check_main",
-      "label": "main()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "os",
-      "file_type": "code",
-      "norm_label": "main()",
-      "source_file": "scripts/health_check.py",
-      "source_location": "L129"
-    },
-    {
-      "id": "scripts_health_check_supabase_get",
-      "label": "supabase_get()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "os",
-      "file_type": "code",
-      "norm_label": "supabase_get()",
-      "source_file": "scripts/health_check.py",
-      "source_location": "L59"
     },
     {
       "id": "scripts_kaggle_video_test_run_test_main",
@@ -2330,42 +2294,6 @@
       "source_location": "L643"
     },
     {
-      "id": "scripts_clip_generation_extract_last_frame_url",
-      "label": "extract_last_frame_url()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 6,
-      "community_name": "video_generation.py",
-      "file_type": "code",
-      "norm_label": "extract_last_frame_url()",
-      "source_file": "scripts/clip_generation.py",
-      "source_location": "L175"
-    },
-    {
-      "id": "scripts_clip_generation_generate_character_reference",
-      "label": "generate_character_reference()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 6,
-      "community_name": "video_generation.py",
-      "file_type": "code",
-      "norm_label": "generate_character_reference()",
-      "source_file": "scripts/clip_generation.py",
-      "source_location": "L105"
-    },
-    {
-      "id": "scripts_clip_generation_get_continuity_anchor",
-      "label": "get_continuity_anchor()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 6,
-      "community_name": "video_generation.py",
-      "file_type": "code",
-      "norm_label": "get_continuity_anchor()",
-      "source_file": "scripts/clip_generation.py",
-      "source_location": "L193"
-    },
-    {
       "id": "scripts_llm_client_retryable_request",
       "label": "retryable_request()",
       "_callable": true,
@@ -2606,52 +2534,76 @@
       "source_location": "L209"
     },
     {
-      "id": "scripts_prompt_builder_build_agnes_prompt",
-      "label": "build_agnes_prompt()",
+      "id": "scripts_health_check_check_generation_failed_backlog",
+      "label": "check_generation_failed_backlog()",
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "build_agnes_prompt",
+      "community_name": "health_check.py",
       "file_type": "code",
-      "norm_label": "build_agnes_prompt()",
-      "source_file": "scripts/prompt_builder.py",
-      "source_location": "L235"
+      "norm_label": "check_generation_failed_backlog()",
+      "source_file": "scripts/health_check.py",
+      "source_location": "L116"
     },
     {
-      "id": "scripts_prompt_builder_build_character_reference_prompt",
-      "label": "build_character_reference_prompt()",
+      "id": "scripts_health_check_check_stale_scripts",
+      "label": "check_stale_scripts()",
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "build_agnes_prompt",
+      "community_name": "health_check.py",
       "file_type": "code",
-      "norm_label": "build_character_reference_prompt()",
-      "source_file": "scripts/prompt_builder.py",
-      "source_location": "L324"
+      "norm_label": "check_stale_scripts()",
+      "source_file": "scripts/health_check.py",
+      "source_location": "L70"
     },
     {
-      "id": "scripts_prompt_builder_sanitize_anchor_for_fallback",
-      "label": "_sanitize_anchor_for_fallback()",
+      "id": "scripts_health_check_check_stuck_scripts",
+      "label": "check_stuck_scripts()",
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "build_agnes_prompt",
+      "community_name": "health_check.py",
       "file_type": "code",
-      "norm_label": "_sanitize_anchor_for_fallback()",
-      "source_file": "scripts/prompt_builder.py",
-      "source_location": "L201"
+      "norm_label": "check_stuck_scripts()",
+      "source_file": "scripts/health_check.py",
+      "source_location": "L85"
     },
     {
-      "id": "scripts_prompt_builder_strip_named_characters_for_group_shot",
-      "label": "_strip_named_characters_for_group_shot()",
+      "id": "scripts_health_check_hours_since",
+      "label": "hours_since()",
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "build_agnes_prompt",
+      "community_name": "health_check.py",
       "file_type": "code",
-      "norm_label": "_strip_named_characters_for_group_shot()",
-      "source_file": "scripts/prompt_builder.py",
-      "source_location": "L224"
+      "norm_label": "hours_since()",
+      "source_file": "scripts/health_check.py",
+      "source_location": "L65"
+    },
+    {
+      "id": "scripts_health_check_main",
+      "label": "main()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 7,
+      "community_name": "health_check.py",
+      "file_type": "code",
+      "norm_label": "main()",
+      "source_file": "scripts/health_check.py",
+      "source_location": "L129"
+    },
+    {
+      "id": "scripts_health_check_supabase_get",
+      "label": "supabase_get()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 7,
+      "community_name": "health_check.py",
+      "file_type": "code",
+      "norm_label": "supabase_get()",
+      "source_file": "scripts/health_check.py",
+      "source_location": "L59"
     },
     {
       "id": "scripts_narration_assign_shots_to_sentences",
@@ -2659,7 +2611,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "_assign_shots_to_sentences()",
       "source_file": "scripts/narration.py",
@@ -2671,7 +2623,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "main()",
       "source_file": "scripts/narration.py",
@@ -2683,7 +2635,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "_max_plausible_duration()",
       "source_file": "scripts/narration.py",
@@ -2695,7 +2647,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "_merge_short_segments()",
       "source_file": "scripts/narration.py",
@@ -2707,7 +2659,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "narrate_one_script()",
       "source_file": "scripts/narration.py",
@@ -2719,7 +2671,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "split_into_segments()",
       "source_file": "scripts/narration.py",
@@ -2731,7 +2683,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "_synthesize_edge()",
       "source_file": "scripts/narration.py",
@@ -2743,7 +2695,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "synthesize_per_sentence_with_shot_durations()",
       "source_file": "scripts/narration.py",
@@ -2755,7 +2707,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "synthesize_sentence()",
       "source_file": "scripts/narration.py",
@@ -2767,19 +2719,67 @@
       "_callable": true,
       "_origin": "ast",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "synthesize_with_pauses()",
       "source_file": "scripts/narration.py",
       "source_location": "L178"
     },
     {
+      "id": "scripts_prompt_builder_build_agnes_prompt",
+      "label": "build_agnes_prompt()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "re",
+      "file_type": "code",
+      "norm_label": "build_agnes_prompt()",
+      "source_file": "scripts/prompt_builder.py",
+      "source_location": "L235"
+    },
+    {
+      "id": "scripts_prompt_builder_sanitize_anchor_for_fallback",
+      "label": "_sanitize_anchor_for_fallback()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "re",
+      "file_type": "code",
+      "norm_label": "_sanitize_anchor_for_fallback()",
+      "source_file": "scripts/prompt_builder.py",
+      "source_location": "L201"
+    },
+    {
+      "id": "scripts_prompt_builder_strip_named_characters_for_group_shot",
+      "label": "_strip_named_characters_for_group_shot()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "re",
+      "file_type": "code",
+      "norm_label": "_strip_named_characters_for_group_shot()",
+      "source_file": "scripts/prompt_builder.py",
+      "source_location": "L224"
+    },
+    {
+      "id": "scripts_shot_breakdown_stage_split_narration_into_chunks",
+      "label": "split_narration_into_chunks()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "re",
+      "file_type": "code",
+      "norm_label": "split_narration_into_chunks()",
+      "source_file": "scripts/shot_breakdown_stage.py",
+      "source_location": "L355"
+    },
+    {
       "id": "scripts_title_gate_ask_gemini_for_titles",
       "label": "_ask_gemini_for_titles()",
       "_callable": true,
       "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
+      "community": 8,
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "_ask_gemini_for_titles()",
       "source_file": "scripts/title_gate.py",
@@ -2790,8 +2790,8 @@
       "label": "lint()",
       "_callable": true,
       "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
+      "community": 8,
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "lint()",
       "source_file": "scripts/title_gate.py",
@@ -2802,8 +2802,8 @@
       "label": "optimize_title()",
       "_callable": true,
       "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
+      "community": 8,
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "optimize_title()",
       "source_file": "scripts/title_gate.py",
@@ -2814,8 +2814,8 @@
       "label": "_words()",
       "_callable": true,
       "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
+      "community": 8,
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "_words()",
       "source_file": "scripts/title_gate.py",
@@ -3354,54 +3354,6 @@
       "source_location": "L1"
     },
     {
-      "id": "continuation_marius_erased_continuation_notes_2026_09_19_part_3_chain_beats_read_this_section_first",
-      "label": "Marius / Erased \u2014 Continuation Notes (2026-09-19 PART 3, CHAIN BEATS \u2014 read this section FIRST)",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "marius / erased \u2014 continuation notes (2026-09-19 part 3, chain beats \u2014 read this section first)",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L57"
-    },
-    {
-      "id": "continuation_not_verified_78",
-      "label": "NOT verified",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "not verified",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L78"
-    },
-    {
-      "id": "continuation_tests_run_sandbox_mocked_agnes_moviepy",
-      "label": "Tests run (sandbox, mocked Agnes/moviepy)",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "tests run (sandbox, mocked agnes/moviepy)",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L71"
-    },
-    {
-      "id": "continuation_verified_live_on_main_2026_09_19",
-      "label": "Verified live on `main` (2026-09-19)",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "verified live on `main` (2026-09-19)",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L61"
-    },
-    {
       "id": "continuation_what_was_found_and_fixed_2026_09_21",
       "label": "What was found and fixed (2026-09-21)",
       "_origin": "ast",
@@ -3411,78 +3363,6 @@
       "node_kind": "heading",
       "norm_label": "what was found and fixed (2026-09-21)",
       "source_file": "CONTINUATION.md",
-      "source_location": "L11"
-    },
-    {
-      "id": "docs_kaggle_video_test_notes",
-      "label": "kaggle-video-test-notes.md",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "document",
-      "node_kind": "page",
-      "norm_label": "kaggle-video-test-notes.md",
-      "source_file": "docs/kaggle-video-test-notes.md",
-      "source_location": "L1"
-    },
-    {
-      "id": "docs_kaggle_video_test_notes_decision",
-      "label": "Decision",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "decision",
-      "source_file": "docs/kaggle-video-test-notes.md",
-      "source_location": "L5"
-    },
-    {
-      "id": "docs_kaggle_video_test_notes_kaggle_free_gpu_video_test_decision_notes",
-      "label": "Kaggle free-GPU video test: decision notes",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "kaggle free-gpu video test: decision notes",
-      "source_file": "docs/kaggle-video-test-notes.md",
-      "source_location": "L1"
-    },
-    {
-      "id": "docs_kaggle_video_test_notes_next_steps",
-      "label": "Next steps",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "next steps",
-      "source_file": "docs/kaggle-video-test-notes.md",
-      "source_location": "L24"
-    },
-    {
-      "id": "docs_kaggle_video_test_notes_requirements_and_open_points",
-      "label": "Requirements and open points",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "requirements and open points",
-      "source_file": "docs/kaggle-video-test-notes.md",
-      "source_location": "L18"
-    },
-    {
-      "id": "docs_kaggle_video_test_notes_where_things_are",
-      "label": "Where things are",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "where things are",
-      "source_file": "docs/kaggle-video-test-notes.md",
       "source_location": "L11"
     },
     {
@@ -3595,6 +3475,17 @@
       "norm_label": "protagonist-everywhere fix + clip qa (2026-10-09), zia's report: protagonist in...",
       "source_file": "scripts/clip_generation.py",
       "source_location": "L237"
+    },
+    {
+      "id": "scripts_storage_b2_rationale_270",
+      "label": "Generates a fresh, short-lived presigned GET URL for object_key and PROVES it\u2026",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "clip_generation.py",
+      "file_type": "rationale",
+      "norm_label": "generates a fresh, short-lived presigned get url for object_key and proves it...",
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L270"
     },
     {
       "id": "scripts_thumbnail_generation",
@@ -4016,17 +3907,6 @@
       "source_location": "L258"
     },
     {
-      "id": "scripts_storage_b2_rationale_270",
-      "label": "Generates a fresh, short-lived presigned GET URL for object_key and PROVES it\u2026",
-      "_origin": "ast",
-      "community": 13,
-      "community_name": "storage_b2.py",
-      "file_type": "rationale",
-      "norm_label": "generates a fresh, short-lived presigned get url for object_key and proves it...",
-      "source_file": "scripts/storage_b2.py",
-      "source_location": "L270"
-    },
-    {
       "id": "scripts_storage_b2_rationale_292",
       "label": "Downloads object_key directly to local_path via the B2 API (no presigned URL\u2026",
       "_origin": "ast",
@@ -4155,6 +4035,18 @@
       "source_location": "L87"
     },
     {
+      "id": "continuation_marius_erased_continuation_notes_2026_09_19_part_3_chain_beats_read_this_section_first",
+      "label": "Marius / Erased \u2014 Continuation Notes (2026-09-19 PART 3, CHAIN BEATS \u2014 read this section FIRST)",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "marius / erased \u2014 continuation notes (2026-09-19 part 3, chain beats \u2014 read this section first)",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L57"
+    },
+    {
       "id": "continuation_marius_erased_continuation_notes_2026_09_19_part_4_skills_declutter_read_this_section_first",
       "label": "Marius / Erased \u2014 Continuation Notes (2026-09-19 PART 4, SKILLS + DECLUTTER, read this section FIRST)",
       "_origin": "ast",
@@ -4191,6 +4083,18 @@
       "source_location": "L22"
     },
     {
+      "id": "continuation_not_verified_78",
+      "label": "NOT verified",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "not verified",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L78"
+    },
+    {
       "id": "continuation_standing_role_from_zia_2026_09_21",
       "label": "Standing role (from Zia, 2026-09-21)",
       "_origin": "ast",
@@ -4201,6 +4105,30 @@
       "norm_label": "standing role (from zia, 2026-09-21)",
       "source_file": "CONTINUATION.md",
       "source_location": "L5"
+    },
+    {
+      "id": "continuation_tests_run_sandbox_mocked_agnes_moviepy",
+      "label": "Tests run (sandbox, mocked Agnes/moviepy)",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "tests run (sandbox, mocked agnes/moviepy)",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L71"
+    },
+    {
+      "id": "continuation_verified_live_on_main_2026_09_19",
+      "label": "Verified live on `main` (2026-09-19)",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "verified live on `main` (2026-09-19)",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L61"
     },
     {
       "id": "continuation_what_happened_this_session",
@@ -4591,6 +4519,78 @@
       "source_location": "L87"
     },
     {
+      "id": "docs_kaggle_video_test_notes",
+      "label": "kaggle-video-test-notes.md",
+      "_origin": "ast",
+      "community": 18,
+      "community_name": "Kaggle free-GPU video test: decision notes",
+      "file_type": "document",
+      "node_kind": "page",
+      "norm_label": "kaggle-video-test-notes.md",
+      "source_file": "docs/kaggle-video-test-notes.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "docs_kaggle_video_test_notes_decision",
+      "label": "Decision",
+      "_origin": "ast",
+      "community": 18,
+      "community_name": "Kaggle free-GPU video test: decision notes",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "decision",
+      "source_file": "docs/kaggle-video-test-notes.md",
+      "source_location": "L5"
+    },
+    {
+      "id": "docs_kaggle_video_test_notes_kaggle_free_gpu_video_test_decision_notes",
+      "label": "Kaggle free-GPU video test: decision notes",
+      "_origin": "ast",
+      "community": 18,
+      "community_name": "Kaggle free-GPU video test: decision notes",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "kaggle free-gpu video test: decision notes",
+      "source_file": "docs/kaggle-video-test-notes.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "docs_kaggle_video_test_notes_next_steps",
+      "label": "Next steps",
+      "_origin": "ast",
+      "community": 18,
+      "community_name": "Kaggle free-GPU video test: decision notes",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "next steps",
+      "source_file": "docs/kaggle-video-test-notes.md",
+      "source_location": "L24"
+    },
+    {
+      "id": "docs_kaggle_video_test_notes_requirements_and_open_points",
+      "label": "Requirements and open points",
+      "_origin": "ast",
+      "community": 18,
+      "community_name": "Kaggle free-GPU video test: decision notes",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "requirements and open points",
+      "source_file": "docs/kaggle-video-test-notes.md",
+      "source_location": "L18"
+    },
+    {
+      "id": "docs_kaggle_video_test_notes_where_things_are",
+      "label": "Where things are",
+      "_origin": "ast",
+      "community": 18,
+      "community_name": "Kaggle free-GPU video test: decision notes",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "where things are",
+      "source_file": "docs/kaggle-video-test-notes.md",
+      "source_location": "L11"
+    },
+    {
       "id": "debugging_methodology",
       "label": "DEBUGGING_METHODOLOGY.md",
       "_origin": "ast",
@@ -4814,25 +4814,14 @@
     },
     {
       "id": "scripts_kaggle_video_test_kernel_rationale_1",
-      "label": "Runs ON KAGGLE (free GPU). TEST 2 (2026-10-24): LTX-Video 2B 0.9.6-DISTILLED.\u2026",
+      "label": "Runs ON KAGGLE (free GPU). TEST 3 (2026-10-24): LTX-Video 2B 0.9.8-DISTILLED\u2026",
       "_origin": "ast",
       "community": 3,
       "community_name": "json",
       "file_type": "rationale",
-      "norm_label": "runs on kaggle (free gpu). test 2 (2026-10-24): ltx-video 2b 0.9.6-distilled....",
+      "norm_label": "runs on kaggle (free gpu). test 3 (2026-10-24): ltx-video 2b 0.9.8-distilled...",
       "source_file": "scripts/kaggle_video_test/kernel.py",
       "source_location": "L1"
-    },
-    {
-      "id": "scripts_kaggle_video_test_kernel_rationale_67",
-      "label": "Two loading routes (A: full single file, B: transformer+vae from single file,\u2026",
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "json",
-      "file_type": "rationale",
-      "norm_label": "two loading routes (a: full single file, b: transformer+vae from single file,...",
-      "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L67"
     },
     {
       "id": "scripts_verify_run_output_rationale_1",
@@ -4943,17 +4932,6 @@
       "norm_label": "builds the prompt for one narration chunk's shot breakdown. the first chunk...",
       "source_file": "scripts/shot_breakdown_stage.py",
       "source_location": "L1287"
-    },
-    {
-      "id": "scripts_shot_breakdown_stage_rationale_356",
-      "label": "Splits narration into num_chunks pieces, breaking only at sentence boundaries\u2026",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "shot_breakdown_stage.py",
-      "file_type": "rationale",
-      "norm_label": "splits narration into num_chunks pieces, breaking only at sentence boundaries...",
-      "source_file": "scripts/shot_breakdown_stage.py",
-      "source_location": "L356"
     },
     {
       "id": "scripts_shot_breakdown_stage_rationale_517",
@@ -5077,17 +5055,6 @@
       "source_location": "L1"
     },
     {
-      "id": "scripts_health_check",
-      "label": "health_check.py",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "os",
-      "file_type": "code",
-      "norm_label": "health_check.py",
-      "source_file": "scripts/health_check.py",
-      "source_location": "L1"
-    },
-    {
       "id": "scripts_kaggle_video_test_run_test",
       "label": "run_test.py",
       "_origin": "ast",
@@ -5163,28 +5130,6 @@
       "norm_label": "recursively lists every object in a bucket, including inside subfolders (e.g....",
       "source_file": "scripts/cleanup_dead_storage.py",
       "source_location": "L49"
-    },
-    {
-      "id": "scripts_health_check_rationale_1",
-      "label": "Marius Command Center - Health Check Read-only monitor. Runs on its own\u2026",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "os",
-      "file_type": "rationale",
-      "norm_label": "marius command center - health check read-only monitor. runs on its own...",
-      "source_file": "scripts/health_check.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "scripts_health_check_rationale_86",
-      "label": "No updated_at column exists on `scripts`, so 'stuck' is approximated as: still\u2026",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "os",
-      "file_type": "rationale",
-      "norm_label": "no updated_at column exists on `scripts`, so 'stuck' is approximated as: still...",
-      "source_file": "scripts/health_check.py",
-      "source_location": "L86"
     },
     {
       "id": "scripts_kaggle_video_test_run_test_rationale_1",
@@ -5418,22 +5363,77 @@
       "source_location": "L346"
     },
     {
+      "id": "scripts_health_check",
+      "label": "health_check.py",
+      "_origin": "ast",
+      "community": 7,
+      "community_name": "health_check.py",
+      "file_type": "code",
+      "norm_label": "health_check.py",
+      "source_file": "scripts/health_check.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "scripts_health_check_rationale_1",
+      "label": "Marius Command Center - Health Check Read-only monitor. Runs on its own\u2026",
+      "_origin": "ast",
+      "community": 7,
+      "community_name": "health_check.py",
+      "file_type": "rationale",
+      "norm_label": "marius command center - health check read-only monitor. runs on its own...",
+      "source_file": "scripts/health_check.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "scripts_health_check_rationale_86",
+      "label": "No updated_at column exists on `scripts`, so 'stuck' is approximated as: still\u2026",
+      "_origin": "ast",
+      "community": 7,
+      "community_name": "health_check.py",
+      "file_type": "rationale",
+      "norm_label": "no updated_at column exists on `scripts`, so 'stuck' is approximated as: still...",
+      "source_file": "scripts/health_check.py",
+      "source_location": "L86"
+    },
+    {
+      "id": "scripts_narration",
+      "label": "narration.py",
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "re",
+      "file_type": "code",
+      "norm_label": "narration.py",
+      "source_file": "scripts/narration.py",
+      "source_location": "L1"
+    },
+    {
       "id": "scripts_prompt_builder",
       "label": "prompt_builder.py",
       "_origin": "ast",
-      "community": 7,
-      "community_name": "build_agnes_prompt",
+      "community": 8,
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "prompt_builder.py",
       "source_file": "scripts/prompt_builder.py",
       "source_location": "L1"
     },
     {
+      "id": "scripts_title_gate",
+      "label": "title_gate.py",
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "re",
+      "file_type": "code",
+      "norm_label": "title_gate.py",
+      "source_file": "scripts/title_gate.py",
+      "source_location": "L1"
+    },
+    {
       "id": "handoff_2026_10_08_visual_quality_and_yt_skills",
       "label": "HANDOFF_2026-10-08_VISUAL_QUALITY_AND_YT_SKILLS.md",
       "_origin": "ast",
-      "community": 7,
-      "community_name": "build_agnes_prompt",
+      "community": 8,
+      "community_name": "re",
       "file_type": "document",
       "node_kind": "page",
       "norm_label": "handoff_2026-10-08_visual_quality_and_yt_skills.md",
@@ -5444,8 +5444,8 @@
       "id": "handoff_2026_10_08_visual_quality_and_yt_skills_1_done_today_verified_by_commit",
       "label": "1. Done today (verified by commit)",
       "_origin": "ast",
-      "community": 7,
-      "community_name": "build_agnes_prompt",
+      "community": 8,
+      "community_name": "re",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "1. done today (verified by commit)",
@@ -5456,8 +5456,8 @@
       "id": "handoff_2026_10_08_visual_quality_and_yt_skills_2_problems_zia_reported_on_2026_10_08_all_still_open",
       "label": "2. Problems Zia reported on 2026-10-08 (all still OPEN)",
       "_origin": "ast",
-      "community": 7,
-      "community_name": "build_agnes_prompt",
+      "community": 8,
+      "community_name": "re",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "2. problems zia reported on 2026-10-08 (all still open)",
@@ -5468,8 +5468,8 @@
       "id": "handoff_2026_10_08_visual_quality_and_yt_skills_3_evidence_gathered_marius_only",
       "label": "3. Evidence gathered (Marius only)",
       "_origin": "ast",
-      "community": 7,
-      "community_name": "build_agnes_prompt",
+      "community": 8,
+      "community_name": "re",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "3. evidence gathered (marius only)",
@@ -5480,8 +5480,8 @@
       "id": "handoff_2026_10_08_visual_quality_and_yt_skills_4_1_plan_check_protagonist_cap_planning_stage",
       "label": "4.1 Plan check: protagonist cap (planning stage)",
       "_origin": "ast",
-      "community": 7,
-      "community_name": "build_agnes_prompt",
+      "community": 8,
+      "community_name": "re",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "4.1 plan check: protagonist cap (planning stage)",
@@ -5492,8 +5492,8 @@
       "id": "handoff_2026_10_08_visual_quality_and_yt_skills_4_2_prompt_fix_only_describe_the_protagonist_when_the_shot_is_about_them",
       "label": "4.2 Prompt fix: only describe the protagonist when the shot is about them",
       "_origin": "ast",
-      "community": 7,
-      "community_name": "build_agnes_prompt",
+      "community": 8,
+      "community_name": "re",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "4.2 prompt fix: only describe the protagonist when the shot is about them",
@@ -5504,8 +5504,8 @@
       "id": "handoff_2026_10_08_visual_quality_and_yt_skills_4_3_clip_check_morphing_and_waxy_face_detector_after_each_clip_before_upload_to_b2",
       "label": "4.3 Clip check: morphing and waxy-face detector (after each clip, before upload to B2)",
       "_origin": "ast",
-      "community": 7,
-      "community_name": "build_agnes_prompt",
+      "community": 8,
+      "community_name": "re",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "4.3 clip check: morphing and waxy-face detector (after each clip, before upload to b2)",
@@ -5516,8 +5516,8 @@
       "id": "handoff_2026_10_08_visual_quality_and_yt_skills_4_4_measure",
       "label": "4.4 Measure",
       "_origin": "ast",
-      "community": 7,
-      "community_name": "build_agnes_prompt",
+      "community": 8,
+      "community_name": "re",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "4.4 measure",
@@ -5528,8 +5528,8 @@
       "id": "handoff_2026_10_08_visual_quality_and_yt_skills_4_build_list_in_this_order",
       "label": "4. Build list (in this order)",
       "_origin": "ast",
-      "community": 7,
-      "community_name": "build_agnes_prompt",
+      "community": 8,
+      "community_name": "re",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "4. build list (in this order)",
@@ -5540,8 +5540,8 @@
       "id": "handoff_2026_10_08_visual_quality_and_yt_skills_5_youtube_agent_skill_what_to_take",
       "label": "5. YouTube Agent Skill: what to take",
       "_origin": "ast",
-      "community": 7,
-      "community_name": "build_agnes_prompt",
+      "community": 8,
+      "community_name": "re",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "5. youtube agent skill: what to take",
@@ -5552,8 +5552,8 @@
       "id": "handoff_2026_10_08_visual_quality_and_yt_skills_6_first_things_the_next_session_should_do",
       "label": "6. First things the next session should do",
       "_origin": "ast",
-      "community": 7,
-      "community_name": "build_agnes_prompt",
+      "community": 8,
+      "community_name": "re",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "6. first things the next session should do",
@@ -5564,8 +5564,8 @@
       "id": "handoff_2026_10_08_visual_quality_and_yt_skills_handoff_2026_10_08_visual_quality_narration_pacing_youtube_agent_skill_ports",
       "label": "HANDOFF 2026-10-08: visual quality, narration pacing, YouTube Agent Skill ports",
       "_origin": "ast",
-      "community": 7,
-      "community_name": "build_agnes_prompt",
+      "community": 8,
+      "community_name": "re",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "handoff 2026-10-08: visual quality, narration pacing, youtube agent skill ports",
@@ -5573,55 +5573,11 @@
       "source_location": "L1"
     },
     {
-      "id": "scripts_prompt_builder_rationale_1",
-      "label": "Marius Command Center - prompt building (split from video_generation.py,\u2026",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "build_agnes_prompt",
-      "file_type": "rationale",
-      "norm_label": "marius command center - prompt building (split from video_generation.py,...",
-      "source_file": "scripts/prompt_builder.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "scripts_prompt_builder_rationale_202",
-      "label": "Drops clauses/sentences containing ethnicity- or atrocity-related keywords from\u2026",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "build_agnes_prompt",
-      "file_type": "rationale",
-      "norm_label": "drops clauses/sentences containing ethnicity- or atrocity-related keywords from...",
-      "source_file": "scripts/prompt_builder.py",
-      "source_location": "L202"
-    },
-    {
-      "id": "scripts_prompt_builder_rationale_236",
-      "label": "fallback_level 0 (primary): full anchor + full visual_description.\u2026",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "build_agnes_prompt",
-      "file_type": "rationale",
-      "norm_label": "fallback_level 0 (primary): full anchor + full visual_description....",
-      "source_file": "scripts/prompt_builder.py",
-      "source_location": "L236"
-    },
-    {
-      "id": "scripts_narration",
-      "label": "narration.py",
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "narration.py",
-      "file_type": "code",
-      "norm_label": "narration.py",
-      "source_file": "scripts/narration.py",
-      "source_location": "L1"
-    },
-    {
       "id": "scripts_narration_rationale_107",
       "label": "Splits narration into one segment per real SENTENCE, so a pause gets inserted\u2026",
       "_origin": "ast",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "file_type": "rationale",
       "norm_label": "splits narration into one segment per real sentence, so a pause gets inserted...",
       "source_file": "scripts/narration.py",
@@ -5632,7 +5588,7 @@
       "label": "One edge-tts call per full sentence - correct prosody/intonation, no mid-\u2026",
       "_origin": "ast",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "file_type": "rationale",
       "norm_label": "one edge-tts call per full sentence - correct prosody/intonation, no mid-...",
       "source_file": "scripts/narration.py",
@@ -5643,7 +5599,7 @@
       "label": "Synthesizes narration sentence-by-sentence and concatenates them with a real\u2026",
       "_origin": "ast",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "file_type": "rationale",
       "norm_label": "synthesizes narration sentence-by-sentence and concatenates them with a real...",
       "source_file": "scripts/narration.py",
@@ -5654,7 +5610,7 @@
       "label": "Maps each shot's narration_excerpt onto the real sentence(s) it falls inside,\u2026",
       "_origin": "ast",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "file_type": "rationale",
       "norm_label": "maps each shot's narration_excerpt onto the real sentence(s) it falls inside,...",
       "source_file": "scripts/narration.py",
@@ -5665,7 +5621,7 @@
       "label": "Synthesizes narration one real SENTENCE at a time via edge-tts. Each full\u2026",
       "_origin": "ast",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "file_type": "rationale",
       "norm_label": "synthesizes narration one real sentence at a time via edge-tts. each full...",
       "source_file": "scripts/narration.py",
@@ -5676,22 +5632,77 @@
       "label": "Runs the full narration pipeline for a single script row. Returns True on\u2026",
       "_origin": "ast",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "file_type": "rationale",
       "norm_label": "runs the full narration pipeline for a single script row. returns true on...",
       "source_file": "scripts/narration.py",
       "source_location": "L289"
     },
     {
-      "id": "scripts_title_gate",
-      "label": "title_gate.py",
+      "id": "scripts_prompt_builder_rationale_1",
+      "label": "Marius Command Center - prompt building (split from video_generation.py,\u2026",
       "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
-      "file_type": "code",
-      "norm_label": "title_gate.py",
+      "community": 8,
+      "community_name": "re",
+      "file_type": "rationale",
+      "norm_label": "marius command center - prompt building (split from video_generation.py,...",
+      "source_file": "scripts/prompt_builder.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "scripts_prompt_builder_rationale_202",
+      "label": "Drops clauses/sentences containing ethnicity- or atrocity-related keywords from\u2026",
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "re",
+      "file_type": "rationale",
+      "norm_label": "drops clauses/sentences containing ethnicity- or atrocity-related keywords from...",
+      "source_file": "scripts/prompt_builder.py",
+      "source_location": "L202"
+    },
+    {
+      "id": "scripts_prompt_builder_rationale_236",
+      "label": "fallback_level 0 (primary): full anchor + full visual_description.\u2026",
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "re",
+      "file_type": "rationale",
+      "norm_label": "fallback_level 0 (primary): full anchor + full visual_description....",
+      "source_file": "scripts/prompt_builder.py",
+      "source_location": "L236"
+    },
+    {
+      "id": "scripts_shot_breakdown_stage_rationale_356",
+      "label": "Splits narration into num_chunks pieces, breaking only at sentence boundaries\u2026",
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "re",
+      "file_type": "rationale",
+      "norm_label": "splits narration into num_chunks pieces, breaking only at sentence boundaries...",
+      "source_file": "scripts/shot_breakdown_stage.py",
+      "source_location": "L356"
+    },
+    {
+      "id": "scripts_title_gate_rationale_1",
+      "label": "Marius Command Center - title gate (2026-10-09). Ported from the MIT-licensed\u2026",
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "re",
+      "file_type": "rationale",
+      "norm_label": "marius command center - title gate (2026-10-09). ported from the mit-licensed...",
       "source_file": "scripts/title_gate.py",
       "source_location": "L1"
+    },
+    {
+      "id": "scripts_title_gate_rationale_112",
+      "label": "Returns the title to upload with. Never raises.",
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "re",
+      "file_type": "rationale",
+      "norm_label": "returns the title to upload with. never raises.",
+      "source_file": "scripts/title_gate.py",
+      "source_location": "L112"
     },
     {
       "id": "scripts_trend_research",
@@ -5714,28 +5725,6 @@
       "norm_label": "youtube_upload.py",
       "source_file": "scripts/youtube_upload.py",
       "source_location": "L1"
-    },
-    {
-      "id": "scripts_title_gate_rationale_1",
-      "label": "Marius Command Center - title gate (2026-10-09). Ported from the MIT-licensed\u2026",
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
-      "file_type": "rationale",
-      "norm_label": "marius command center - title gate (2026-10-09). ported from the mit-licensed...",
-      "source_file": "scripts/title_gate.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "scripts_title_gate_rationale_112",
-      "label": "Returns the title to upload with. Never raises.",
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
-      "file_type": "rationale",
-      "norm_label": "returns the title to upload with. never raises.",
-      "source_file": "scripts/title_gate.py",
-      "source_location": "L112"
     },
     {
       "id": "scripts_trend_research_rationale_1",
@@ -5972,6 +5961,18 @@
       "type": "external"
     },
     {
+      "id": "diffusers",
+      "label": "diffusers",
+      "_origin": "semantic",
+      "community": 3,
+      "community_name": "json",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "diffusers",
+      "source_file": "",
+      "type": "external"
+    },
+    {
       "id": "diffusers_utils",
       "label": "diffusers_utils",
       "_origin": "semantic",
@@ -6144,7 +6145,7 @@
       "label": "asyncio",
       "_origin": "semantic",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "external": true,
       "file_type": "concept",
       "norm_label": "asyncio",
@@ -6156,7 +6157,7 @@
       "label": "edge_tts",
       "_origin": "semantic",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "external": true,
       "file_type": "concept",
       "norm_label": "edge_tts",
@@ -6168,7 +6169,7 @@
       "label": "pydub",
       "_origin": "semantic",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "external": true,
       "file_type": "concept",
       "norm_label": "pydub",
@@ -6180,7 +6181,7 @@
       "label": "pydub_effects",
       "_origin": "semantic",
       "community": 8,
-      "community_name": "narration.py",
+      "community_name": "re",
       "external": true,
       "file_type": "concept",
       "norm_label": "pydub_effects",
@@ -6191,8 +6192,8 @@
       "id": "re",
       "label": "re",
       "_origin": "semantic",
-      "community": 9,
-      "community_name": "requests",
+      "community": 8,
+      "community_name": "re",
       "external": true,
       "file_type": "concept",
       "norm_label": "re",
@@ -6212,13 +6213,13 @@
       "type": "external"
     },
     {
-      "id": "diffusers",
-      "label": "diffusers",
+      "id": "inspect",
+      "label": "inspect",
       "community": 3,
       "community_name": "json",
       "external": true,
       "file_type": "concept",
-      "norm_label": "diffusers",
+      "norm_label": "inspect",
       "source_file": "",
       "type": "external"
     }
@@ -7773,6 +7774,30 @@
       "weight": 1.0
     },
     {
+      "source": "scripts_kaggle_video_test_kernel_call",
+      "target": "torch",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "scripts/kaggle_video_test/kernel.py",
+      "source_location": "L94",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_kaggle_video_test_kernel_call",
+      "target": "inspect",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "scripts/kaggle_video_test/kernel.py",
+      "source_location": "L98",
+      "weight": 1.0
+    },
+    {
       "source": "scripts_kaggle_video_test_kernel_free",
       "target": "gc",
       "relation": "calls",
@@ -7781,19 +7806,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L61",
-      "weight": 1.0
-    },
-    {
-      "source": "scripts_kaggle_video_test_kernel_gen",
-      "target": "torch",
-      "relation": "calls",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "call",
-      "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L101",
+      "source_location": "L66",
       "weight": 1.0
     },
     {
@@ -7805,12 +7818,12 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L68",
+      "source_location": "L72",
       "weight": 1.0
     },
     {
       "source": "scripts_kaggle_video_test_kernel_load",
-      "target": "traceback",
+      "target": "scripts_kaggle_video_test_kernel_log",
       "relation": "calls",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -7822,14 +7835,14 @@
     },
     {
       "source": "scripts_kaggle_video_test_kernel_load",
-      "target": "scripts_kaggle_video_test_kernel_log",
+      "target": "traceback",
       "relation": "calls",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L85",
+      "source_location": "L87",
       "weight": 1.0
     },
     {
@@ -7841,7 +7854,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L44",
+      "source_location": "L49",
       "weight": 1.0
     },
     {
@@ -7853,7 +7866,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L45",
+      "source_location": "L50",
       "weight": 1.0
     },
     {
@@ -7865,7 +7878,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L39",
+      "source_location": "L44",
       "weight": 1.0
     },
     {
@@ -7877,7 +7890,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L35",
+      "source_location": "L40",
       "weight": 1.0
     },
     {
@@ -7889,19 +7902,19 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L114",
+      "source_location": "L107",
       "weight": 1.0
     },
     {
       "source": "scripts_kaggle_video_test_kernel_timed",
-      "target": "scripts_kaggle_video_test_kernel_gen",
+      "target": "scripts_kaggle_video_test_kernel_call",
       "relation": "calls",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L116",
+      "source_location": "L109",
       "weight": 1.0
     },
     {
@@ -7913,7 +7926,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L124",
+      "source_location": "L118",
       "weight": 1.0
     },
     {
@@ -7925,7 +7938,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L128",
+      "source_location": "L122",
       "weight": 1.0
     },
     {
@@ -7937,7 +7950,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L130",
+      "source_location": "L124",
       "weight": 1.0
     },
     {
@@ -12190,7 +12203,7 @@
     },
     {
       "source": "scripts_kaggle_video_test_kernel",
-      "target": "traceback",
+      "target": "inspect",
       "relation": "imports",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -12202,7 +12215,7 @@
     },
     {
       "source": "scripts_kaggle_video_test_kernel",
-      "target": "subprocess",
+      "target": "traceback",
       "relation": "imports",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -12214,6 +12227,18 @@
     },
     {
       "source": "scripts_kaggle_video_test_kernel",
+      "target": "subprocess",
+      "relation": "imports",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "scripts/kaggle_video_test/kernel.py",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_kaggle_video_test_kernel",
       "target": "torch",
       "relation": "imports",
       "_origin": "ast",
@@ -12221,7 +12246,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L55",
+      "source_location": "L60",
       "weight": 1.0
     },
     {
@@ -13649,7 +13674,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L56",
+      "source_location": "L61",
       "weight": 1.0
     },
     {
@@ -13661,7 +13686,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L57",
+      "source_location": "L62",
       "weight": 1.0
     },
     {
@@ -15673,7 +15698,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L111",
+      "source_location": "L104",
       "weight": 1.0
     },
     {
@@ -15684,7 +15709,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L33",
+      "source_location": "L38",
       "weight": 1.0
     },
     {
@@ -15695,7 +15720,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L38",
+      "source_location": "L43",
       "weight": 1.0
     },
     {
@@ -15706,7 +15731,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L42",
+      "source_location": "L47",
       "weight": 1.0
     },
     {
@@ -15717,7 +15742,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L60",
+      "source_location": "L65",
       "weight": 1.0
     },
     {
@@ -15728,18 +15753,18 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L66",
+      "source_location": "L71",
       "weight": 1.0
     },
     {
       "source": "scripts_kaggle_video_test_kernel",
-      "target": "scripts_kaggle_video_test_kernel_gen",
+      "target": "scripts_kaggle_video_test_kernel_call",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L99",
+      "source_location": "L91",
       "weight": 1.0
     },
     {
@@ -17921,17 +17946,6 @@
       "weight": 1.0
     },
     {
-      "source": "scripts_kaggle_video_test_kernel_rationale_67",
-      "target": "scripts_kaggle_video_test_kernel_load",
-      "relation": "rationale_for",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L67",
-      "weight": 1.0
-    },
-    {
       "source": "scripts_kaggle_video_test_run_test_rationale_1",
       "target": "scripts_kaggle_video_test_run_test",
       "relation": "rationale_for",
@@ -19487,5 +19501,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "ceb598d94e2ef00febb06474dbee4de5239e22b7"
+  "built_at_commit": "02260672a80abbf911f4f9790d35ced6a00363e9"
 }
