@@ -1402,8 +1402,8 @@
       "path": "scripts/kaggle_video_test/kernel.py",
       "functions": [
         {
-          "name": "save_report",
-          "line": 23,
+          "name": "save",
+          "line": 33,
           "args": [],
           "calls": [
             "dump",
@@ -1414,7 +1414,7 @@
         },
         {
           "name": "run",
-          "line": 28,
+          "line": 38,
           "args": [
             "cmd"
           ],
@@ -1424,8 +1424,22 @@
           "docstring": ""
         },
         {
+          "name": "log",
+          "line": 42,
+          "args": [
+            "step"
+          ],
+          "calls": [
+            "append",
+            "dumps",
+            "print",
+            "save"
+          ],
+          "docstring": ""
+        },
+        {
           "name": "free",
-          "line": 54,
+          "line": 60,
           "args": [],
           "calls": [
             "collect",
@@ -1435,85 +1449,68 @@
           "docstring": ""
         },
         {
-          "name": "try_model",
-          "line": 60,
+          "name": "load",
+          "line": 66,
           "args": [
-            "name",
-            "load_fn",
-            "call_fn",
-            "rungs",
-            "out_name"
+            "mode"
           ],
           "calls": [
             "append",
-            "call_fn",
-            "dumps",
-            "export_to_video",
+            "enable_model_cpu_offload",
+            "enable_sequential_cpu_offload",
+            "enable_tiling",
             "format_exc",
-            "free",
-            "get",
-            "join",
-            "load_fn",
-            "max_memory_allocated",
-            "print",
-            "reset_peak_memory_stats",
+            "from_pretrained",
+            "from_single_file",
+            "log",
             "round",
-            "save_report",
             "str",
             "time",
             "type"
           ],
-          "docstring": "Load once, then try each (width, height, frames) rung until one makes a clip."
+          "docstring": "Two loading routes (A: full single file, B: transformer+vae from single file, rest from base repo)."
         },
         {
-          "name": "load_wan",
-          "line": 107,
-          "args": [],
-          "calls": [
-            "enable_sequential_cpu_offload",
-            "enable_tiling",
-            "from_pretrained",
-            "print"
-          ],
-          "docstring": ""
-        },
-        {
-          "name": "call_wan",
-          "line": 120,
+          "name": "gen",
+          "line": 99,
           "args": [
             "pipe",
-            "w",
-            "h",
-            "f"
+            "prompt",
+            "seed",
+            "image"
           ],
           "calls": [
+            "Generator",
+            "dict",
+            "manual_seed",
             "pipe"
           ],
           "docstring": ""
         },
         {
-          "name": "load_ltx",
-          "line": 125,
-          "args": [],
-          "calls": [
-            "enable_sequential_cpu_offload",
-            "enable_tiling",
-            "from_pretrained",
-            "print"
-          ],
-          "docstring": ""
-        },
-        {
-          "name": "call_ltx",
-          "line": 136,
+          "name": "timed",
+          "line": 111,
           "args": [
+            "name",
             "pipe",
-            "w",
-            "h",
-            "f"
+            "prompt",
+            "seed",
+            "image"
           ],
           "calls": [
-            "pipe"
+            "export_to_video",
+            "format_exc",
+            "free",
+            "gen",
+            "join",
+            "len",
+            "log",
+            "max_memory_allocated",
+            "reset_peak_memory_stats",
+            "round",
+            "str",
+            "time",
+            "type"
           ],
           "docstring": ""
         }
