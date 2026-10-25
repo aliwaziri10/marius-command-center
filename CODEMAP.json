@@ -1403,7 +1403,7 @@
       "functions": [
         {
           "name": "save",
-          "line": 38,
+          "line": 49,
           "args": [],
           "calls": [
             "dump",
@@ -1414,7 +1414,7 @@
         },
         {
           "name": "run",
-          "line": 43,
+          "line": 54,
           "args": [
             "cmd"
           ],
@@ -1425,7 +1425,7 @@
         },
         {
           "name": "log",
-          "line": 47,
+          "line": 58,
           "args": [
             "step"
           ],
@@ -1438,8 +1438,83 @@
           "docstring": ""
         },
         {
+          "name": "ff",
+          "line": 97,
+          "args": [
+            "args"
+          ],
+          "calls": [
+            "run"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "make_effect",
+          "line": 101,
+          "args": [
+            "name"
+          ],
+          "calls": [
+            "exists",
+            "ff",
+            "get",
+            "join",
+            "str"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "make_music",
+          "line": 109,
+          "args": [
+            "duration"
+          ],
+          "calls": [
+            "ff",
+            "len",
+            "max",
+            "range",
+            "reversed"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "add_sound",
+          "line": 121,
+          "args": [
+            "video_path",
+            "sound_words",
+            "duration"
+          ],
+          "calls": [
+            "append",
+            "ff",
+            "int",
+            "join",
+            "len",
+            "make_effect",
+            "make_music",
+            "range",
+            "replace",
+            "split",
+            "strip"
+          ],
+          "docstring": "Mux music + effects onto a silent clip. Returns the new file path."
+        },
+        {
+          "name": "has_audio",
+          "line": 142,
+          "args": [
+            "path"
+          ],
+          "calls": [
+            "run"
+          ],
+          "docstring": ""
+        },
+        {
           "name": "free",
-          "line": 65,
+          "line": 148,
           "args": [],
           "calls": [
             "collect",
@@ -1450,7 +1525,7 @@
         },
         {
           "name": "load",
-          "line": 71,
+          "line": 154,
           "args": [],
           "calls": [
             "enable_sequential_cpu_offload",
@@ -1467,8 +1542,25 @@
           "docstring": ""
         },
         {
+          "name": "load_mimsi",
+          "line": 174,
+          "args": [],
+          "calls": [
+            "convert",
+            "crop",
+            "join",
+            "max",
+            "open",
+            "resize",
+            "round",
+            "save",
+            "urlretrieve"
+          ],
+          "docstring": "Download Mimsi's reference picture and crop it to the video shape."
+        },
+        {
           "name": "call",
-          "line": 91,
+          "line": 187,
           "args": [
             "pipe",
             "prompt",
@@ -1488,19 +1580,22 @@
         },
         {
           "name": "timed",
-          "line": 104,
+          "line": 201,
           "args": [
             "name",
             "pipe",
             "prompt",
             "seed",
+            "sound_words",
             "image"
           ],
           "calls": [
+            "add_sound",
             "call",
             "export_to_video",
             "format_exc",
             "free",
+            "has_audio",
             "join",
             "len",
             "log",
