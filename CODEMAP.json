@@ -3223,7 +3223,7 @@
       "functions": [
         {
           "name": "download_video_frame",
-          "line": 87,
+          "line": 100,
           "args": [
             "video_key",
             "fraction"
@@ -3243,7 +3243,7 @@
         },
         {
           "name": "resize_to_canvas",
-          "line": 105,
+          "line": 118,
           "args": [
             "img",
             "target_w",
@@ -3259,7 +3259,7 @@
         },
         {
           "name": "derive_hook_text",
-          "line": 120,
+          "line": 133,
           "args": [
             "script",
             "shot_list"
@@ -3275,7 +3275,7 @@
         },
         {
           "name": "split_into_phrase_lines",
-          "line": 138,
+          "line": 151,
           "args": [
             "text"
           ],
@@ -3287,7 +3287,7 @@
         },
         {
           "name": "_line_bbox",
-          "line": 147,
+          "line": 160,
           "args": [
             "draw",
             "text",
@@ -3300,7 +3300,7 @@
         },
         {
           "name": "wrap_text",
-          "line": 153,
+          "line": 166,
           "args": [
             "text",
             "font",
@@ -3317,7 +3317,7 @@
         },
         {
           "name": "fits",
-          "line": 172,
+          "line": 185,
           "args": [
             "lines",
             "font",
@@ -3336,7 +3336,7 @@
         },
         {
           "name": "fit_text_to_frame",
-          "line": 185,
+          "line": 198,
           "args": [
             "hook_text",
             "draw",
@@ -3355,7 +3355,7 @@
         },
         {
           "name": "overlay_hook_text",
-          "line": 209,
+          "line": 222,
           "args": [
             "img",
             "hook_text"
@@ -3378,7 +3378,7 @@
         },
         {
           "name": "push_thumbnail_to_youtube",
-          "line": 248,
+          "line": 261,
           "args": [
             "youtube_video_id",
             "image_bytes"
@@ -3395,7 +3395,7 @@
         },
         {
           "name": "main",
-          "line": 297,
+          "line": 310,
           "args": [],
           "calls": [
             "create_client",
@@ -3406,11 +3406,11 @@
             "from_",
             "get",
             "get_public_url",
-            "in_",
             "is_",
             "isinstance",
             "limit",
             "loads",
+            "object_size",
             "order",
             "overlay_hook_text",
             "print",
