@@ -4,11 +4,18 @@ Manual one-off. For every script that has generated shot clips in B2
 (scripts.video_urls), downloads those clips in order, joins them into one
 silent video (no narration, no music) and writes it to ./silent_out/<id>.mp4.
 The workflow silent_videos.yml then offers that folder as a downloadable
-GitHub Actions artifact. Changes nothing in Supabase and deletes nothing in B2.
+GitHub Actions artifact.
+
+DELETE STEP (2026-10-25): run with --delete AFTER the artifact is saved. It
+deletes the clip files that were successfully joined from B2 and resets that
+script's clip progress in Supabase (video_urls empty, video_next_index 0) so
+the pipeline does not look for files that no longer exist. Only scripts
+listed in silent_manifest.json (built successfully this run) are touched.
 """
 
 import os
 import sys
+import json
 import requests
 from moviepy import VideoFileClip, concatenate_videoclips
 import storage_b2
@@ -17,6 +24,7 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
 HEADERS = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
 OUT_DIR = "silent_out"
+MANIFEST = "silent_manifest.json"
 FPS = 24
 SIZE = (1280, 704)
 
@@ -42,7 +50,7 @@ def build(script):
     clips = []
     for p in paths:
         c = VideoFileClip(p)
-        if c.size != list(SIZE) and tuple(c.size) != SIZE:
+        if tuple(c.size) != SIZE:
             c = c.resized(SIZE)
         clips.append(c)
     final = concatenate_videoclips(clips, method="compose")
@@ -55,20 +63,43 @@ def build(script):
     print(f"Built {out} from {len(keys)} clips.")
 
 
-def main():
+def build_all():
     os.makedirs(OUT_DIR, exist_ok=True)
     scripts = get_scripts()
     print(f"{len(scripts)} script(s) with generated clips.")
-    failures = 0
+    built = []
     for s in scripts:
         try:
             build(s)
+            built.append({"id": s["id"], "keys": s["video_urls"]})
         except Exception as e:
-            failures += 1
             print(f"FAILED for script {s['id']}: {e}")
-    if failures and failures == len(scripts):
+    with open(MANIFEST, "w") as f:
+        json.dump(built, f)
+    if scripts and not built:
         sys.exit(1)
 
 
+def delete_built():
+    if not os.path.exists(MANIFEST):
+        print("No manifest - nothing to delete.")
+        return
+    with open(MANIFEST) as f:
+        built = json.load(f)
+    for item in built:
+        ok = sum(1 for k in item["keys"] if storage_b2.delete_object(k))
+        r = requests.patch(
+            f"{SUPABASE_URL}/rest/v1/scripts?id=eq.{item['id']}",
+            headers={**HEADERS, "Content-Type": "application/json"},
+            json={"video_urls": [], "video_next_index": 0},
+            timeout=30,
+        )
+        r.raise_for_status()
+        print(f"Script {item['id']}: deleted {ok}/{len(item['keys'])} clips from B2 and reset clip progress.")
+
+
 if __name__ == "__main__":
-    main()
+    if "--delete" in sys.argv:
+        delete_built()
+    else:
+        build_all()
