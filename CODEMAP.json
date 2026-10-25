@@ -2679,7 +2679,7 @@
       "functions": [
         {
           "name": "get_scripts",
-          "line": 24,
+          "line": 32,
           "args": [],
           "calls": [
             "get",
@@ -2690,7 +2690,7 @@
         },
         {
           "name": "build",
-          "line": 34,
+          "line": 42,
           "args": [
             "script"
           ],
@@ -2703,7 +2703,6 @@
             "enumerate",
             "join",
             "len",
-            "list",
             "print",
             "remove",
             "resized",
@@ -2713,16 +2712,36 @@
           "docstring": ""
         },
         {
-          "name": "main",
-          "line": 58,
+          "name": "build_all",
+          "line": 66,
           "args": [],
           "calls": [
+            "append",
             "build",
+            "dump",
             "exit",
             "get_scripts",
             "len",
             "makedirs",
+            "open",
             "print"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "delete_built",
+          "line": 83,
+          "args": [],
+          "calls": [
+            "delete_object",
+            "exists",
+            "len",
+            "load",
+            "open",
+            "patch",
+            "print",
+            "raise_for_status",
+            "sum"
           ],
           "docstring": ""
         }
