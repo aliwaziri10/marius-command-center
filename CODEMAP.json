@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 31,
+  "file_count": 32,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -2673,6 +2673,67 @@
       ],
       "env_vars": [],
       "tables": []
+    },
+    {
+      "path": "scripts/silent_videos.py",
+      "functions": [
+        {
+          "name": "get_scripts",
+          "line": 24,
+          "args": [],
+          "calls": [
+            "get",
+            "json",
+            "raise_for_status"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build",
+          "line": 34,
+          "args": [
+            "script"
+          ],
+          "calls": [
+            "VideoFileClip",
+            "append",
+            "close",
+            "concatenate_videoclips",
+            "download_to_file",
+            "enumerate",
+            "join",
+            "len",
+            "list",
+            "print",
+            "remove",
+            "resized",
+            "tuple",
+            "write_videofile"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 58,
+          "args": [],
+          "calls": [
+            "build",
+            "exit",
+            "get_scripts",
+            "len",
+            "makedirs",
+            "print"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": [
+        "scripts"
+      ]
     },
     {
       "path": "scripts/stall_monitor.py",
