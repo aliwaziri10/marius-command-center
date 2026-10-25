@@ -36,6 +36,19 @@ that raises requests.exceptions.MissingSchema immediately, which is why
 every Thumbnail Generation run has been failing since the migration. Now
 downloads via storage_b2.download_to_file(), the same helper
 youtube_upload.py already uses for this exact situation.
+
+DEAD-VIDEO LOOP FIX (2026-10-25) - CONFIRMED live: youtube_upload.py
+deletes the final video from B2 right after a successful YouTube upload
+(delete_source_from_storage, 2026-09-10). This script still selected the
+OLDEST row with no thumbnail among status 'video_generated' AND
+'uploaded'. All 12 'uploaded' rows in Supabase have thumbnail_url null and
+no video left in B2, so every run picked the oldest one (e086c4f2), failed
+on the missing B2 object, exited 1 and opened a "Thumbnail Generation
+workflow failed" GitHub issue (issues #1519 to #1545 and beyond), and never
+reached any newer video. Fix: (1) only 'video_generated' rows are selected
+(their video is still in B2 until uploaded); (2) object_size() is checked
+before downloading, so a missing video is skipped quietly and never costs
+B2 download bandwidth or opens an issue.
 """
 
 import os
@@ -297,10 +310,13 @@ def push_thumbnail_to_youtube(youtube_video_id, image_bytes):
 def main():
     supabase = create_client(SUPABASE_URL, SUPABASE_SECRET_KEY)
 
+    # DEAD-VIDEO LOOP FIX (2026-10-25): only 'video_generated' rows. Uploaded
+    # rows have had their video deleted from B2 by youtube_upload.py, so they
+    # can never produce a frame and used to block the whole queue.
     result = (
         supabase.table("scripts")
         .select("*")
-        .in_("status", ["video_generated", "uploaded"])
+        .eq("status", "video_generated")
         .is_("thumbnail_url", "null")
         .order("created_at", desc=False)
         .limit(1)
@@ -321,6 +337,12 @@ def main():
     video_url = script.get("video_url")
     if not video_url:
         print("Script has no finished video yet. Cannot pull a thumbnail frame. Exiting.")
+        return
+
+    # DEAD-VIDEO LOOP FIX (2026-10-25): confirm the video really exists in B2
+    # before downloading it (a head request, no download bandwidth).
+    if not storage_b2.object_size(video_url):
+        print(f"Video {video_url!r} is not in B2 (already deleted or never uploaded). Skipping - nothing to download.")
         return
 
     hook_text = derive_hook_text(script, shot_list or [])
