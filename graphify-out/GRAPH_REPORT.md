@@ -1,16 +1,16 @@
-# Graph Report - marius-command-center  (2026-10-24)
+# Graph Report - marius-command-center  (2026-10-25)
 
 ## Corpus Check
-- 41 files · ~67,530 words
+- 41 files · ~67,716 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 531 nodes · 1145 edges · 22 communities (21 shown, 1 thin omitted)
+- 531 nodes · 1146 edges · 26 communities (25 shown, 1 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 36 edges (avg confidence: 0.94)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `02260672`
+- Built from commit: `2278c378`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -18,7 +18,7 @@
 - llm_client.py
 - clip_generation.py
 - assembly_stage.py
-- json
+- verify_run_output.py
 - shot_breakdown_stage.py
 - os
 - video_generation.py
@@ -36,7 +36,11 @@
 - Kaggle free-GPU video test: decision notes
 - Debugging Methodology — Mandatory for Every AI Agent Working on Atlas Frame Pipelines
 - Marius Command Center — AI Operating Standards
+- upload_bytes
 - STATUS.md
+- _get_client
+- b2_preflight.py
+- Marius / Erased — Continuation Notes (2026-09-19 PART 2, LIVE HANDOFF)
 
 ## God Nodes (most connected - your core abstractions)
 1. `process_script()` - 25 edges
@@ -65,23 +69,23 @@
 ## Import Cycles
 - None detected.
 
-## Communities (22 total, 1 thin omitted)
+## Communities (26 total, 1 thin omitted)
 
 ### Community 0 - "llm_client.py"
 Cohesion: 0.07
 Nodes (28): call_llm(), DailyQuotaExhausted, extract_json(), InfraFailure, _quote_unquoted_keys(), sanitize_json_control_chars(), _strip_trailing_commas(), build_narration_continuation_prompt() (+20 more)
 
 ### Community 1 - "clip_generation.py"
-Cohesion: 0.10
-Nodes (28): What was found and fixed (2026-09-21), What was learned this session, AgnesBadRequestError, AgnesOverloadedError, ContentPolicyRejection, create_agnes_task(), extract_video_url(), poll_agnes_task() (+20 more)
+Cohesion: 0.09
+Nodes (32): Marius / Erased — Continuation Notes (2026-09-19 PART 3, CHAIN BEATS — read this section FIRST), NOT verified, Tests run (sandbox, mocked Agnes/moviepy), Verified live on `main` (2026-09-19), What was found and fixed (2026-09-21), What was learned this session, AgnesBadRequestError, AgnesOverloadedError (+24 more)
 
 ### Community 2 - "assembly_stage.py"
 Cohesion: 0.12
 Nodes (18): apply_safety_limiter(), assemble_final_video(), build_audio_mix(), build_caption_clip(), build_caption_clips(), compute_shot_start_times(), compute_target_bitrate(), download_file() (+10 more)
 
-### Community 3 - "json"
-Cohesion: 0.11
-Nodes (15): call(), free(), load(), log(), run(), save(), timed(), check_b2_key_alive() (+7 more)
+### Community 3 - "verify_run_output.py"
+Cohesion: 0.20
+Nodes (8): check_b2_key_alive(), check_stalled_scripts(), check_url_alive(), fetch_scripts(), main(), run_verification(), verify_shot_breakdown_script(), verify_video_generated_script()
 
 ### Community 4 - "shot_breakdown_stage.py"
 Cohesion: 0.08
@@ -92,8 +96,8 @@ Cohesion: 0.08
 Nodes (25): list_all_objects(), main(), main(), sh(), main(), _concat(), configure_agnes_wait(), _download() (+17 more)
 
 ### Community 6 - "video_generation.py"
-Cohesion: 0.14
-Nodes (21): upload_video(), retryable_request(), upload_file(), clear_error(), compute_shot_durations(), download_file(), get_ready_scripts(), get_shot_durations() (+13 more)
+Cohesion: 0.09
+Nodes (28): upload_video(), call(), free(), load(), log(), run(), save(), timed() (+20 more)
 
 ### Community 7 - "health_check.py"
 Cohesion: 0.44
@@ -120,12 +124,12 @@ Cohesion: 0.29
 Nodes (6): Chosen plan, HANDOFF 2026-10-18: Free backup video generator (Agnes queue full), Read this first (how to work with Zia), Research findings (searches only, limits not tested by us), Status / next steps, The problem
 
 ### Community 13 - "storage_b2.py"
-Cohesion: 0.07
-Nodes (23): 2026-09-19 session — B2/Agnes fixes landed, throughput math checked, Agnes-replacement researched, Agnes-replacement research (requested by Ali — "generate video on a, EXACT NEXT STEPS for whoever picks this up, Marius / Erased — Continuation Notes (2026-09-19 PART 1, THROUGHPUT + AGNES-REPLACEMENT SESSION), What's CONFIRMED this session, main(), probe(), fetch_script_ids() (+15 more)
+Cohesion: 0.15
+Nodes (6): download_to_file(), object_size(), _presign_clients(), _presign_config(), _region_from_endpoint(), _url_is_fetchable()
 
 ### Community 14 - "Marius / Erased — Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)"
-Cohesion: 0.11
-Nodes (17): Correction to PART 4 (important — do NOT delete these files), CURRENT STATE (as of handoff), Declutter done (2026-09-19, verified before deleting), EXACT NEXT STEPS, EXACT NEXT STEPS for whoever picks this up, Marius / Erased — Continuation Notes (2026-09-19 PART 2, LIVE HANDOFF), Marius / Erased — Continuation Notes (2026-09-19 PART 3, CHAIN BEATS — read this section FIRST), Marius / Erased — Continuation Notes (2026-09-19 PART 4, SKILLS + DECLUTTER, read this section FIRST) (+9 more)
+Cohesion: 0.17
+Nodes (11): Correction to PART 4 (important — do NOT delete these files), Declutter done (2026-09-19, verified before deleting), EXACT NEXT STEPS, EXACT NEXT STEPS for whoever picks this up, Marius / Erased — Continuation Notes (2026-09-19 PART 1, THROUGHPUT + AGNES-REPLACEMENT SESSION), Marius / Erased — Continuation Notes (2026-09-19 PART 4, SKILLS + DECLUTTER, read this section FIRST), Marius / Erased — Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST), NOT verified (+3 more)
 
 ### Community 15 - "Marius Command Center — Handoff Doc"
 Cohesion: 0.17
@@ -151,6 +155,22 @@ Nodes (5): Debugging Methodology — Mandatory for Every AI Agent Working on Atl
 Cohesion: 0.40
 Nodes (4): Before ending any session, Marius Command Center — AI Operating Standards, Standing behavioral rules, The three living docs in this repo — know the difference
 
+### Community 21 - "upload_bytes"
+Cohesion: 0.25
+Nodes (6): 2026-09-19 session — B2/Agnes fixes landed, throughput math checked, Agnes-replacement researched, Agnes-replacement research (requested by Ali — "generate video on a, What's CONFIRMED this session, _client_config(), _new_client(), upload_bytes()
+
+### Community 23 - "_get_client"
+Cohesion: 0.33
+Nodes (6): fetch_script_ids(), gb(), list_bucket(), main(), _get_client(), object_exists()
+
+### Community 24 - "b2_preflight.py"
+Cohesion: 0.29
+Nodes (3): main(), probe(), delete_object()
+
+### Community 25 - "Marius / Erased — Continuation Notes (2026-09-19 PART 2, LIVE HANDOFF)"
+Cohesion: 0.50
+Nodes (4): CURRENT STATE (as of handoff), EXACT NEXT STEPS for whoever picks this up, Marius / Erased — Continuation Notes (2026-09-19 PART 2, LIVE HANDOFF), WHY this matters — the live open question at handoff
+
 ## Knowledge Gaps
 - **49 isolated node(s):** `Standing role (from Zia, 2026-09-21)`, `Correction to PART 4 (important — do NOT delete these files)`, `Declutter done (2026-09-19, verified before deleting)`, `NOT verified`, `EXACT NEXT STEPS` (+44 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 202 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
@@ -167,9 +187,9 @@ _Questions this graph is uniquely positioned to answer:_
   _49 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `llm_client.py` be split into smaller, more focused modules?**
   _Cohesion score 0.07272727272727272 - nodes in this community are weakly interconnected._
-- **Why does `call_llm()` connect `llm_client.py` to `json`, `shot_breakdown_stage.py`, `video_generation.py`, `requests`, `Marius / Erased — Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)`?**
+- **Why does `call_llm()` connect `llm_client.py` to `clip_generation.py`, `shot_breakdown_stage.py`, `video_generation.py`, `requests`?**
   _High betweenness centrality (0.040) - this node is a cross-community bridge._
 - **Should `clip_generation.py` be split into smaller, more focused modules?**
-  _Cohesion score 0.09856035437430787 - nodes in this community are weakly interconnected._
-- **Why does `poll_agnes_task()` connect `clip_generation.py` to `requests`, `storage_b2.py`, `video_generation.py`, `Marius Command Center — Handoff Doc`?**
+  _Cohesion score 0.08695652173913043 - nodes in this community are weakly interconnected._
+- **Why does `poll_agnes_task()` connect `clip_generation.py` to `Marius / Erased — Continuation Notes (2026-09-19 PART 2, LIVE HANDOFF)`, `video_generation.py`, `requests`, `Marius Command Center — Handoff Doc`?**
   _High betweenness centrality (0.039) - this node is a cross-community bridge._
