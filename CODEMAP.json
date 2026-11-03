@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 32,
+  "file_count": 33,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -8,6 +8,7 @@
     "B2_BUCKET_NAME",
     "B2_ENDPOINT_URL",
     "B2_KEY_ID",
+    "B2_SWEEP_ENABLED",
     "CLIP_QA_ENABLED",
     "CLIP_QA_MAX_CALLS_PER_RUN",
     "CLIP_QA_MAX_REDO",
@@ -727,6 +728,64 @@
       ],
       "env_vars": [],
       "tables": []
+    },
+    {
+      "path": "scripts/b2_sweep.py",
+      "functions": [
+        {
+          "name": "_gb",
+          "line": 25,
+          "args": [
+            "n"
+          ],
+          "calls": [],
+          "docstring": ""
+        },
+        {
+          "name": "_fetch_script_ids",
+          "line": 29,
+          "args": [],
+          "calls": [
+            "add",
+            "get",
+            "json",
+            "len",
+            "raise_for_status",
+            "set"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "sweep",
+          "line": 51,
+          "args": [],
+          "calls": [
+            "_fetch_script_ids",
+            "_gb",
+            "_new_client",
+            "any",
+            "append",
+            "delete_objects",
+            "get",
+            "get_paginator",
+            "len",
+            "paginate",
+            "print",
+            "range",
+            "strip",
+            "sum"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "B2_SWEEP_ENABLED",
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL"
+      ],
+      "tables": [
+        "scripts"
+      ]
     },
     {
       "path": "scripts/beat_director.py",
