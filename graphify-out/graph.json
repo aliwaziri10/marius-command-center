@@ -77,8 +77,8 @@
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
-      "community": 11,
-      "community_name": "generate_codemap.py",
+      "community": 12,
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "callcollector",
       "source_file": "generate_codemap.py",
@@ -470,18 +470,6 @@
       "source_location": "L93"
     },
     {
-      "id": "scripts_assembly_stage_upload_video",
-      "label": "upload_video()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "upload_video()",
-      "source_file": "scripts/assembly_stage.py",
-      "source_location": "L643"
-    },
-    {
       "id": "scripts_beat_director_apply_beat_to_shot",
       "label": "apply_beat_to_shot()",
       "_callable": true,
@@ -578,18 +566,6 @@
       "source_location": "L270"
     },
     {
-      "id": "scripts_clip_generation_extract_last_frame_url",
-      "label": "extract_last_frame_url()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "extract_last_frame_url()",
-      "source_file": "scripts/clip_generation.py",
-      "source_location": "L175"
-    },
-    {
       "id": "scripts_clip_generation_fit_clip_to_duration",
       "label": "fit_clip_to_duration()",
       "_callable": true,
@@ -650,18 +626,6 @@
       "source_location": "L287"
     },
     {
-      "id": "scripts_clip_generation_get_continuity_anchor",
-      "label": "get_continuity_anchor()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "get_continuity_anchor()",
-      "source_file": "scripts/clip_generation.py",
-      "source_location": "L193"
-    },
-    {
       "id": "scripts_clip_generation_upload_local_image_for_anchor",
       "label": "_upload_local_image_for_anchor()",
       "_callable": true,
@@ -686,18 +650,6 @@
       "source_location": "L96"
     },
     {
-      "id": "scripts_llm_client_retryable_request",
-      "label": "retryable_request()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "retryable_request()",
-      "source_file": "scripts/llm_client.py",
-      "source_location": "L231"
-    },
-    {
       "id": "scripts_prompt_builder_build_character_reference_prompt",
       "label": "build_character_reference_prompt()",
       "_callable": true,
@@ -708,222 +660,6 @@
       "norm_label": "build_character_reference_prompt()",
       "source_file": "scripts/prompt_builder.py",
       "source_location": "L324"
-    },
-    {
-      "id": "scripts_video_generation_clear_error",
-      "label": "clear_error()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "clear_error()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L279"
-    },
-    {
-      "id": "scripts_video_generation_compute_shot_durations",
-      "label": "compute_shot_durations()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "compute_shot_durations()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L294"
-    },
-    {
-      "id": "scripts_video_generation_download_file",
-      "label": "download_file()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "download_file()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L246"
-    },
-    {
-      "id": "scripts_video_generation_get_ready_scripts",
-      "label": "get_ready_scripts()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "get_ready_scripts()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L162"
-    },
-    {
-      "id": "scripts_video_generation_get_shot_durations",
-      "label": "get_shot_durations()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "get_shot_durations()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L300"
-    },
-    {
-      "id": "scripts_video_generation_main",
-      "label": "main()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "main()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L653"
-    },
-    {
-      "id": "scripts_video_generation_mark_content_flagged",
-      "label": "mark_content_flagged()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "mark_content_flagged()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L330"
-    },
-    {
-      "id": "scripts_video_generation_mark_video_generated",
-      "label": "mark_video_generated()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "mark_video_generated()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L371"
-    },
-    {
-      "id": "scripts_video_generation_mark_video_stalled",
-      "label": "mark_video_stalled()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "mark_video_stalled()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L345"
-    },
-    {
-      "id": "scripts_video_generation_process_script",
-      "label": "process_script()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "process_script()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L394"
-    },
-    {
-      "id": "scripts_video_generation_record_error",
-      "label": "record_error()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "record_error()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L255"
-    },
-    {
-      "id": "scripts_video_generation_recover_stalled_scripts",
-      "label": "recover_stalled_scripts()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "recover_stalled_scripts()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L173"
-    },
-    {
-      "id": "scripts_video_generation_report_fault",
-      "label": "report_fault()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "report_fault()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L154"
-    },
-    {
-      "id": "scripts_video_generation_report_note",
-      "label": "report_note()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "report_note()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L158"
-    },
-    {
-      "id": "scripts_video_generation_run",
-      "label": "run()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "run()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L574"
-    },
-    {
-      "id": "scripts_video_generation_save_progress",
-      "label": "save_progress()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "save_progress()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L320"
-    },
-    {
-      "id": "scripts_video_generation_upload_clip",
-      "label": "upload_clip()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "upload_clip()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L313"
-    },
-    {
-      "id": "scripts_video_generation_write_run_report",
-      "label": "write_run_report()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "write_run_report()",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L209"
     },
     {
       "id": "scripts_clip_qa_check_clip",
@@ -1190,12 +926,276 @@
       "source_location": "L166"
     },
     {
+      "id": "scripts_assembly_stage_upload_video",
+      "label": "upload_video()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "upload_video()",
+      "source_file": "scripts/assembly_stage.py",
+      "source_location": "L643"
+    },
+    {
+      "id": "scripts_clip_generation_extract_last_frame_url",
+      "label": "extract_last_frame_url()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "extract_last_frame_url()",
+      "source_file": "scripts/clip_generation.py",
+      "source_location": "L175"
+    },
+    {
+      "id": "scripts_clip_generation_get_continuity_anchor",
+      "label": "get_continuity_anchor()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "get_continuity_anchor()",
+      "source_file": "scripts/clip_generation.py",
+      "source_location": "L193"
+    },
+    {
+      "id": "scripts_llm_client_retryable_request",
+      "label": "retryable_request()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "retryable_request()",
+      "source_file": "scripts/llm_client.py",
+      "source_location": "L231"
+    },
+    {
+      "id": "scripts_video_generation_clear_error",
+      "label": "clear_error()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "clear_error()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L279"
+    },
+    {
+      "id": "scripts_video_generation_compute_shot_durations",
+      "label": "compute_shot_durations()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "compute_shot_durations()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L294"
+    },
+    {
+      "id": "scripts_video_generation_download_file",
+      "label": "download_file()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "download_file()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L246"
+    },
+    {
+      "id": "scripts_video_generation_get_ready_scripts",
+      "label": "get_ready_scripts()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "get_ready_scripts()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L162"
+    },
+    {
+      "id": "scripts_video_generation_get_shot_durations",
+      "label": "get_shot_durations()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "get_shot_durations()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L300"
+    },
+    {
+      "id": "scripts_video_generation_main",
+      "label": "main()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "main()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L653"
+    },
+    {
+      "id": "scripts_video_generation_mark_content_flagged",
+      "label": "mark_content_flagged()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "mark_content_flagged()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L330"
+    },
+    {
+      "id": "scripts_video_generation_mark_video_generated",
+      "label": "mark_video_generated()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "mark_video_generated()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L371"
+    },
+    {
+      "id": "scripts_video_generation_mark_video_stalled",
+      "label": "mark_video_stalled()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "mark_video_stalled()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L345"
+    },
+    {
+      "id": "scripts_video_generation_process_script",
+      "label": "process_script()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "process_script()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L394"
+    },
+    {
+      "id": "scripts_video_generation_record_error",
+      "label": "record_error()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "record_error()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L255"
+    },
+    {
+      "id": "scripts_video_generation_recover_stalled_scripts",
+      "label": "recover_stalled_scripts()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "recover_stalled_scripts()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L173"
+    },
+    {
+      "id": "scripts_video_generation_report_fault",
+      "label": "report_fault()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "report_fault()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L154"
+    },
+    {
+      "id": "scripts_video_generation_report_note",
+      "label": "report_note()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "report_note()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L158"
+    },
+    {
+      "id": "scripts_video_generation_run",
+      "label": "run()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "run()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L574"
+    },
+    {
+      "id": "scripts_video_generation_save_progress",
+      "label": "save_progress()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "save_progress()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L320"
+    },
+    {
+      "id": "scripts_video_generation_upload_clip",
+      "label": "upload_clip()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "upload_clip()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L313"
+    },
+    {
+      "id": "scripts_video_generation_write_run_report",
+      "label": "write_run_report()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "write_run_report()",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L209"
+    },
+    {
       "id": "generate_codemap_build_codemap",
       "label": "build_codemap()",
       "_callable": true,
       "_origin": "ast",
-      "community": 11,
-      "community_name": "generate_codemap.py",
+      "community": 12,
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "build_codemap()",
       "source_file": "generate_codemap.py",
@@ -1206,8 +1206,8 @@
       "label": ".__init__()",
       "_callable": true,
       "_origin": "ast",
-      "community": 11,
-      "community_name": "generate_codemap.py",
+      "community": 12,
+      "community_name": "re",
       "file_type": "code",
       "norm_label": ".__init__()",
       "source_file": "generate_codemap.py",
@@ -1218,8 +1218,8 @@
       "label": ".visit_Call()",
       "_callable": true,
       "_origin": "ast",
-      "community": 11,
-      "community_name": "generate_codemap.py",
+      "community": 12,
+      "community_name": "re",
       "file_type": "code",
       "norm_label": ".visit_call()",
       "source_file": "generate_codemap.py",
@@ -1230,8 +1230,8 @@
       "label": "extract_env_vars()",
       "_callable": true,
       "_origin": "ast",
-      "community": 11,
-      "community_name": "generate_codemap.py",
+      "community": 12,
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "extract_env_vars()",
       "source_file": "generate_codemap.py",
@@ -1242,8 +1242,8 @@
       "label": "extract_tables()",
       "_callable": true,
       "_origin": "ast",
-      "community": 11,
-      "community_name": "generate_codemap.py",
+      "community": 12,
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "extract_tables()",
       "source_file": "generate_codemap.py",
@@ -1254,8 +1254,8 @@
       "label": "find_py_files()",
       "_callable": true,
       "_origin": "ast",
-      "community": 11,
-      "community_name": "generate_codemap.py",
+      "community": 12,
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "find_py_files()",
       "source_file": "generate_codemap.py",
@@ -1266,8 +1266,8 @@
       "label": "get_docstring_first_line()",
       "_callable": true,
       "_origin": "ast",
-      "community": 11,
-      "community_name": "generate_codemap.py",
+      "community": 12,
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "get_docstring_first_line()",
       "source_file": "generate_codemap.py",
@@ -1278,8 +1278,8 @@
       "label": "main()",
       "_callable": true,
       "_origin": "ast",
-      "community": 11,
-      "community_name": "generate_codemap.py",
+      "community": 12,
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "main()",
       "source_file": "generate_codemap.py",
@@ -1290,8 +1290,8 @@
       "label": "process_file()",
       "_callable": true,
       "_origin": "ast",
-      "community": 11,
-      "community_name": "generate_codemap.py",
+      "community": 12,
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "process_file()",
       "source_file": "generate_codemap.py",
@@ -3023,7 +3023,7 @@
       "file_type": "code",
       "norm_label": "build_description()",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L213"
+      "source_location": "L223"
     },
     {
       "id": "scripts_youtube_upload_delete_source_from_storage",
@@ -3035,7 +3035,7 @@
       "file_type": "code",
       "norm_label": "delete_source_from_storage()",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L323"
+      "source_location": "L333"
     },
     {
       "id": "scripts_youtube_upload_download_file",
@@ -3047,7 +3047,7 @@
       "file_type": "code",
       "norm_label": "download_file()",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L159"
+      "source_location": "L169"
     },
     {
       "id": "scripts_youtube_upload_get_access_token",
@@ -3059,7 +3059,7 @@
       "file_type": "code",
       "norm_label": "get_access_token()",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L99"
+      "source_location": "L109"
     },
     {
       "id": "scripts_youtube_upload_get_authorized_channel",
@@ -3071,7 +3071,7 @@
       "file_type": "code",
       "norm_label": "get_authorized_channel()",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L116"
+      "source_location": "L126"
     },
     {
       "id": "scripts_youtube_upload_get_next_ready_script",
@@ -3083,7 +3083,7 @@
       "file_type": "code",
       "norm_label": "get_next_ready_script()",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L137"
+      "source_location": "L147"
     },
     {
       "id": "scripts_youtube_upload_get_topic_title",
@@ -3095,7 +3095,7 @@
       "file_type": "code",
       "norm_label": "get_topic_title()",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L148"
+      "source_location": "L158"
     },
     {
       "id": "scripts_youtube_upload_main",
@@ -3107,7 +3107,7 @@
       "file_type": "code",
       "norm_label": "main()",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L336"
+      "source_location": "L346"
     },
     {
       "id": "scripts_youtube_upload_mark_uploaded",
@@ -3119,7 +3119,7 @@
       "file_type": "code",
       "norm_label": "mark_uploaded()",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L313"
+      "source_location": "L323"
     },
     {
       "id": "scripts_youtube_upload_set_thumbnail",
@@ -3131,7 +3131,7 @@
       "file_type": "code",
       "norm_label": "set_thumbnail()",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L289"
+      "source_location": "L299"
     },
     {
       "id": "scripts_youtube_upload_stitch_chunks_to_local_file",
@@ -3143,7 +3143,7 @@
       "file_type": "code",
       "norm_label": "stitch_chunks_to_local_file()",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L167"
+      "source_location": "L177"
     },
     {
       "id": "scripts_youtube_upload_upload_to_youtube",
@@ -3155,7 +3155,7 @@
       "file_type": "code",
       "norm_label": "upload_to_youtube()",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L239"
+      "source_location": "L249"
     },
     {
       "id": "runtimeerror",
@@ -3510,15 +3510,52 @@
       "source_location": "L1"
     },
     {
-      "id": "scripts_video_generation",
-      "label": "video_generation.py",
+      "id": "continuation_marius_erased_continuation_notes_2026_09_19_part_3_chain_beats_read_this_section_first",
+      "label": "Marius / Erased \u2014 Continuation Notes (2026-09-19 PART 3, CHAIN BEATS \u2014 read this section FIRST)",
       "_origin": "ast",
       "community": 1,
       "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "video_generation.py",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L1"
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "marius / erased \u2014 continuation notes (2026-09-19 part 3, chain beats \u2014 read this section first)",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L57"
+    },
+    {
+      "id": "continuation_not_verified_78",
+      "label": "NOT verified",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "clip_generation.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "not verified",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L78"
+    },
+    {
+      "id": "continuation_tests_run_sandbox_mocked_agnes_moviepy",
+      "label": "Tests run (sandbox, mocked Agnes/moviepy)",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "clip_generation.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "tests run (sandbox, mocked agnes/moviepy)",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L71"
+    },
+    {
+      "id": "continuation_verified_live_on_main_2026_09_19",
+      "label": "Verified live on `main` (2026-09-19)",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "clip_generation.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "verified live on `main` (2026-09-19)",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L61"
     },
     {
       "id": "continuation_what_was_found_and_fixed_2026_09_21",
@@ -3531,6 +3568,54 @@
       "norm_label": "what was found and fixed (2026-09-21)",
       "source_file": "CONTINUATION.md",
       "source_location": "L11"
+    },
+    {
+      "id": "docs_marius_handoff_2026_09_18_19_video_generation_stall_three_independent_root_causes",
+      "label": "2026-09-18/19 \u2014 Video generation stall, three independent root causes",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "clip_generation.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "2026-09-18/19 \u2014 video generation stall, three independent root causes",
+      "source_file": "docs/marius-handoff.md",
+      "source_location": "L151"
+    },
+    {
+      "id": "docs_marius_handoff_2026_09_19_trend_grounding_was_completely_dead_since_creation",
+      "label": "2026-09-19 \u2014 Trend grounding was completely dead since creation",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "clip_generation.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "2026-09-19 \u2014 trend grounding was completely dead since creation",
+      "source_file": "docs/marius-handoff.md",
+      "source_location": "L127"
+    },
+    {
+      "id": "docs_marius_handoff_2026_09_21_agnes_create_task_readtimeout_crash_fixed_declutter",
+      "label": "2026-09-21 \u2014 Agnes create-task ReadTimeout crash fixed; declutter",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "clip_generation.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "2026-09-21 \u2014 agnes create-task readtimeout crash fixed; declutter",
+      "source_file": "docs/marius-handoff.md",
+      "source_location": "L117"
+    },
+    {
+      "id": "docs_marius_handoff_session_log_most_recent_first_keep_this_section_don_t_delete_old",
+      "label": "Session log (most recent first \u2014 keep this section, don't delete old",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "clip_generation.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "session log (most recent first \u2014 keep this section, don't delete old",
+      "source_file": "docs/marius-handoff.md",
+      "source_location": "L114"
     },
     {
       "id": "handoff_2026_10_18_free_video_fallback_what_was_learned_this_session",
@@ -3589,17 +3674,6 @@
       "source_location": "L94"
     },
     {
-      "id": "scripts_assembly_stage_rationale_644",
-      "label": "Returns the B2 object KEY (not a URL) - stored in scripts.video_url. STORAGE\u2026",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "rationale",
-      "norm_label": "returns the b2 object key (not a url) - stored in scripts.video_url. storage...",
-      "source_file": "scripts/assembly_stage.py",
-      "source_location": "L644"
-    },
-    {
       "id": "scripts_beat_director_rationale_1",
       "label": "Marius Command Center - beat director (2026-09-19). PROBLEM: a shot longer than\u2026",
       "_origin": "ast",
@@ -3653,94 +3727,6 @@
       "norm_label": "protagonist-everywhere fix + clip qa (2026-10-09), zia's report: protagonist in...",
       "source_file": "scripts/clip_generation.py",
       "source_location": "L237"
-    },
-    {
-      "id": "scripts_llm_client_rationale_232",
-      "label": "SILENT ZERO-ROW PATCH FIX (2026-09-12): see module docstring. For PATCH/DELETE,\u2026",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "rationale",
-      "norm_label": "silent zero-row patch fix (2026-09-12): see module docstring. for patch/delete,...",
-      "source_file": "scripts/llm_client.py",
-      "source_location": "L232"
-    },
-    {
-      "id": "scripts_video_generation_rationale_1",
-      "label": "Marius Command Center - Video Generation (orchestration only) Split 2026-09-06\u2026",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "rationale",
-      "norm_label": "marius command center - video generation (orchestration only) split 2026-09-06...",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "scripts_video_generation_rationale_174",
-      "label": "SELF-HEALING (2026-10-10): puts up to MAX_STALL_RECOVERIES_PER_RUN scripts\u2026",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "rationale",
-      "norm_label": "self-healing (2026-10-10): puts up to max_stall_recoveries_per_run scripts...",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L174"
-    },
-    {
-      "id": "scripts_video_generation_rationale_210",
-      "label": "RUN REPORT (2026-10-10): prints a plain report and appends it to the GitHub\u2026",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "rationale",
-      "norm_label": "run report (2026-10-10): prints a plain report and appends it to the github...",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L210"
-    },
-    {
-      "id": "scripts_video_generation_rationale_256",
-      "label": "VERIFIER-GATE FIX (2026-08-22): persists the real exception (full traceback)\u2026",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "rationale",
-      "norm_label": "verifier-gate fix (2026-08-22): persists the real exception (full traceback)...",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L256"
-    },
-    {
-      "id": "scripts_video_generation_rationale_280",
-      "label": "Clears a previously recorded last_error once a script succeeds, so Supabase\u2026",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "rationale",
-      "norm_label": "clears a previously recorded last_error once a script succeeds, so supabase...",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L280"
-    },
-    {
-      "id": "scripts_video_generation_rationale_314",
-      "label": "Returns the B2 object KEY (not a URL) - see storage_b2.py docstring. This is\u2026",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "rationale",
-      "norm_label": "returns the b2 object key (not a url) - see storage_b2.py docstring. this is...",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L314"
-    },
-    {
-      "id": "scripts_video_generation_rationale_346",
-      "label": "STALL FIX (2026-09-02): companion to mark_content_flagged, but for a non-\u2026",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "rationale",
-      "norm_label": "stall fix (2026-09-02): companion to mark_content_flagged, but for a non-...",
-      "source_file": "scripts/video_generation.py",
-      "source_location": "L346"
     },
     {
       "id": "scripts_clip_qa",
@@ -3941,37 +3927,125 @@
       "source_location": "L262"
     },
     {
+      "id": "scripts_video_generation",
+      "label": "video_generation.py",
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "video_generation.py",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "scripts_assembly_stage_rationale_644",
+      "label": "Returns the B2 object KEY (not a URL) - stored in scripts.video_url. STORAGE\u2026",
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "rationale",
+      "norm_label": "returns the b2 object key (not a url) - stored in scripts.video_url. storage...",
+      "source_file": "scripts/assembly_stage.py",
+      "source_location": "L644"
+    },
+    {
+      "id": "scripts_llm_client_rationale_232",
+      "label": "SILENT ZERO-ROW PATCH FIX (2026-09-12): see module docstring. For PATCH/DELETE,\u2026",
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "rationale",
+      "norm_label": "silent zero-row patch fix (2026-09-12): see module docstring. for patch/delete,...",
+      "source_file": "scripts/llm_client.py",
+      "source_location": "L232"
+    },
+    {
+      "id": "scripts_video_generation_rationale_1",
+      "label": "Marius Command Center - Video Generation (orchestration only) Split 2026-09-06\u2026",
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "rationale",
+      "norm_label": "marius command center - video generation (orchestration only) split 2026-09-06...",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "scripts_video_generation_rationale_174",
+      "label": "SELF-HEALING (2026-10-10): puts up to MAX_STALL_RECOVERIES_PER_RUN scripts\u2026",
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "rationale",
+      "norm_label": "self-healing (2026-10-10): puts up to max_stall_recoveries_per_run scripts...",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L174"
+    },
+    {
+      "id": "scripts_video_generation_rationale_210",
+      "label": "RUN REPORT (2026-10-10): prints a plain report and appends it to the GitHub\u2026",
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "rationale",
+      "norm_label": "run report (2026-10-10): prints a plain report and appends it to the github...",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L210"
+    },
+    {
+      "id": "scripts_video_generation_rationale_256",
+      "label": "VERIFIER-GATE FIX (2026-08-22): persists the real exception (full traceback)\u2026",
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "rationale",
+      "norm_label": "verifier-gate fix (2026-08-22): persists the real exception (full traceback)...",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L256"
+    },
+    {
+      "id": "scripts_video_generation_rationale_280",
+      "label": "Clears a previously recorded last_error once a script succeeds, so Supabase\u2026",
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "rationale",
+      "norm_label": "clears a previously recorded last_error once a script succeeds, so supabase...",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L280"
+    },
+    {
+      "id": "scripts_video_generation_rationale_314",
+      "label": "Returns the B2 object KEY (not a URL) - see storage_b2.py docstring. This is\u2026",
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "rationale",
+      "norm_label": "returns the b2 object key (not a url) - see storage_b2.py docstring. this is...",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L314"
+    },
+    {
+      "id": "scripts_video_generation_rationale_346",
+      "label": "STALL FIX (2026-09-02): companion to mark_content_flagged, but for a non-\u2026",
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "rationale",
+      "norm_label": "stall fix (2026-09-02): companion to mark_content_flagged, but for a non-...",
+      "source_file": "scripts/video_generation.py",
+      "source_location": "L346"
+    },
+    {
       "id": "generate_codemap",
       "label": "generate_codemap.py",
       "_origin": "ast",
-      "community": 11,
-      "community_name": "generate_codemap.py",
+      "community": 12,
+      "community_name": "re",
       "file_type": "code",
       "norm_label": "generate_codemap.py",
       "source_file": "generate_codemap.py",
       "source_location": "L1"
-    },
-    {
-      "id": "generate_codemap_rationale_1",
-      "label": "CODEMAP.json generator. Walks every .py file in the repo (skipping common noise\u2026",
-      "_origin": "ast",
-      "community": 11,
-      "community_name": "generate_codemap.py",
-      "file_type": "rationale",
-      "norm_label": "codemap.json generator. walks every .py file in the repo (skipping common noise...",
-      "source_file": "generate_codemap.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "generate_codemap_rationale_43",
-      "label": "Collects the names of functions called within a single function body.",
-      "_origin": "ast",
-      "community": 11,
-      "community_name": "generate_codemap.py",
-      "file_type": "rationale",
-      "norm_label": "collects the names of functions called within a single function body.",
-      "source_file": "generate_codemap.py",
-      "source_location": "L43"
     },
     {
       "id": "scripts_prompt_builder",
@@ -4138,6 +4212,28 @@
       "norm_label": "handoff 2026-10-08: visual quality, narration pacing, youtube agent skill ports",
       "source_file": "HANDOFF_2026-10-08_VISUAL_QUALITY_AND_YT_SKILLS.md",
       "source_location": "L1"
+    },
+    {
+      "id": "generate_codemap_rationale_1",
+      "label": "CODEMAP.json generator. Walks every .py file in the repo (skipping common noise\u2026",
+      "_origin": "ast",
+      "community": 12,
+      "community_name": "re",
+      "file_type": "rationale",
+      "norm_label": "codemap.json generator. walks every .py file in the repo (skipping common noise...",
+      "source_file": "generate_codemap.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "generate_codemap_rationale_43",
+      "label": "Collects the names of functions called within a single function body.",
+      "_origin": "ast",
+      "community": 12,
+      "community_name": "re",
+      "file_type": "rationale",
+      "norm_label": "collects the names of functions called within a single function body.",
+      "source_file": "generate_codemap.py",
+      "source_location": "L43"
     },
     {
       "id": "scripts_prompt_builder_rationale_1",
@@ -4537,18 +4633,6 @@
       "source_location": "L87"
     },
     {
-      "id": "continuation_marius_erased_continuation_notes_2026_09_19_part_3_chain_beats_read_this_section_first",
-      "label": "Marius / Erased \u2014 Continuation Notes (2026-09-19 PART 3, CHAIN BEATS \u2014 read this section FIRST)",
-      "_origin": "ast",
-      "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "marius / erased \u2014 continuation notes (2026-09-19 part 3, chain beats \u2014 read this section first)",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L57"
-    },
-    {
       "id": "continuation_marius_erased_continuation_notes_2026_09_19_part_4_skills_declutter_read_this_section_first",
       "label": "Marius / Erased \u2014 Continuation Notes (2026-09-19 PART 4, SKILLS + DECLUTTER, read this section FIRST)",
       "_origin": "ast",
@@ -4585,18 +4669,6 @@
       "source_location": "L22"
     },
     {
-      "id": "continuation_not_verified_78",
-      "label": "NOT verified",
-      "_origin": "ast",
-      "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "not verified",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L78"
-    },
-    {
       "id": "continuation_standing_role_from_zia_2026_09_21",
       "label": "Standing role (from Zia, 2026-09-21)",
       "_origin": "ast",
@@ -4607,30 +4679,6 @@
       "norm_label": "standing role (from zia, 2026-09-21)",
       "source_file": "CONTINUATION.md",
       "source_location": "L5"
-    },
-    {
-      "id": "continuation_tests_run_sandbox_mocked_agnes_moviepy",
-      "label": "Tests run (sandbox, mocked Agnes/moviepy)",
-      "_origin": "ast",
-      "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "tests run (sandbox, mocked agnes/moviepy)",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L71"
-    },
-    {
-      "id": "continuation_verified_live_on_main_2026_09_19",
-      "label": "Verified live on `main` (2026-09-19)",
-      "_origin": "ast",
-      "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "verified live on `main` (2026-09-19)",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L61"
     },
     {
       "id": "continuation_what_happened_this_session",
@@ -4681,42 +4729,6 @@
       "source_location": "L1"
     },
     {
-      "id": "docs_marius_handoff_2026_09_18_19_video_generation_stall_three_independent_root_causes",
-      "label": "2026-09-18/19 \u2014 Video generation stall, three independent root causes",
-      "_origin": "ast",
-      "community": 15,
-      "community_name": "Marius Command Center \u2014 Handoff Doc",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "2026-09-18/19 \u2014 video generation stall, three independent root causes",
-      "source_file": "docs/marius-handoff.md",
-      "source_location": "L151"
-    },
-    {
-      "id": "docs_marius_handoff_2026_09_19_trend_grounding_was_completely_dead_since_creation",
-      "label": "2026-09-19 \u2014 Trend grounding was completely dead since creation",
-      "_origin": "ast",
-      "community": 15,
-      "community_name": "Marius Command Center \u2014 Handoff Doc",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "2026-09-19 \u2014 trend grounding was completely dead since creation",
-      "source_file": "docs/marius-handoff.md",
-      "source_location": "L127"
-    },
-    {
-      "id": "docs_marius_handoff_2026_09_21_agnes_create_task_readtimeout_crash_fixed_declutter",
-      "label": "2026-09-21 \u2014 Agnes create-task ReadTimeout crash fixed; declutter",
-      "_origin": "ast",
-      "community": 15,
-      "community_name": "Marius Command Center \u2014 Handoff Doc",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "2026-09-21 \u2014 agnes create-task readtimeout crash fixed; declutter",
-      "source_file": "docs/marius-handoff.md",
-      "source_location": "L117"
-    },
-    {
       "id": "docs_marius_handoff_current_scripts_files_2026_09_21_confirmed_live_via_a_clone_of_main",
       "label": "Current `scripts/` files (2026-09-21, confirmed live via a clone of `main`)",
       "_origin": "ast",
@@ -4763,18 +4775,6 @@
       "norm_label": "pipeline",
       "source_file": "docs/marius-handoff.md",
       "source_location": "L66"
-    },
-    {
-      "id": "docs_marius_handoff_session_log_most_recent_first_keep_this_section_don_t_delete_old",
-      "label": "Session log (most recent first \u2014 keep this section, don't delete old",
-      "_origin": "ast",
-      "community": 15,
-      "community_name": "Marius Command Center \u2014 Handoff Doc",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "session log (most recent first \u2014 keep this section, don't delete old",
-      "source_file": "docs/marius-handoff.md",
-      "source_location": "L114"
     },
     {
       "id": "docs_marius_handoff_standing_rules_read_this_section_first_every_session_no_exceptions",
@@ -6151,7 +6151,7 @@
       "source_location": "L1"
     },
     {
-      "id": "scripts_youtube_upload_rationale_117",
+      "id": "scripts_youtube_upload_rationale_127",
       "label": "Asks YouTube which channel the current access token is actually authorized for.\u2026",
       "_origin": "ast",
       "community": 9,
@@ -6159,10 +6159,10 @@
       "file_type": "rationale",
       "norm_label": "asks youtube which channel the current access token is actually authorized for....",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L117"
+      "source_location": "L127"
     },
     {
-      "id": "scripts_youtube_upload_rationale_168",
+      "id": "scripts_youtube_upload_rationale_178",
       "label": "CHUNK-STITCH FIX (2026-08-22): downloads every chunk in order (the chunk_urls\u2026",
       "_origin": "ast",
       "community": 9,
@@ -6170,10 +6170,10 @@
       "file_type": "rationale",
       "norm_label": "chunk-stitch fix (2026-08-22): downloads every chunk in order (the chunk_urls...",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L168"
+      "source_location": "L178"
     },
     {
-      "id": "scripts_youtube_upload_rationale_290",
+      "id": "scripts_youtube_upload_rationale_300",
       "label": "Best-effort: a thumbnail failure should never fail the whole upload, since the\u2026",
       "_origin": "ast",
       "community": 9,
@@ -6181,10 +6181,10 @@
       "file_type": "rationale",
       "norm_label": "best-effort: a thumbnail failure should never fail the whole upload, since the...",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L290"
+      "source_location": "L300"
     },
     {
-      "id": "scripts_youtube_upload_rationale_324",
+      "id": "scripts_youtube_upload_rationale_334",
       "label": "STORAGE CLEANUP (2026-09-10): removes the uploaded video's source file from B2,\u2026",
       "_origin": "ast",
       "community": 9,
@@ -6192,7 +6192,7 @@
       "file_type": "rationale",
       "norm_label": "storage cleanup (2026-09-10): removes the uploaded video's source file from b2,...",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L324"
+      "source_location": "L334"
     },
     {
       "id": "math",
@@ -6203,18 +6203,6 @@
       "external": true,
       "file_type": "concept",
       "norm_label": "math",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "time",
-      "label": "time",
-      "_origin": "semantic",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "time",
       "source_file": "",
       "type": "external"
     },
@@ -6267,11 +6255,23 @@
       "type": "external"
     },
     {
+      "id": "time",
+      "label": "time",
+      "_origin": "semantic",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "time",
+      "source_file": "",
+      "type": "external"
+    },
+    {
       "id": "ast",
       "label": "ast",
       "_origin": "semantic",
-      "community": 11,
-      "community_name": "generate_codemap.py",
+      "community": 12,
+      "community_name": "re",
       "external": true,
       "file_type": "concept",
       "norm_label": "ast",
@@ -11845,7 +11845,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L332",
+      "source_location": "L342",
       "weight": 1.0
     },
     {
@@ -11857,7 +11857,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L160",
+      "source_location": "L170",
       "weight": 1.0
     },
     {
@@ -11869,7 +11869,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L100",
+      "source_location": "L110",
       "weight": 1.0
     },
     {
@@ -11881,7 +11881,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L120",
+      "source_location": "L130",
       "weight": 1.0
     },
     {
@@ -11893,7 +11893,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L138",
+      "source_location": "L148",
       "weight": 1.0
     },
     {
@@ -11905,7 +11905,19 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L149",
+      "source_location": "L159",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_youtube_upload_main",
+      "target": "scripts_b2_sweep_sweep",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "scripts/youtube_upload.py",
+      "source_location": "L349",
       "weight": 1.0
     },
     {
@@ -11917,7 +11929,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L337",
+      "source_location": "L351",
       "weight": 1.0
     },
     {
@@ -11929,7 +11941,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L355",
+      "source_location": "L369",
       "weight": 1.0
     },
     {
@@ -11941,7 +11953,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L365",
+      "source_location": "L379",
       "weight": 1.0
     },
     {
@@ -11953,7 +11965,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L371",
+      "source_location": "L385",
       "weight": 1.0
     },
     {
@@ -11965,7 +11977,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L373",
+      "source_location": "L387",
       "weight": 1.0
     },
     {
@@ -11977,7 +11989,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L392",
+      "source_location": "L406",
       "weight": 1.0
     },
     {
@@ -11989,7 +12001,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L393",
+      "source_location": "L407",
       "weight": 1.0
     },
     {
@@ -12001,7 +12013,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L394",
+      "source_location": "L408",
       "weight": 1.0
     },
     {
@@ -12013,7 +12025,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L396",
+      "source_location": "L410",
       "weight": 1.0
     },
     {
@@ -12025,7 +12037,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L402",
+      "source_location": "L416",
       "weight": 1.0
     },
     {
@@ -12037,7 +12049,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L409",
+      "source_location": "L423",
       "weight": 1.0
     },
     {
@@ -12049,7 +12061,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L417",
+      "source_location": "L436",
       "weight": 1.0
     },
     {
@@ -12061,7 +12073,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L418",
+      "source_location": "L437",
       "weight": 1.0
     },
     {
@@ -12073,7 +12085,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L314",
+      "source_location": "L324",
       "weight": 1.0
     },
     {
@@ -12085,7 +12097,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L296",
+      "source_location": "L306",
       "weight": 1.0
     },
     {
@@ -12097,7 +12109,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L187",
+      "source_location": "L197",
       "weight": 1.0
     },
     {
@@ -12109,7 +12121,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L208",
+      "source_location": "L218",
       "weight": 1.0
     },
     {
@@ -12121,7 +12133,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L255",
+      "source_location": "L265",
       "weight": 1.0
     },
     {
@@ -14257,7 +14269,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L70",
+      "source_location": "L79",
       "weight": 1.0
     },
     {
@@ -14269,7 +14281,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L71",
+      "source_location": "L80",
       "weight": 1.0
     },
     {
@@ -14281,7 +14293,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L73",
+      "source_location": "L82",
       "weight": 1.0
     },
     {
@@ -14293,7 +14305,19 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L74",
+      "source_location": "L83",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_youtube_upload",
+      "target": "scripts_b2_sweep",
+      "relation": "imports",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "scripts/youtube_upload.py",
+      "source_location": "L84",
       "weight": 1.0
     },
     {
@@ -14929,7 +14953,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L72",
+      "source_location": "L81",
       "weight": 1.0
     },
     {
@@ -14941,7 +14965,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L74",
+      "source_location": "L83",
       "weight": 1.0
     },
     {
@@ -18609,13 +18633,24 @@
     },
     {
       "source": "scripts_youtube_upload",
+      "target": "scripts_youtube_upload_get_access_token",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/youtube_upload.py",
+      "source_location": "L109",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_youtube_upload",
       "target": "scripts_youtube_upload_get_authorized_channel",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L116",
+      "source_location": "L126",
       "weight": 1.0
     },
     {
@@ -18626,7 +18661,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L137",
+      "source_location": "L147",
       "weight": 1.0
     },
     {
@@ -18637,7 +18672,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L148",
+      "source_location": "L158",
       "weight": 1.0
     },
     {
@@ -18648,7 +18683,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L159",
+      "source_location": "L169",
       "weight": 1.0
     },
     {
@@ -18659,7 +18694,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L167",
+      "source_location": "L177",
       "weight": 1.0
     },
     {
@@ -18670,7 +18705,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L213",
+      "source_location": "L223",
       "weight": 1.0
     },
     {
@@ -18681,7 +18716,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L239",
+      "source_location": "L249",
       "weight": 1.0
     },
     {
@@ -18692,7 +18727,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L289",
+      "source_location": "L299",
       "weight": 1.0
     },
     {
@@ -18703,7 +18738,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L313",
+      "source_location": "L323",
       "weight": 1.0
     },
     {
@@ -18714,7 +18749,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L323",
+      "source_location": "L333",
       "weight": 1.0
     },
     {
@@ -18725,18 +18760,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L336",
-      "weight": 1.0
-    },
-    {
-      "source": "scripts_youtube_upload",
-      "target": "scripts_youtube_upload_get_access_token",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "scripts/youtube_upload.py",
-      "source_location": "L99",
+      "source_location": "L346",
       "weight": 1.0
     },
     {
@@ -20236,47 +20260,47 @@
       "weight": 1.0
     },
     {
-      "source": "scripts_youtube_upload_rationale_117",
+      "source": "scripts_youtube_upload_rationale_127",
       "target": "scripts_youtube_upload_get_authorized_channel",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L117",
+      "source_location": "L127",
       "weight": 1.0
     },
     {
-      "source": "scripts_youtube_upload_rationale_168",
+      "source": "scripts_youtube_upload_rationale_178",
       "target": "scripts_youtube_upload_stitch_chunks_to_local_file",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L168",
+      "source_location": "L178",
       "weight": 1.0
     },
     {
-      "source": "scripts_youtube_upload_rationale_290",
+      "source": "scripts_youtube_upload_rationale_300",
       "target": "scripts_youtube_upload_set_thumbnail",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L290",
+      "source_location": "L300",
       "weight": 1.0
     },
     {
-      "source": "scripts_youtube_upload_rationale_324",
+      "source": "scripts_youtube_upload_rationale_334",
       "target": "scripts_youtube_upload_delete_source_from_storage",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/youtube_upload.py",
-      "source_location": "L324",
+      "source_location": "L334",
       "weight": 1.0
     },
     {
@@ -20702,5 +20726,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "775e478e8ddf43fdd64a072f0cb4d3b319e429c0"
+  "built_at_commit": "abc6213d812b6467ab6e902b0479e98c465b4b8f"
 }
