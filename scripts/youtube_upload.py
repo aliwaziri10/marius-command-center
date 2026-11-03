@@ -65,6 +65,15 @@ can never affect upload correctness. Only handles the B2 video_url case
 (current/live path) - the legacy video_chunk_urls path is pre-migration
 Supabase Storage rows only, already migrated off the active pipeline, not
 worth adding extra cleanup logic for.
+
+B2 SWEEP WIRED IN (2026-11-03): the cleanup above only ever removed the
+final video, and only hid it (a plain B2 delete leaves the old version in
+place, still counted as storage). Per-shot clips, narration, images and
+thumbnails of uploaded episodes were never removed. scripts/b2_sweep.py
+existed but was not called by anything. main() now runs b2_sweep.sweep()
+at the start of every run (including runs with nothing to upload) and
+again right after a successful upload. sweep() never raises. Turn off with
+B2_SWEEP_ENABLED=0.
 """
 
 import os
@@ -72,6 +81,7 @@ import requests
 from moviepy import VideoFileClip, concatenate_videoclips
 import storage_b2
 from title_gate import optimize_title  # TITLE GATE (2026-10-09)
+import b2_sweep  # B2 SWEEP (2026-11-03)
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SECRET_KEY"]
@@ -334,6 +344,10 @@ def delete_source_from_storage(script):
 
 
 def main():
+    # B2 SWEEP (2026-11-03): clear everything (all versions) that belongs to
+    # already-uploaded episodes before doing anything else. Never raises.
+    b2_sweep.sweep()
+
     script = get_next_ready_script()
     if not script:
         print("No videos ready for YouTube upload. Nothing to do.")
@@ -410,6 +424,11 @@ def main():
     except Exception as e:
         print(f"Storage cleanup failed (non-fatal, video already live): {e}")
 
+    # B2 SWEEP (2026-11-03): remove every remaining file/version of this
+    # episode (clips, narration, images, thumbnail, final video). The
+    # thumbnail is downloaded below FIRST would be lost, so the sweep runs
+    # after the thumbnail step instead - see the end of main().
+
     thumbnail_url = script.get("thumbnail_url")
     if thumbnail_url:
         try:
@@ -420,6 +439,8 @@ def main():
             print(f"Thumbnail upload failed, video is still live without a custom thumbnail: {e}")
     else:
         print("No thumbnail_url on this script - skipping custom thumbnail.")
+
+    b2_sweep.sweep()
 
     print("Done.")
 
