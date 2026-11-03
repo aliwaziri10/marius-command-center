@@ -4394,7 +4394,7 @@
       "functions": [
         {
           "name": "get_access_token",
-          "line": 99,
+          "line": 109,
           "args": [],
           "calls": [
             "json",
@@ -4406,7 +4406,7 @@
         },
         {
           "name": "get_authorized_channel",
-          "line": 116,
+          "line": 126,
           "args": [
             "access_token"
           ],
@@ -4420,7 +4420,7 @@
         },
         {
           "name": "get_next_ready_script",
-          "line": 137,
+          "line": 147,
           "args": [],
           "calls": [
             "get",
@@ -4431,7 +4431,7 @@
         },
         {
           "name": "get_topic_title",
-          "line": 148,
+          "line": 158,
           "args": [
             "topic_id"
           ],
@@ -4444,7 +4444,7 @@
         },
         {
           "name": "download_file",
-          "line": 159,
+          "line": 169,
           "args": [
             "url",
             "out_path"
@@ -4459,7 +4459,7 @@
         },
         {
           "name": "stitch_chunks_to_local_file",
-          "line": 167,
+          "line": 177,
           "args": [
             "video_chunk_urls",
             "out_path"
@@ -4479,7 +4479,7 @@
         },
         {
           "name": "build_description",
-          "line": 213,
+          "line": 223,
           "args": [
             "narration_text"
           ],
@@ -4493,7 +4493,7 @@
         },
         {
           "name": "upload_to_youtube",
-          "line": 239,
+          "line": 249,
           "args": [
             "access_token",
             "video_path",
@@ -4515,7 +4515,7 @@
         },
         {
           "name": "set_thumbnail",
-          "line": 289,
+          "line": 299,
           "args": [
             "access_token",
             "youtube_id",
@@ -4533,7 +4533,7 @@
         },
         {
           "name": "mark_uploaded",
-          "line": 313,
+          "line": 323,
           "args": [
             "script_id",
             "youtube_id"
@@ -4546,7 +4546,7 @@
         },
         {
           "name": "delete_source_from_storage",
-          "line": 323,
+          "line": 333,
           "args": [
             "script"
           ],
@@ -4559,7 +4559,7 @@
         },
         {
           "name": "main",
-          "line": 336,
+          "line": 346,
           "args": [],
           "calls": [
             "RuntimeError",
@@ -4580,6 +4580,7 @@
             "set_thumbnail",
             "stitch_chunks_to_local_file",
             "strip",
+            "sweep",
             "upload_to_youtube"
           ],
           "docstring": ""
