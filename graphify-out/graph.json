@@ -77,8 +77,8 @@
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
-      "community": 12,
-      "community_name": "re",
+      "community": 23,
+      "community_name": "generate_codemap.py",
       "file_type": "code",
       "norm_label": "callcollector",
       "source_file": "generate_codemap.py",
@@ -91,7 +91,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "stockonlyerror",
       "source_file": "scripts/stock_fallback.py",
@@ -578,18 +578,6 @@
       "source_location": "L380"
     },
     {
-      "id": "scripts_clip_generation_generate_character_reference",
-      "label": "generate_character_reference()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "generate_character_reference()",
-      "source_file": "scripts/clip_generation.py",
-      "source_location": "L105"
-    },
-    {
       "id": "scripts_clip_generation_generate_one_segment",
       "label": "_generate_one_segment()",
       "_callable": true,
@@ -650,16 +638,16 @@
       "source_location": "L96"
     },
     {
-      "id": "scripts_prompt_builder_build_character_reference_prompt",
-      "label": "build_character_reference_prompt()",
+      "id": "scripts_prompt_focus_no_people_clause",
+      "label": "no_people_clause()",
       "_callable": true,
       "_origin": "ast",
       "community": 1,
       "community_name": "clip_generation.py",
       "file_type": "code",
-      "norm_label": "build_character_reference_prompt()",
-      "source_file": "scripts/prompt_builder.py",
-      "source_location": "L324"
+      "norm_label": "no_people_clause()",
+      "source_file": "scripts/prompt_focus.py",
+      "source_location": "L86"
     },
     {
       "id": "scripts_clip_qa_check_clip",
@@ -744,18 +732,6 @@
       "norm_label": "focus_anchor()",
       "source_file": "scripts/prompt_focus.py",
       "source_location": "L66"
-    },
-    {
-      "id": "scripts_prompt_focus_no_people_clause",
-      "label": "no_people_clause()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 10,
-      "community_name": "thumbnail_generation.py",
-      "file_type": "code",
-      "norm_label": "no_people_clause()",
-      "source_file": "scripts/prompt_focus.py",
-      "source_location": "L86"
     },
     {
       "id": "scripts_prompt_focus_protagonist_name",
@@ -950,6 +926,18 @@
       "source_location": "L175"
     },
     {
+      "id": "scripts_clip_generation_generate_character_reference",
+      "label": "generate_character_reference()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "generate_character_reference()",
+      "source_file": "scripts/clip_generation.py",
+      "source_location": "L105"
+    },
+    {
       "id": "scripts_clip_generation_get_continuity_anchor",
       "label": "get_continuity_anchor()",
       "_callable": true,
@@ -972,6 +960,18 @@
       "norm_label": "retryable_request()",
       "source_file": "scripts/llm_client.py",
       "source_location": "L231"
+    },
+    {
+      "id": "scripts_storage_b2_upload_file",
+      "label": "upload_file()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "video_generation.py",
+      "file_type": "code",
+      "norm_label": "upload_file()",
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L217"
     },
     {
       "id": "scripts_video_generation_clear_error",
@@ -1190,114 +1190,6 @@
       "source_location": "L209"
     },
     {
-      "id": "generate_codemap_build_codemap",
-      "label": "build_codemap()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "re",
-      "file_type": "code",
-      "norm_label": "build_codemap()",
-      "source_file": "generate_codemap.py",
-      "source_location": "L111"
-    },
-    {
-      "id": "generate_codemap_callcollector_init",
-      "label": ".__init__()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "re",
-      "file_type": "code",
-      "norm_label": ".__init__()",
-      "source_file": "generate_codemap.py",
-      "source_location": "L45"
-    },
-    {
-      "id": "generate_codemap_callcollector_visit_call",
-      "label": ".visit_Call()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "re",
-      "file_type": "code",
-      "norm_label": ".visit_call()",
-      "source_file": "generate_codemap.py",
-      "source_location": "L48"
-    },
-    {
-      "id": "generate_codemap_extract_env_vars",
-      "label": "extract_env_vars()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "re",
-      "file_type": "code",
-      "norm_label": "extract_env_vars()",
-      "source_file": "generate_codemap.py",
-      "source_location": "L59"
-    },
-    {
-      "id": "generate_codemap_extract_tables",
-      "label": "extract_tables()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "re",
-      "file_type": "code",
-      "norm_label": "extract_tables()",
-      "source_file": "generate_codemap.py",
-      "source_location": "L70"
-    },
-    {
-      "id": "generate_codemap_find_py_files",
-      "label": "find_py_files()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "re",
-      "file_type": "code",
-      "norm_label": "find_py_files()",
-      "source_file": "generate_codemap.py",
-      "source_location": "L27"
-    },
-    {
-      "id": "generate_codemap_get_docstring_first_line",
-      "label": "get_docstring_first_line()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "re",
-      "file_type": "code",
-      "norm_label": "get_docstring_first_line()",
-      "source_file": "generate_codemap.py",
-      "source_location": "L35"
-    },
-    {
-      "id": "generate_codemap_main",
-      "label": "main()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "re",
-      "file_type": "code",
-      "norm_label": "main()",
-      "source_file": "generate_codemap.py",
-      "source_location": "L133"
-    },
-    {
-      "id": "generate_codemap_process_file",
-      "label": "process_file()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "re",
-      "file_type": "code",
-      "norm_label": "process_file()",
-      "source_file": "generate_codemap.py",
-      "source_location": "L74"
-    },
-    {
       "id": "scripts_prompt_builder_build_agnes_prompt",
       "label": "build_agnes_prompt()",
       "_callable": true,
@@ -1308,6 +1200,18 @@
       "norm_label": "build_agnes_prompt()",
       "source_file": "scripts/prompt_builder.py",
       "source_location": "L235"
+    },
+    {
+      "id": "scripts_prompt_builder_build_character_reference_prompt",
+      "label": "build_character_reference_prompt()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 12,
+      "community_name": "re",
+      "file_type": "code",
+      "norm_label": "build_character_reference_prompt()",
+      "source_file": "scripts/prompt_builder.py",
+      "source_location": "L324"
     },
     {
       "id": "scripts_prompt_builder_sanitize_anchor_for_fallback",
@@ -1466,6 +1370,18 @@
       "source_location": "L61"
     },
     {
+      "id": "scripts_silent_videos_delete_built",
+      "label": "delete_built()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "storage_b2.py",
+      "file_type": "code",
+      "norm_label": "delete_built()",
+      "source_file": "scripts/silent_videos.py",
+      "source_location": "L83"
+    },
+    {
       "id": "scripts_storage_b2_client_config",
       "label": "_client_config()",
       "_callable": true,
@@ -1475,7 +1391,7 @@
       "file_type": "code",
       "norm_label": "_client_config()",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L135"
+      "source_location": "L148"
     },
     {
       "id": "scripts_storage_b2_delete_object",
@@ -1487,7 +1403,7 @@
       "file_type": "code",
       "norm_label": "delete_object()",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L333"
+      "source_location": "L407"
     },
     {
       "id": "scripts_storage_b2_download_to_file",
@@ -1499,7 +1415,19 @@
       "file_type": "code",
       "norm_label": "download_to_file()",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L291"
+      "source_location": "L360"
+    },
+    {
+      "id": "scripts_storage_b2_ffmpeg_exe",
+      "label": "_ffmpeg_exe()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "storage_b2.py",
+      "file_type": "code",
+      "norm_label": "_ffmpeg_exe()",
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L304"
     },
     {
       "id": "scripts_storage_b2_get_client",
@@ -1511,7 +1439,7 @@
       "file_type": "code",
       "norm_label": "_get_client()",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L164"
+      "source_location": "L177"
     },
     {
       "id": "scripts_storage_b2_new_client",
@@ -1523,7 +1451,7 @@
       "file_type": "code",
       "norm_label": "_new_client()",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L151"
+      "source_location": "L164"
     },
     {
       "id": "scripts_storage_b2_object_exists",
@@ -1535,7 +1463,7 @@
       "file_type": "code",
       "norm_label": "object_exists()",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L300"
+      "source_location": "L374"
     },
     {
       "id": "scripts_storage_b2_object_size",
@@ -1547,7 +1475,7 @@
       "file_type": "code",
       "norm_label": "object_size()",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L313"
+      "source_location": "L387"
     },
     {
       "id": "scripts_storage_b2_presign_clients",
@@ -1559,7 +1487,7 @@
       "file_type": "code",
       "norm_label": "_presign_clients()",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L232"
+      "source_location": "L245"
     },
     {
       "id": "scripts_storage_b2_presign_config",
@@ -1571,7 +1499,7 @@
       "file_type": "code",
       "norm_label": "_presign_config()",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L220"
+      "source_location": "L233"
     },
     {
       "id": "scripts_storage_b2_presigned_url",
@@ -1583,7 +1511,7 @@
       "file_type": "code",
       "norm_label": "presigned_url()",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L269"
+      "source_location": "L282"
     },
     {
       "id": "scripts_storage_b2_region_from_endpoint",
@@ -1595,7 +1523,19 @@
       "file_type": "code",
       "norm_label": "_region_from_endpoint()",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L209"
+      "source_location": "L222"
+    },
+    {
+      "id": "scripts_storage_b2_strip_data_tracks",
+      "label": "strip_data_tracks()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "storage_b2.py",
+      "file_type": "code",
+      "norm_label": "strip_data_tracks()",
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L316"
     },
     {
       "id": "scripts_storage_b2_upload_bytes",
@@ -1607,19 +1547,7 @@
       "file_type": "code",
       "norm_label": "upload_bytes()",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L171"
-    },
-    {
-      "id": "scripts_storage_b2_upload_file",
-      "label": "upload_file()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 13,
-      "community_name": "storage_b2.py",
-      "file_type": "code",
-      "norm_label": "upload_file()",
-      "source_file": "scripts/storage_b2.py",
-      "source_location": "L204"
+      "source_location": "L184"
     },
     {
       "id": "scripts_storage_b2_url_is_fetchable",
@@ -1631,7 +1559,7 @@
       "file_type": "code",
       "norm_label": "_url_is_fetchable()",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L257"
+      "source_location": "L270"
     },
     {
       "id": "scripts_assembly_stage_apply_safety_limiter",
@@ -1872,6 +1800,114 @@
       "norm_label": "_wrap_caption_text()",
       "source_file": "scripts/assembly_stage.py",
       "source_location": "L474"
+    },
+    {
+      "id": "generate_codemap_build_codemap",
+      "label": "build_codemap()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "generate_codemap.py",
+      "file_type": "code",
+      "norm_label": "build_codemap()",
+      "source_file": "generate_codemap.py",
+      "source_location": "L111"
+    },
+    {
+      "id": "generate_codemap_callcollector_init",
+      "label": ".__init__()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "generate_codemap.py",
+      "file_type": "code",
+      "norm_label": ".__init__()",
+      "source_file": "generate_codemap.py",
+      "source_location": "L45"
+    },
+    {
+      "id": "generate_codemap_callcollector_visit_call",
+      "label": ".visit_Call()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "generate_codemap.py",
+      "file_type": "code",
+      "norm_label": ".visit_call()",
+      "source_file": "generate_codemap.py",
+      "source_location": "L48"
+    },
+    {
+      "id": "generate_codemap_extract_env_vars",
+      "label": "extract_env_vars()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "generate_codemap.py",
+      "file_type": "code",
+      "norm_label": "extract_env_vars()",
+      "source_file": "generate_codemap.py",
+      "source_location": "L59"
+    },
+    {
+      "id": "generate_codemap_extract_tables",
+      "label": "extract_tables()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "generate_codemap.py",
+      "file_type": "code",
+      "norm_label": "extract_tables()",
+      "source_file": "generate_codemap.py",
+      "source_location": "L70"
+    },
+    {
+      "id": "generate_codemap_find_py_files",
+      "label": "find_py_files()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "generate_codemap.py",
+      "file_type": "code",
+      "norm_label": "find_py_files()",
+      "source_file": "generate_codemap.py",
+      "source_location": "L27"
+    },
+    {
+      "id": "generate_codemap_get_docstring_first_line",
+      "label": "get_docstring_first_line()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "generate_codemap.py",
+      "file_type": "code",
+      "norm_label": "get_docstring_first_line()",
+      "source_file": "generate_codemap.py",
+      "source_location": "L35"
+    },
+    {
+      "id": "generate_codemap_main",
+      "label": "main()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "generate_codemap.py",
+      "file_type": "code",
+      "norm_label": "main()",
+      "source_file": "generate_codemap.py",
+      "source_location": "L133"
+    },
+    {
+      "id": "generate_codemap_process_file",
+      "label": "process_file()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "generate_codemap.py",
+      "file_type": "code",
+      "norm_label": "process_file()",
+      "source_file": "generate_codemap.py",
+      "source_location": "L74"
     },
     {
       "id": "scripts_kaggle_video_test_kernel_add_sound",
@@ -2323,7 +2359,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "_concat()",
       "source_file": "scripts/stock_fallback.py",
@@ -2335,7 +2371,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "configure_agnes_wait()",
       "source_file": "scripts/stock_fallback.py",
@@ -2347,7 +2383,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "_download()",
       "source_file": "scripts/stock_fallback.py",
@@ -2359,7 +2395,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "_ffmpeg()",
       "source_file": "scripts/stock_fallback.py",
@@ -2371,7 +2407,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "_generic_queries()",
       "source_file": "scripts/stock_fallback.py",
@@ -2383,7 +2419,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "is_enabled()",
       "source_file": "scripts/stock_fallback.py",
@@ -2395,7 +2431,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "_keywords()",
       "source_file": "scripts/stock_fallback.py",
@@ -2407,7 +2443,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "_loop_fill()",
       "source_file": "scripts/stock_fallback.py",
@@ -2419,7 +2455,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "make_stock_clip()",
       "source_file": "scripts/stock_fallback.py",
@@ -2431,7 +2467,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "mark_script_stock()",
       "source_file": "scripts/stock_fallback.py",
@@ -2443,7 +2479,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "_normalize()",
       "source_file": "scripts/stock_fallback.py",
@@ -2455,7 +2491,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "_pad_to()",
       "source_file": "scripts/stock_fallback.py",
@@ -2467,7 +2503,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "_pick_file()",
       "source_file": "scripts/stock_fallback.py",
@@ -2479,7 +2515,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "_probe_duration()",
       "source_file": "scripts/stock_fallback.py",
@@ -2491,7 +2527,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "_query_ladder()",
       "source_file": "scripts/stock_fallback.py",
@@ -2503,7 +2539,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "require_stock_clip()",
       "source_file": "scripts/stock_fallback.py",
@@ -2515,7 +2551,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "_sb()",
       "source_file": "scripts/stock_fallback.py",
@@ -2527,7 +2563,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "script_is_stock()",
       "source_file": "scripts/stock_fallback.py",
@@ -2539,7 +2575,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "_search()",
       "source_file": "scripts/stock_fallback.py",
@@ -2551,7 +2587,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "list_all_objects()",
       "source_file": "scripts/cleanup_dead_storage.py",
@@ -2563,7 +2599,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "main()",
       "source_file": "scripts/cleanup_dead_storage.py",
@@ -2575,7 +2611,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "check_generation_failed_backlog()",
       "source_file": "scripts/health_check.py",
@@ -2587,7 +2623,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "check_stale_scripts()",
       "source_file": "scripts/health_check.py",
@@ -2599,7 +2635,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "check_stuck_scripts()",
       "source_file": "scripts/health_check.py",
@@ -2611,7 +2647,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "hours_since()",
       "source_file": "scripts/health_check.py",
@@ -2623,7 +2659,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "main()",
       "source_file": "scripts/health_check.py",
@@ -2635,7 +2671,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "supabase_get()",
       "source_file": "scripts/health_check.py",
@@ -2647,7 +2683,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "main()",
       "source_file": "scripts/kaggle_video_test/run_test.py",
@@ -2659,7 +2695,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "sh()",
       "source_file": "scripts/kaggle_video_test/run_test.py",
@@ -2671,7 +2707,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "build()",
       "source_file": "scripts/silent_videos.py",
@@ -2683,23 +2719,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "build_all()",
       "source_file": "scripts/silent_videos.py",
       "source_location": "L66"
-    },
-    {
-      "id": "scripts_silent_videos_delete_built",
-      "label": "delete_built()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "json",
-      "file_type": "code",
-      "norm_label": "delete_built()",
-      "source_file": "scripts/silent_videos.py",
-      "source_location": "L83"
     },
     {
       "id": "scripts_silent_videos_get_scripts",
@@ -2707,7 +2731,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "get_scripts()",
       "source_file": "scripts/silent_videos.py",
@@ -2719,7 +2743,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "main()",
       "source_file": "scripts/stall_monitor.py",
@@ -2731,7 +2755,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "check_b2_key_alive()",
       "source_file": "scripts/verify_run_output.py",
@@ -2743,7 +2767,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "check_stalled_scripts()",
       "source_file": "scripts/verify_run_output.py",
@@ -2755,7 +2779,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "check_url_alive()",
       "source_file": "scripts/verify_run_output.py",
@@ -2767,7 +2791,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "fetch_scripts()",
       "source_file": "scripts/verify_run_output.py",
@@ -2779,7 +2803,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "main()",
       "source_file": "scripts/verify_run_output.py",
@@ -2791,7 +2815,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "run_verification()",
       "source_file": "scripts/verify_run_output.py",
@@ -2803,7 +2827,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "verify_shot_breakdown_script()",
       "source_file": "scripts/verify_run_output.py",
@@ -2815,7 +2839,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "verify_video_generated_script()",
       "source_file": "scripts/verify_run_output.py",
@@ -3729,6 +3753,17 @@
       "source_location": "L237"
     },
     {
+      "id": "scripts_prompt_focus_rationale_87",
+      "label": "The 'no people in frame' clause, only for shots that clearly have no people: no\u2026",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "clip_generation.py",
+      "file_type": "rationale",
+      "norm_label": "the 'no people in frame' clause, only for shots that clearly have no people: no...",
+      "source_file": "scripts/prompt_focus.py",
+      "source_location": "L87"
+    },
+    {
       "id": "scripts_clip_qa",
       "label": "clip_qa.py",
       "_origin": "ast",
@@ -3815,17 +3850,6 @@
       "norm_label": "anchor to send with this shot: unchanged if the shot features the protagonist,...",
       "source_file": "scripts/prompt_focus.py",
       "source_location": "L67"
-    },
-    {
-      "id": "scripts_prompt_focus_rationale_87",
-      "label": "The 'no people in frame' clause, only for shots that clearly have no people: no\u2026",
-      "_origin": "ast",
-      "community": 10,
-      "community_name": "thumbnail_generation.py",
-      "file_type": "rationale",
-      "norm_label": "the 'no people in frame' clause, only for shots that clearly have no people: no...",
-      "source_file": "scripts/prompt_focus.py",
-      "source_location": "L87"
     },
     {
       "id": "scripts_thumbnail_generation_rationale_1",
@@ -4037,17 +4061,6 @@
       "source_location": "L346"
     },
     {
-      "id": "generate_codemap",
-      "label": "generate_codemap.py",
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "re",
-      "file_type": "code",
-      "norm_label": "generate_codemap.py",
-      "source_file": "generate_codemap.py",
-      "source_location": "L1"
-    },
-    {
       "id": "scripts_prompt_builder",
       "label": "prompt_builder.py",
       "_origin": "ast",
@@ -4214,28 +4227,6 @@
       "source_location": "L1"
     },
     {
-      "id": "generate_codemap_rationale_1",
-      "label": "CODEMAP.json generator. Walks every .py file in the repo (skipping common noise\u2026",
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "re",
-      "file_type": "rationale",
-      "norm_label": "codemap.json generator. walks every .py file in the repo (skipping common noise...",
-      "source_file": "generate_codemap.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "generate_codemap_rationale_43",
-      "label": "Collects the names of functions called within a single function body.",
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "re",
-      "file_type": "rationale",
-      "norm_label": "collects the names of functions called within a single function body.",
-      "source_file": "generate_codemap.py",
-      "source_location": "L43"
-    },
-    {
       "id": "scripts_prompt_builder_rationale_1",
       "label": "Marius Command Center - prompt building (split from video_generation.py,\u2026",
       "_origin": "ast",
@@ -4335,6 +4326,54 @@
       "source_location": "L1"
     },
     {
+      "id": "continuation_2026_09_19_session_b2_agnes_fixes_landed_throughput_math_checked_agnes_replacement_researched",
+      "label": "2026-09-19 session \u2014 B2/Agnes fixes landed, throughput math checked, Agnes-replacement researched",
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "storage_b2.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "2026-09-19 session \u2014 b2/agnes fixes landed, throughput math checked, agnes-replacement researched",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L192"
+    },
+    {
+      "id": "continuation_agnes_replacement_research_requested_by_ali_generate_video_on_a",
+      "label": "Agnes-replacement research (requested by Ali \u2014 \"generate video on a",
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "storage_b2.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "agnes-replacement research (requested by ali \u2014 \"generate video on a",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L230"
+    },
+    {
+      "id": "continuation_exact_next_steps_for_whoever_picks_this_up_152",
+      "label": "EXACT NEXT STEPS for whoever picks this up",
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "storage_b2.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "exact next steps for whoever picks this up",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L152"
+    },
+    {
+      "id": "continuation_marius_erased_continuation_notes_2026_09_19_part_1_throughput_agnes_replacement_session",
+      "label": "Marius / Erased \u2014 Continuation Notes (2026-09-19 PART 1, THROUGHPUT + AGNES-REPLACEMENT SESSION)",
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "storage_b2.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "marius / erased \u2014 continuation notes (2026-09-19 part 1, throughput + agnes-replacement session)",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L181"
+    },
+    {
       "id": "continuation_what_s_confirmed_this_session",
       "label": "What's CONFIRMED this session",
       "_origin": "ast",
@@ -4380,7 +4419,7 @@
       "source_location": "L1"
     },
     {
-      "id": "scripts_storage_b2_rationale_136",
+      "id": "scripts_storage_b2_rationale_149",
       "label": "CHECKSUM-COMPAT CHANGE (2026-09-19, HYPOTHESIS - see module docstring): opts\u2026",
       "_origin": "ast",
       "community": 13,
@@ -4388,10 +4427,10 @@
       "file_type": "rationale",
       "norm_label": "checksum-compat change (2026-09-19, hypothesis - see module docstring): opts...",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L136"
+      "source_location": "L149"
     },
     {
-      "id": "scripts_storage_b2_rationale_152",
+      "id": "scripts_storage_b2_rationale_165",
       "label": "Builds a brand-new boto3 S3 client (fresh TCP+TLS connection, fresh connection\u2026",
       "_origin": "ast",
       "community": 13,
@@ -4399,10 +4438,10 @@
       "file_type": "rationale",
       "norm_label": "builds a brand-new boto3 s3 client (fresh tcp+tls connection, fresh connection...",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L152"
+      "source_location": "L165"
     },
     {
-      "id": "scripts_storage_b2_rationale_172",
+      "id": "scripts_storage_b2_rationale_185",
       "label": "Uploads bytes to B2 under object_key. Returns object_key unchanged (the caller\u2026",
       "_origin": "ast",
       "community": 13,
@@ -4410,10 +4449,10 @@
       "file_type": "rationale",
       "norm_label": "uploads bytes to b2 under object_key. returns object_key unchanged (the caller...",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L172"
+      "source_location": "L185"
     },
     {
-      "id": "scripts_storage_b2_rationale_210",
+      "id": "scripts_storage_b2_rationale_223",
       "label": "Parses the B2 region (e.g. us-west-004) out of an endpoint host like s3.us-\u2026",
       "_origin": "ast",
       "community": 13,
@@ -4421,10 +4460,10 @@
       "file_type": "rationale",
       "norm_label": "parses the b2 region (e.g. us-west-004) out of an endpoint host like s3.us-...",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L210"
+      "source_location": "L223"
     },
     {
-      "id": "scripts_storage_b2_rationale_233",
+      "id": "scripts_storage_b2_rationale_246",
       "label": "Candidate clients for presigning, best first. PRESIGN-REGION FIX (2026-10-08):\u2026",
       "_origin": "ast",
       "community": 13,
@@ -4432,10 +4471,10 @@
       "file_type": "rationale",
       "norm_label": "candidate clients for presigning, best first. presign-region fix (2026-10-08):...",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L233"
+      "source_location": "L246"
     },
     {
-      "id": "scripts_storage_b2_rationale_258",
+      "id": "scripts_storage_b2_rationale_271",
       "label": "Fetches 1 byte of the presigned URL exactly the way Agnes will. Returns (ok,\u2026",
       "_origin": "ast",
       "community": 13,
@@ -4443,10 +4482,10 @@
       "file_type": "rationale",
       "norm_label": "fetches 1 byte of the presigned url exactly the way agnes will. returns (ok,...",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L258"
+      "source_location": "L271"
     },
     {
-      "id": "scripts_storage_b2_rationale_270",
+      "id": "scripts_storage_b2_rationale_283",
       "label": "Generates a fresh, short-lived presigned GET URL for object_key and PROVES it\u2026",
       "_origin": "ast",
       "community": 13,
@@ -4454,10 +4493,32 @@
       "file_type": "rationale",
       "norm_label": "generates a fresh, short-lived presigned get url for object_key and proves it...",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L270"
+      "source_location": "L283"
     },
     {
-      "id": "scripts_storage_b2_rationale_292",
+      "id": "scripts_storage_b2_rationale_305",
+      "label": "Same ffmpeg binary moviepy itself uses, so the cleanup below sees exactly what\u2026",
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "storage_b2.py",
+      "file_type": "rationale",
+      "norm_label": "same ffmpeg binary moviepy itself uses, so the cleanup below sees exactly what...",
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L305"
+    },
+    {
+      "id": "scripts_storage_b2_rationale_317",
+      "label": "TIMECODE-TRACK FIX (2026-11-09): see module docstring. If the .mp4 at\u2026",
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "storage_b2.py",
+      "file_type": "rationale",
+      "norm_label": "timecode-track fix (2026-11-09): see module docstring. if the .mp4 at...",
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L317"
+    },
+    {
+      "id": "scripts_storage_b2_rationale_361",
       "label": "Downloads object_key directly to local_path via the B2 API (no presigned URL\u2026",
       "_origin": "ast",
       "community": 13,
@@ -4465,10 +4526,10 @@
       "file_type": "rationale",
       "norm_label": "downloads object_key directly to local_path via the b2 api (no presigned url...",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L292"
+      "source_location": "L361"
     },
     {
-      "id": "scripts_storage_b2_rationale_301",
+      "id": "scripts_storage_b2_rationale_375",
       "label": "Used by process_script's per-run clip re-verification step, in place of the old\u2026",
       "_origin": "ast",
       "community": 13,
@@ -4476,10 +4537,10 @@
       "file_type": "rationale",
       "norm_label": "used by process_script's per-run clip re-verification step, in place of the old...",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L301"
+      "source_location": "L375"
     },
     {
-      "id": "scripts_storage_b2_rationale_314",
+      "id": "scripts_storage_b2_rationale_388",
       "label": "ADDED (2026-09-02): returns the real byte size of object_key in B2, or None if\u2026",
       "_origin": "ast",
       "community": 13,
@@ -4487,10 +4548,10 @@
       "file_type": "rationale",
       "norm_label": "added (2026-09-02): returns the real byte size of object_key in b2, or none if...",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L314"
+      "source_location": "L388"
     },
     {
-      "id": "scripts_storage_b2_rationale_334",
+      "id": "scripts_storage_b2_rationale_408",
       "label": "ADDED (2026-09-10): deletes object_key from B2. Used for post- upload cleanup -\u2026",
       "_origin": "ast",
       "community": 13,
@@ -4498,7 +4559,7 @@
       "file_type": "rationale",
       "norm_label": "added (2026-09-10): deletes object_key from b2. used for post- upload cleanup -...",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L334"
+      "source_location": "L408"
     },
     {
       "id": "continuation",
@@ -4511,30 +4572,6 @@
       "norm_label": "continuation.md",
       "source_file": "CONTINUATION.md",
       "source_location": "L1"
-    },
-    {
-      "id": "continuation_2026_09_19_session_b2_agnes_fixes_landed_throughput_math_checked_agnes_replacement_researched",
-      "label": "2026-09-19 session \u2014 B2/Agnes fixes landed, throughput math checked, Agnes-replacement researched",
-      "_origin": "ast",
-      "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "2026-09-19 session \u2014 b2/agnes fixes landed, throughput math checked, agnes-replacement researched",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L192"
-    },
-    {
-      "id": "continuation_agnes_replacement_research_requested_by_ali_generate_video_on_a",
-      "label": "Agnes-replacement research (requested by Ali \u2014 \"generate video on a",
-      "_origin": "ast",
-      "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "agnes-replacement research (requested by ali \u2014 \"generate video on a",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L230"
     },
     {
       "id": "continuation_correction_to_part_4_important_do_not_delete_these_files",
@@ -4595,30 +4632,6 @@
       "norm_label": "exact next steps for whoever picks this up",
       "source_file": "CONTINUATION.md",
       "source_location": "L46"
-    },
-    {
-      "id": "continuation_exact_next_steps_for_whoever_picks_this_up_152",
-      "label": "EXACT NEXT STEPS for whoever picks this up",
-      "_origin": "ast",
-      "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "exact next steps for whoever picks this up",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L152"
-    },
-    {
-      "id": "continuation_marius_erased_continuation_notes_2026_09_19_part_1_throughput_agnes_replacement_session",
-      "label": "Marius / Erased \u2014 Continuation Notes (2026-09-19 PART 1, THROUGHPUT + AGNES-REPLACEMENT SESSION)",
-      "_origin": "ast",
-      "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "marius / erased \u2014 continuation notes (2026-09-19 part 1, throughput + agnes-replacement session)",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L181"
     },
     {
       "id": "continuation_marius_erased_continuation_notes_2026_09_19_part_2_live_handoff",
@@ -5385,6 +5398,39 @@
       "source_location": "L1"
     },
     {
+      "id": "generate_codemap",
+      "label": "generate_codemap.py",
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "generate_codemap.py",
+      "file_type": "code",
+      "norm_label": "generate_codemap.py",
+      "source_file": "generate_codemap.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "generate_codemap_rationale_1",
+      "label": "CODEMAP.json generator. Walks every .py file in the repo (skipping common noise\u2026",
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "generate_codemap.py",
+      "file_type": "rationale",
+      "norm_label": "codemap.json generator. walks every .py file in the repo (skipping common noise...",
+      "source_file": "generate_codemap.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "generate_codemap_rationale_43",
+      "label": "Collects the names of functions called within a single function body.",
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "generate_codemap.py",
+      "file_type": "rationale",
+      "norm_label": "collects the names of functions called within a single function body.",
+      "source_file": "generate_codemap.py",
+      "source_location": "L43"
+    },
+    {
       "id": "scripts_kaggle_video_test_kernel",
       "label": "kernel.py",
       "_origin": "ast",
@@ -5587,7 +5633,7 @@
       "label": "stock_fallback.py",
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "stock_fallback.py",
       "source_file": "scripts/stock_fallback.py",
@@ -5598,7 +5644,7 @@
       "label": "Exception",
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "code",
       "norm_label": "exception",
       "source_file": "",
@@ -5609,7 +5655,7 @@
       "label": "Marius Command Center - free stock-footage fallback (2026-10-18). WHY: Agnes\u2026",
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "rationale",
       "norm_label": "marius command center - free stock-footage fallback (2026-10-18). why: agnes...",
       "source_file": "scripts/stock_fallback.py",
@@ -5620,7 +5666,7 @@
       "label": "True once this video has started using stock footage. Stays True across runs\u2026",
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "rationale",
       "norm_label": "true once this video has started using stock footage. stays true across runs...",
       "source_file": "scripts/stock_fallback.py",
@@ -5631,7 +5677,7 @@
       "label": "Scale and crop to 1920x1080 at 24 fps, no audio, at most `seconds` long.",
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "rationale",
       "norm_label": "scale and crop to 1920x1080 at 24 fps, no audio, at most `seconds` long.",
       "source_file": "scripts/stock_fallback.py",
@@ -5642,7 +5688,7 @@
       "label": "Real length of a video file in seconds (None if it cannot be read).",
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "rationale",
       "norm_label": "real length of a video file in seconds (none if it cannot be read).",
       "source_file": "scripts/stock_fallback.py",
@@ -5653,7 +5699,7 @@
       "label": "Keep playing the cut pieces again (new cuts, no frozen frame) until the file is\u2026",
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "rationale",
       "norm_label": "keep playing the cut pieces again (new cuts, no frozen frame) until the file is...",
       "source_file": "scripts/stock_fallback.py",
@@ -5664,7 +5710,7 @@
       "label": "Last resort: hold the last frame so the file is exactly `target` seconds long.",
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "rationale",
       "norm_label": "last resort: hold the last frame so the file is exactly `target` seconds long.",
       "source_file": "scripts/stock_fallback.py",
@@ -5675,7 +5721,7 @@
       "label": "For a video already in stock mode: make the stock clip or raise. Never Agnes.",
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "rationale",
       "norm_label": "for a video already in stock mode: make the stock clip or raise. never agnes.",
       "source_file": "scripts/stock_fallback.py",
@@ -5686,7 +5732,7 @@
       "label": "Write a stock clip of exactly target_duration seconds to out_path. Returns True\u2026",
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "rationale",
       "norm_label": "write a stock clip of exactly target_duration seconds to out_path. returns true...",
       "source_file": "scripts/stock_fallback.py",
@@ -5697,7 +5743,7 @@
       "label": "Raised when a video that is already in stock mode cannot get a stock clip.",
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "rationale",
       "norm_label": "raised when a video that is already in stock mode cannot get a stock clip.",
       "source_file": "scripts/stock_fallback.py",
@@ -5708,7 +5754,7 @@
       "label": "When the fallback is enabled there is no point waiting ~16 minutes per shot for\u2026",
       "_origin": "ast",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "file_type": "rationale",
       "norm_label": "when the fallback is enabled there is no point waiting ~16 minutes per shot for...",
       "source_file": "scripts/stock_fallback.py",
@@ -5803,7 +5849,7 @@
       "label": "cleanup_dead_storage.py",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "cleanup_dead_storage.py",
       "source_file": "scripts/cleanup_dead_storage.py",
@@ -5814,7 +5860,7 @@
       "label": "health_check.py",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "health_check.py",
       "source_file": "scripts/health_check.py",
@@ -5825,7 +5871,7 @@
       "label": "run_test.py",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "run_test.py",
       "source_file": "scripts/kaggle_video_test/run_test.py",
@@ -5836,7 +5882,7 @@
       "label": "silent_videos.py",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "silent_videos.py",
       "source_file": "scripts/silent_videos.py",
@@ -5847,7 +5893,7 @@
       "label": "stall_monitor.py",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "stall_monitor.py",
       "source_file": "scripts/stall_monitor.py",
@@ -5858,7 +5904,7 @@
       "label": "update_status.py",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "update_status.py",
       "source_file": "scripts/update_status.py",
@@ -5869,7 +5915,7 @@
       "label": "verify_run_output.py",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "code",
       "norm_label": "verify_run_output.py",
       "source_file": "scripts/verify_run_output.py",
@@ -5880,7 +5926,7 @@
       "label": "Marius Command Center - One-off Supabase Storage Cleanup Run manually via\u2026",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "rationale",
       "norm_label": "marius command center - one-off supabase storage cleanup run manually via...",
       "source_file": "scripts/cleanup_dead_storage.py",
@@ -5891,7 +5937,7 @@
       "label": "Recursively lists every object in a bucket, including inside subfolders (e.g.\u2026",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "rationale",
       "norm_label": "recursively lists every object in a bucket, including inside subfolders (e.g....",
       "source_file": "scripts/cleanup_dead_storage.py",
@@ -5902,7 +5948,7 @@
       "label": "Marius Command Center - Health Check Read-only monitor. Runs on its own\u2026",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "rationale",
       "norm_label": "marius command center - health check read-only monitor. runs on its own...",
       "source_file": "scripts/health_check.py",
@@ -5913,7 +5959,7 @@
       "label": "No updated_at column exists on `scripts`, so 'stuck' is approximated as: still\u2026",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "rationale",
       "norm_label": "no updated_at column exists on `scripts`, so 'stuck' is approximated as: still...",
       "source_file": "scripts/health_check.py",
@@ -5924,7 +5970,7 @@
       "label": "Runs in GitHub Actions. Pushes scripts/kaggle_video_test/kernel.py to Kaggle as\u2026",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "rationale",
       "norm_label": "runs in github actions. pushes scripts/kaggle_video_test/kernel.py to kaggle as...",
       "source_file": "scripts/kaggle_video_test/run_test.py",
@@ -5935,7 +5981,7 @@
       "label": "Marius Command Center - Silent video export (2026-10-25) Manual one-off. For\u2026",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "rationale",
       "norm_label": "marius command center - silent video export (2026-10-25) manual one-off. for...",
       "source_file": "scripts/silent_videos.py",
@@ -5946,7 +5992,7 @@
       "label": "Marius Command Center - Post-Run Output Verifier (Loop Skill 1) Checks what's\u2026",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "rationale",
       "norm_label": "marius command center - post-run output verifier (loop skill 1) checks what's...",
       "source_file": "scripts/verify_run_output.py",
@@ -5957,7 +6003,7 @@
       "label": "ADDED (2026-09-02): the B2-key equivalent of check_url_alive, for\u2026",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "rationale",
       "norm_label": "added (2026-09-02): the b2-key equivalent of check_url_alive, for...",
       "source_file": "scripts/verify_run_output.py",
@@ -5968,7 +6014,7 @@
       "label": "Any script that has passed shot breakdown (status images_generated or later)\u2026",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "rationale",
       "norm_label": "any script that has passed shot breakdown (status images_generated or later)...",
       "source_file": "scripts/verify_run_output.py",
@@ -5979,7 +6025,7 @@
       "label": "A script marked video_generated must have a video that's actually live and non-\u2026",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "rationale",
       "norm_label": "a script marked video_generated must have a video that's actually live and non-...",
       "source_file": "scripts/verify_run_output.py",
@@ -5990,7 +6036,7 @@
       "label": "Non-fatal early warning for the exact pattern STATUS.md is showing right now: a\u2026",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "rationale",
       "norm_label": "non-fatal early warning for the exact pattern status.md is showing right now: a...",
       "source_file": "scripts/verify_run_output.py",
@@ -6001,7 +6047,7 @@
       "label": "HEAD request - confirms the URL is actually live and (optionally) non-trivially\u2026",
       "_origin": "ast",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "file_type": "rationale",
       "norm_label": "head request - confirms the url is actually live and (optionally) non-trivially...",
       "source_file": "scripts/verify_run_output.py",
@@ -6267,18 +6313,6 @@
       "type": "external"
     },
     {
-      "id": "ast",
-      "label": "ast",
-      "_origin": "semantic",
-      "community": 12,
-      "community_name": "re",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "ast",
-      "source_file": "",
-      "type": "external"
-    },
-    {
       "id": "re",
       "label": "re",
       "_origin": "semantic",
@@ -6371,6 +6405,18 @@
       "external": true,
       "file_type": "concept",
       "norm_label": "numpy",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "ast",
+      "label": "ast",
+      "_origin": "semantic",
+      "community": 23,
+      "community_name": "generate_codemap.py",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "ast",
       "source_file": "",
       "type": "external"
     },
@@ -6487,22 +6533,10 @@
       "label": "hashlib",
       "_origin": "semantic",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "external": true,
       "file_type": "concept",
       "norm_label": "hashlib",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "os",
-      "label": "os",
-      "_origin": "semantic",
-      "community": 5,
-      "community_name": "os",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "os",
       "source_file": "",
       "type": "external"
     },
@@ -6511,7 +6545,7 @@
       "label": "shutil",
       "_origin": "semantic",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "external": true,
       "file_type": "concept",
       "norm_label": "shutil",
@@ -6523,7 +6557,7 @@
       "label": "subprocess",
       "_origin": "semantic",
       "community": 5,
-      "community_name": "os",
+      "community_name": "stock_fallback.py",
       "external": true,
       "file_type": "concept",
       "norm_label": "subprocess",
@@ -6535,7 +6569,7 @@
       "label": "argparse",
       "_origin": "semantic",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "external": true,
       "file_type": "concept",
       "norm_label": "argparse",
@@ -6547,7 +6581,7 @@
       "label": "datetime",
       "_origin": "semantic",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "external": true,
       "file_type": "concept",
       "norm_label": "datetime",
@@ -6559,10 +6593,22 @@
       "label": "json",
       "_origin": "semantic",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "external": true,
       "file_type": "concept",
       "norm_label": "json",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "os",
+      "label": "os",
+      "_origin": "semantic",
+      "community": 7,
+      "community_name": "os",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "os",
       "source_file": "",
       "type": "external"
     },
@@ -6571,7 +6617,7 @@
       "label": "supabase",
       "_origin": "semantic",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "external": true,
       "file_type": "concept",
       "norm_label": "supabase",
@@ -6583,7 +6629,7 @@
       "label": "sys",
       "_origin": "semantic",
       "community": 7,
-      "community_name": "json",
+      "community_name": "os",
       "external": true,
       "file_type": "concept",
       "norm_label": "sys",
@@ -10417,7 +10463,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L341",
+      "source_location": "L415",
       "weight": 1.0
     },
     {
@@ -10429,7 +10475,19 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L295",
+      "source_location": "L368",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_storage_b2_download_to_file",
+      "target": "scripts_storage_b2_strip_data_tracks",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L370",
       "weight": 1.0
     },
     {
@@ -10441,7 +10499,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L167",
+      "source_location": "L180",
       "weight": 1.0
     },
     {
@@ -10453,7 +10511,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L160",
+      "source_location": "L173",
       "weight": 1.0
     },
     {
@@ -10465,7 +10523,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L305",
+      "source_location": "L379",
       "weight": 1.0
     },
     {
@@ -10477,7 +10535,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L325",
+      "source_location": "L399",
       "weight": 1.0
     },
     {
@@ -10489,7 +10547,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L241",
+      "source_location": "L254",
       "weight": 1.0
     },
     {
@@ -10501,7 +10559,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L251",
+      "source_location": "L264",
       "weight": 1.0
     },
     {
@@ -10513,7 +10571,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L253",
+      "source_location": "L266",
       "weight": 1.0
     },
     {
@@ -10525,7 +10583,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L277",
+      "source_location": "L290",
       "weight": 1.0
     },
     {
@@ -10537,7 +10595,19 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L283",
+      "source_location": "L296",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_storage_b2_strip_data_tracks",
+      "target": "scripts_storage_b2_ffmpeg_exe",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L326",
       "weight": 1.0
     },
     {
@@ -10549,7 +10619,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L185",
+      "source_location": "L198",
       "weight": 1.0
     },
     {
@@ -10561,7 +10631,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L185",
+      "source_location": "L198",
       "weight": 1.0
     },
     {
@@ -10573,7 +10643,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L206",
+      "source_location": "L219",
       "weight": 1.0
     },
     {
@@ -13765,7 +13835,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L101",
+      "source_location": "L113",
       "weight": 1.0
     },
     {
@@ -13777,7 +13847,19 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L102",
+      "source_location": "L114",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_storage_b2",
+      "target": "subprocess",
+      "relation": "imports",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L115",
       "weight": 1.0
     },
     {
@@ -13789,7 +13871,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L103",
+      "source_location": "L116",
       "weight": 1.0
     },
     {
@@ -13801,7 +13883,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L104",
+      "source_location": "L117",
       "weight": 1.0
     },
     {
@@ -14761,7 +14843,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L105",
+      "source_location": "L118",
       "weight": 1.0
     },
     {
@@ -14773,7 +14855,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L106",
+      "source_location": "L119",
       "weight": 1.0
     },
     {
@@ -17924,7 +18006,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L135",
+      "source_location": "L148",
       "weight": 1.0
     },
     {
@@ -17935,7 +18017,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L151",
+      "source_location": "L164",
       "weight": 1.0
     },
     {
@@ -17946,7 +18028,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L164",
+      "source_location": "L177",
       "weight": 1.0
     },
     {
@@ -17957,7 +18039,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L171",
+      "source_location": "L184",
       "weight": 1.0
     },
     {
@@ -17968,7 +18050,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L204",
+      "source_location": "L217",
       "weight": 1.0
     },
     {
@@ -17979,7 +18061,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L209",
+      "source_location": "L222",
       "weight": 1.0
     },
     {
@@ -17990,7 +18072,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L220",
+      "source_location": "L233",
       "weight": 1.0
     },
     {
@@ -18001,7 +18083,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L232",
+      "source_location": "L245",
       "weight": 1.0
     },
     {
@@ -18012,7 +18094,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L257",
+      "source_location": "L270",
       "weight": 1.0
     },
     {
@@ -18023,7 +18105,29 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L269",
+      "source_location": "L282",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_storage_b2",
+      "target": "scripts_storage_b2_ffmpeg_exe",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L304",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_storage_b2",
+      "target": "scripts_storage_b2_strip_data_tracks",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L316",
       "weight": 1.0
     },
     {
@@ -18034,7 +18138,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L291",
+      "source_location": "L360",
       "weight": 1.0
     },
     {
@@ -18045,7 +18149,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L300",
+      "source_location": "L374",
       "weight": 1.0
     },
     {
@@ -18056,7 +18160,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L313",
+      "source_location": "L387",
       "weight": 1.0
     },
     {
@@ -18067,7 +18171,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L333",
+      "source_location": "L407",
       "weight": 1.0
     },
     {
@@ -19809,124 +19913,146 @@
       "weight": 1.0
     },
     {
-      "source": "scripts_storage_b2_rationale_136",
+      "source": "scripts_storage_b2_rationale_149",
       "target": "scripts_storage_b2_client_config",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L136",
+      "source_location": "L149",
       "weight": 1.0
     },
     {
-      "source": "scripts_storage_b2_rationale_152",
+      "source": "scripts_storage_b2_rationale_165",
       "target": "scripts_storage_b2_new_client",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L152",
+      "source_location": "L165",
       "weight": 1.0
     },
     {
-      "source": "scripts_storage_b2_rationale_172",
+      "source": "scripts_storage_b2_rationale_185",
       "target": "scripts_storage_b2_upload_bytes",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L172",
+      "source_location": "L185",
       "weight": 1.0
     },
     {
-      "source": "scripts_storage_b2_rationale_210",
+      "source": "scripts_storage_b2_rationale_223",
       "target": "scripts_storage_b2_region_from_endpoint",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L210",
+      "source_location": "L223",
       "weight": 1.0
     },
     {
-      "source": "scripts_storage_b2_rationale_233",
+      "source": "scripts_storage_b2_rationale_246",
       "target": "scripts_storage_b2_presign_clients",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L233",
+      "source_location": "L246",
       "weight": 1.0
     },
     {
-      "source": "scripts_storage_b2_rationale_258",
+      "source": "scripts_storage_b2_rationale_271",
       "target": "scripts_storage_b2_url_is_fetchable",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L258",
+      "source_location": "L271",
       "weight": 1.0
     },
     {
-      "source": "scripts_storage_b2_rationale_270",
+      "source": "scripts_storage_b2_rationale_283",
       "target": "scripts_storage_b2_presigned_url",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L270",
+      "source_location": "L283",
       "weight": 1.0
     },
     {
-      "source": "scripts_storage_b2_rationale_292",
+      "source": "scripts_storage_b2_rationale_305",
+      "target": "scripts_storage_b2_ffmpeg_exe",
+      "relation": "rationale_for",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L305",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_storage_b2_rationale_317",
+      "target": "scripts_storage_b2_strip_data_tracks",
+      "relation": "rationale_for",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L317",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_storage_b2_rationale_361",
       "target": "scripts_storage_b2_download_to_file",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L292",
+      "source_location": "L361",
       "weight": 1.0
     },
     {
-      "source": "scripts_storage_b2_rationale_301",
+      "source": "scripts_storage_b2_rationale_375",
       "target": "scripts_storage_b2_object_exists",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L301",
+      "source_location": "L375",
       "weight": 1.0
     },
     {
-      "source": "scripts_storage_b2_rationale_314",
+      "source": "scripts_storage_b2_rationale_388",
       "target": "scripts_storage_b2_object_size",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L314",
+      "source_location": "L388",
       "weight": 1.0
     },
     {
-      "source": "scripts_storage_b2_rationale_334",
+      "source": "scripts_storage_b2_rationale_408",
       "target": "scripts_storage_b2_delete_object",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/storage_b2.py",
-      "source_location": "L334",
+      "source_location": "L408",
       "weight": 1.0
     },
     {
@@ -20726,5 +20852,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "abc6213d812b6467ab6e902b0479e98c465b4b8f"
+  "built_at_commit": "3ad804296891cdaf822eb3e0782d4aa6dc5178a0"
 }
