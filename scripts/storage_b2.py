@@ -96,10 +96,23 @@ indicated, verify with the presign probe in b2_preflight.py): presigned
 URLs were signed for the wrong region. presigned_url() now signs with the
 region parsed from B2_ENDPOINT_URL, fetches 1 byte to prove the URL works,
 and returns None (no anchor) rather than a URL that Agnes would reject.
+
+TIMECODE-TRACK FIX (2026-11-09) - CONFIRMED by reproduction: assembly of
+scripts 4d32a7b4 (shot 5) and 47d425f1 (shot 13) failed every run with
+"AttributeError: 'NoneType' object has no attribute 'groups'" inside
+moviepy's ffmpeg parser. The clips are valid 1080p H.264 files, but they
+carry a timecode data track (tmcd). Recent ffmpeg builds print that as a
+"Stream group ... Track Reference" line, and moviepy 2.1.2's parser cannot
+read it (feeding the exact log text to moviepy's FFmpegInfosParser failed
+with that line present and passed with it removed). download_to_file now
+remuxes any downloaded .mp4 that has a tmcd track or stream group with
+"-c copy" (no re-encode) and drops the data track. Clips without one are
+left untouched. If the cleanup itself fails, the original file is kept.
 """
 
 import time
 import os
+import subprocess
 import boto3
 import requests
 from botocore.client import Config
@@ -288,12 +301,73 @@ def presigned_url(object_key, expires_in=PRESIGNED_URL_EXPIRY_SECONDS):
     return None
 
 
+def _ffmpeg_exe():
+    """Same ffmpeg binary moviepy itself uses, so the cleanup below sees
+    exactly what moviepy will see. Falls back to 'ffmpeg' on PATH."""
+    try:
+        from moviepy.config import FFMPEG_BINARY
+        if FFMPEG_BINARY:
+            return FFMPEG_BINARY
+    except Exception:
+        pass
+    return "ffmpeg"
+
+
+def strip_data_tracks(local_path):
+    """TIMECODE-TRACK FIX (2026-11-09): see module docstring. If the .mp4
+    at local_path has a timecode (tmcd) data track or a 'Stream group'
+    entry, remux it in place with '-c copy' (no re-encode) keeping only
+    the first video stream and any audio. Returns True if the file was
+    rewritten, False if it was left untouched (no such track, not an
+    .mp4, or the cleanup failed - the original is always kept on
+    failure). Never raises."""
+    if not local_path.lower().endswith(".mp4"):
+        return False
+    exe = _ffmpeg_exe()
+    clean_path = local_path + ".clean.mp4"
+    try:
+        probe = subprocess.run(
+            [exe, "-hide_banner", "-i", local_path],
+            capture_output=True, text=True, timeout=60,
+        )
+        info = (probe.stderr or "") + (probe.stdout or "")
+        if "tmcd" not in info and "Stream group" not in info:
+            return False
+        res = subprocess.run(
+            [exe, "-hide_banner", "-loglevel", "error", "-y", "-i", local_path,
+             "-map", "0:v:0", "-map", "0:a?", "-c", "copy",
+             "-map_metadata", "-1", "-write_tmcd", "0", clean_path],
+            capture_output=True, text=True, timeout=300,
+        )
+        if res.returncode != 0 or not os.path.exists(clean_path) or os.path.getsize(clean_path) == 0:
+            print(f"Clip cleanup failed for {local_path} (kept original): {(res.stderr or '')[-300:]}")
+            if os.path.exists(clean_path):
+                os.remove(clean_path)
+            return False
+        os.replace(clean_path, local_path)
+        print(f"Removed timecode data track from {local_path} (stream copy, no re-encode).")
+        return True
+    except Exception as e:
+        print(f"Clip cleanup raised for {local_path} (kept original): {e}")
+        if os.path.exists(clean_path):
+            try:
+                os.remove(clean_path)
+            except Exception:
+                pass
+        return False
+
+
 def download_to_file(object_key, local_path):
     """Downloads object_key directly to local_path via the B2 API (no
     presigned URL needed for this - boto3 downloads authenticated
-    directly)."""
+    directly).
+
+    TIMECODE-TRACK FIX (2026-11-09): after the download, any .mp4 that
+    carries a timecode data track is cleaned (see strip_data_tracks)
+    so moviepy can open it."""
     client = _get_client()
     client.download_file(B2_BUCKET_NAME, object_key, local_path)
+    strip_data_tracks(local_path)
     return local_path
 
 
