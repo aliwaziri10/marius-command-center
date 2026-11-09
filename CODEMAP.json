@@ -3270,7 +3270,7 @@
       "functions": [
         {
           "name": "_client_config",
-          "line": 135,
+          "line": 148,
           "args": [],
           "calls": [
             "Config"
@@ -3279,7 +3279,7 @@
         },
         {
           "name": "_new_client",
-          "line": 151,
+          "line": 164,
           "args": [],
           "calls": [
             "_client_config",
@@ -3289,7 +3289,7 @@
         },
         {
           "name": "_get_client",
-          "line": 164,
+          "line": 177,
           "args": [],
           "calls": [
             "_new_client"
@@ -3298,7 +3298,7 @@
         },
         {
           "name": "upload_bytes",
-          "line": 171,
+          "line": 184,
           "args": [
             "object_key",
             "file_bytes",
@@ -3317,7 +3317,7 @@
         },
         {
           "name": "upload_file",
-          "line": 204,
+          "line": 217,
           "args": [
             "object_key",
             "local_path",
@@ -3332,7 +3332,7 @@
         },
         {
           "name": "_region_from_endpoint",
-          "line": 209,
+          "line": 222,
           "args": [],
           "calls": [
             "len",
@@ -3343,7 +3343,7 @@
         },
         {
           "name": "_presign_config",
-          "line": 220,
+          "line": 233,
           "args": [
             "addressing"
           ],
@@ -3354,7 +3354,7 @@
         },
         {
           "name": "_presign_clients",
-          "line": 232,
+          "line": 245,
           "args": [],
           "calls": [
             "_get_client",
@@ -3367,7 +3367,7 @@
         },
         {
           "name": "_url_is_fetchable",
-          "line": 257,
+          "line": 270,
           "args": [
             "url"
           ],
@@ -3379,7 +3379,7 @@
         },
         {
           "name": "presigned_url",
-          "line": 269,
+          "line": 282,
           "args": [
             "object_key",
             "expires_in"
@@ -3393,21 +3393,48 @@
           "docstring": "Generates a fresh, short-lived presigned GET URL for object_key and"
         },
         {
+          "name": "_ffmpeg_exe",
+          "line": 304,
+          "args": [],
+          "calls": [],
+          "docstring": "Same ffmpeg binary moviepy itself uses, so the cleanup below sees"
+        },
+        {
+          "name": "strip_data_tracks",
+          "line": 316,
+          "args": [
+            "local_path"
+          ],
+          "calls": [
+            "_ffmpeg_exe",
+            "endswith",
+            "exists",
+            "getsize",
+            "lower",
+            "print",
+            "remove",
+            "replace",
+            "run"
+          ],
+          "docstring": "TIMECODE-TRACK FIX (2026-11-09): see module docstring. If the .mp4"
+        },
+        {
           "name": "download_to_file",
-          "line": 291,
+          "line": 360,
           "args": [
             "object_key",
             "local_path"
           ],
           "calls": [
             "_get_client",
-            "download_file"
+            "download_file",
+            "strip_data_tracks"
           ],
           "docstring": "Downloads object_key directly to local_path via the B2 API (no"
         },
         {
           "name": "object_exists",
-          "line": 300,
+          "line": 374,
           "args": [
             "object_key"
           ],
@@ -3419,7 +3446,7 @@
         },
         {
           "name": "object_size",
-          "line": 313,
+          "line": 387,
           "args": [
             "object_key"
           ],
@@ -3432,7 +3459,7 @@
         },
         {
           "name": "delete_object",
-          "line": 333,
+          "line": 407,
           "args": [
             "object_key"
           ],
