@@ -1,5 +1,5 @@
 """
-Runs ON KAGGLE (free GPU). Marius shot-clip generator (2026-11-10).
+Runs ON KAGGLE (free GPU). Marius shot-clip generator (2026-11-10, rev 2).
 
 The GitHub runner (scripts/kaggle_clips.py) bakes the shot jobs into MANIFEST (base64).
 This notebook makes each shot with LTX-Video 2B distilled: the first piece of a shot is
@@ -24,6 +24,7 @@ T0 = time.time()
 BUDGET_SEC = int(MANIFEST.get("budget_minutes", 420)) * 60
 W, H, STEPS, FPS = 704, 480, 8, 24
 MAX_SEG_FRAMES = 97
+MAX_PROMPT_TOKENS = 256
 CKPTS = [
     "https://huggingface.co/Lightricks/LTX-Video/ltxv-2b-0.9.8-distilled.safetensors",
     "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltxv-2b-0.9.8-distilled.safetensors",
@@ -96,7 +97,8 @@ def call(pipe, prompt, seed, frames, image=None):
     else:
         gen = torch.Generator().manual_seed(seed)
     kw = dict(prompt=prompt, width=W, height=H, num_frames=frames, num_inference_steps=STEPS,
-              guidance_scale=1.0, decode_timestep=0.05, decode_noise_scale=0.025, generator=gen)
+              guidance_scale=1.0, decode_timestep=0.05, decode_noise_scale=0.025, generator=gen,
+              max_sequence_length=MAX_PROMPT_TOKENS)
     if image is not None:
         kw["image"] = image
         kw["image_cond_noise_scale"] = 0.025
