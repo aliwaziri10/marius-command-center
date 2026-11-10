@@ -1,0 +1,45 @@
+name: Agnes Probe
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */2 * * *'
+concurrency:
+  group: agnes-probe
+  cancel-in-progress: false
+permissions:
+  contents: read
+  issues: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install requests
+      - name: Ask Agnes for one tiny test video
+        env:
+          PYTHONUNBUFFERED: "1"
+          AGNES_API_KEY: ${{ secrets.AGNES_API_KEY }}
+        run: python scripts/agnes_probe.py
+      - name: Open an issue when Agnes is producing again
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RESULT="$(cat /tmp/agnes_probe_result.txt 2>/dev/null || echo NONE)"
+          echo "Probe result: $RESULT"
+          if [ "$RESULT" = "OPEN_AND_PRODUCING" ]; then
+            EXISTING="$(gh issue list --repo "${{ github.repository }}" --state open --search 'Agnes is generating videos again in:title' --json number --jq 'length')"
+            if [ "$EXISTING" = "0" ]; then
+              gh issue create \
+                --repo "${{ github.repository }}" \
+                --title "Agnes is generating videos again" \
+                --body "The Agnes probe got a finished test video back. Run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            fi
+          fi
