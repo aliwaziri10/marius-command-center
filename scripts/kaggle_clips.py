@@ -1,15 +1,24 @@
 """
-Marius Command Center - Kaggle clip generation (2026-11-10).
+Marius Command Center - Kaggle clip generation (2026-11-10, rev 2).
 
 Replaces Agnes / stock footage with real AI-generated clips made on Kaggle's free GPU.
-Runs in GitHub Actions every 30 minutes (workflow: kaggle_video.yml). Each run does ONE of:
+Runs in GitHub Actions every 30 minutes (workflow: kaggle_clips.yml). Each run does ONE of:
   - kernel running/queued on Kaggle  -> nothing (wait for the next run)
   - kernel finished                  -> download the clips, scale them to 1280x704, upload to B2,
                                         save progress to Supabase (video_urls / video_next_index)
-  - nothing running                  -> push the next batch of shots of the most-advanced script
+  - no kernel yet / nothing running  -> push the next batch of shots of the most-advanced script
 When every shot of a script is saved, the existing assembly in video_generation.process_script
 (narration + SFX + music mix + upload prep) runs with shot_limit=0, so no clip is ever asked
 of Agnes or stock footage.
+
+REV 2 FIXES (after run #1 failed in 32 s):
+  - Kaggle answers "Cannot access kernel ... Permission 'kernels.get' was denied" for a notebook
+    that does not exist yet. That is now read as "no notebook yet" and the first batch is pushed.
+    If the status still cannot be read after our own push, the run reports it and waits 6 h
+    instead of pushing again every 30 minutes.
+  - The Agnes prompt is a 2,500+ character wall of guard text and the model reads only the first
+    ~256 tokens, so the shot's own description would have been cut off. This file now builds a
+    short prompt with the shot description FIRST.
 
 State lives in Kaggle's kernel (slug marius-clips) and in Supabase scripts.video_urls, so every
 run is safe to repeat. Needs env: SUPABASE_URL, SUPABASE_SECRET_KEY, B2_*, GEMINI_API_KEY,
@@ -31,7 +40,7 @@ import requests
 
 import storage_b2
 from llm_client import retryable_request, SUPABASE_URL, HEADERS
-from prompt_builder import build_agnes_prompt
+from prompt_builder import LIGHTING_PROMPT_MAP, DEFAULT_LIGHTING_KEY
 from prompt_focus import focus_anchor, no_people_clause
 from beat_director import author_chain_beats, apply_beat_to_shot
 
@@ -47,6 +56,7 @@ SEG_SECONDS = 4.0
 MAX_SEGMENTS = 7
 RETRY_COOLDOWN_HOURS = 6
 OUT_W, OUT_H = 1280, 704
+UNREADABLE_MARK = "KAGGLE_STATUS_UNREADABLE"
 
 SUMMARY = []
 FAULTS = []
@@ -151,6 +161,38 @@ def get_durations(script, shot_list):
     return [w / tw * total for w in weights]
 
 
+def short_anchor(text, limit=300):
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    i = max(cut.rfind(". "), cut.rfind("; "))
+    return cut[:i + 1] if i > 100 else cut
+
+
+def ltx_prompt(shot, anchor, extra=""):
+    """Short prompt for LTX (reads ~256 tokens): the shot description comes FIRST."""
+    visual = (shot.get("visual_description") or "").strip()
+    shot_type = (shot.get("shot_type") or "medium").replace("_", " ")
+    cam = (shot.get("camera_movement") or "static").replace("_", " ")
+    key = shot.get("lighting") or DEFAULT_LIGHTING_KEY
+    lighting = LIGHTING_PROMPT_MAP.get(key, LIGHTING_PROMPT_MAP[DEFAULT_LIGHTING_KEY])
+    parts = [f"{shot_type} shot. {visual}"]
+    if extra:
+        parts.append(extra[:200])
+    a = short_anchor(anchor)
+    if a:
+        parts.append(a)
+    parts.append(lighting)
+    parts.append("photorealistic cinematic documentary footage, natural skin texture, "
+                 "historically accurate, no modern objects")
+    if cam != "static":
+        parts.append(f"camera {cam}")
+    parts.append("smooth continuous motion")
+    text = ". ".join(p.strip().rstrip(".") for p in parts if p and p.strip())
+    return text[:1100]
+
+
 def build_manifest(script, start):
     script_id = script["id"]
     shot_list = parse_shot_list(script)
@@ -166,9 +208,7 @@ def build_manifest(script, start):
         segs = min(MAX_SEGMENTS, max(1, math.ceil(dur / SEG_SECONDS)))
         focused = focus_anchor(shot, sac)
         extra = no_people_clause(shot, sac)
-        base = build_agnes_prompt(shot, focused, fallback_level=0)
-        if extra:
-            base = f"{base}, {extra}"
+        base = ltx_prompt(shot, focused, extra)
         prompts = [base]
         if segs > 1:
             beats = None
@@ -180,14 +220,10 @@ def build_manifest(script, start):
                 p = base
                 if beats and k < len(beats):
                     try:
-                        cs = apply_beat_to_shot(shot, beats[k])
-                        p = build_agnes_prompt(cs, focused, fallback_level=0)
-                        if extra:
-                            p = f"{p}, {extra}"
+                        p = ltx_prompt(apply_beat_to_shot(shot, beats[k]), focused, extra)
                     except Exception:
                         p = base
                 prompts.append(p)
-        prompts = [p[:1500] for p in prompts]
         seed = int(hashlib.md5(f"{script_id}:{i}".encode()).hexdigest()[:8], 16)
         jobs.append({"index": i, "duration": round(dur, 3), "prompts": prompts, "seed": seed})
     return {"script_id": script_id, "start_index": start, "budget_minutes": BUDGET_MIN, "jobs": jobs}
@@ -196,6 +232,11 @@ def build_manifest(script, start):
 def kernel_status(ref):
     code, out = sh(f"kaggle kernels status {ref}")
     low = out.lower()
+    # Kaggle says "Cannot access kernel ... Permission 'kernels.get' was denied" for a notebook
+    # that does not exist yet (confirmed in run #1), so that text means "no notebook yet".
+    if ("cannot access kernel" in low or "permission 'kernels.get'" in low
+            or "404" in low or "not found" in low or "notfound" in low or "could not find" in low):
+        return "none"
     if "complete" in low:
         return "complete"
     if "running" in low:
@@ -203,11 +244,9 @@ def kernel_status(ref):
     if "queued" in low or "queue" in low:
         return "queued"
     if "error" in low or "cancel" in low or "failed" in low:
-        if "404" in low or "not found" in low or "notfound" in low:
-            return "none"
         return "error"
-    if "404" in low or "not found" in low or "notfound" in low or "could not find" in low:
-        return "none"
+    if "has status" in low:
+        return "running"  # a status word we do not know: be safe and wait
     return "unknown"
 
 
@@ -244,9 +283,17 @@ def push_batch(script, start):
     code, out = sh(f"kaggle kernels push -p {WORK}")
     if code != 0 or "error" in out.lower():
         record_error(script_id, "Kaggle refused the push: " + out[-1500:])
-        FAULTS.append(f"Kaggle refused the push for script {script_id}: {out[-300:]}")
+        FAULTS.append(f"Kaggle refused the push for script {script_id}: {out[-400:]}")
         return False
     say(f"Pushed a Kaggle batch for script {script_id}: shots {start + 1} to {start + len(manifest['jobs'])}.")
+    time.sleep(8)
+    after = kernel_status(f"{user}/{SLUG}")
+    say(f"Kaggle notebook status right after the push: {after}.")
+    if after in ("none", "unknown"):
+        record_error(script_id, f"{UNREADABLE_MARK}: pushed a batch but cannot read the notebook status "
+                                f"afterwards (the Kaggle token may lack permission to read notebooks).")
+        FAULTS.append("Pushed to Kaggle but cannot read the notebook status afterwards. "
+                      "No more pushes for 6 hours; check the Kaggle token permissions.")
     return True
 
 
@@ -357,7 +404,12 @@ def run():
         say("Kaggle is still working; the next run will collect the clips.")
         return
     if state == "unknown":
-        FAULTS.append("Could not read the Kaggle notebook status (login problem?). Nothing pushed.")
+        FAULTS.append("Could not read the Kaggle notebook status (unexpected answer, see the log). Nothing pushed.")
+        return
+    if (state == "none" and (target.get("last_error") or "").startswith(UNREADABLE_MARK)
+            and recently_errored(target)):
+        say(f"A batch was pushed earlier but its status cannot be read; waiting up to {RETRY_COOLDOWN_HOURS} h "
+            f"instead of pushing again.")
         return
 
     failed_collect = False
