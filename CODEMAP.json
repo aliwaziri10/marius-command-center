@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 33,
+  "file_count": 35,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -20,6 +20,8 @@
     "GITHUB_STEP_SUMMARY",
     "HF_TOKEN",
     "KAGGLE_API_TOKEN",
+    "KAGGLE_BATCH_SHOTS",
+    "KAGGLE_BUDGET_MINUTES",
     "KAGGLE_KEY",
     "KAGGLE_TEST_MAX_MINUTES",
     "KAGGLE_USERNAME",
@@ -1455,6 +1457,457 @@
         "SUPABASE_SECRET_KEY",
         "SUPABASE_URL"
       ],
+      "tables": []
+    },
+    {
+      "path": "scripts/kaggle_clips.py",
+      "functions": [
+        {
+          "name": "say",
+          "line": 56,
+          "args": [
+            "text"
+          ],
+          "calls": [
+            "append",
+            "print",
+            "str"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "sh",
+          "line": 61,
+          "args": [
+            "cmd"
+          ],
+          "calls": [
+            "print",
+            "run",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "kaggle_user",
+          "line": 68,
+          "args": [],
+          "calls": [
+            "get",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "parse_shot_list",
+          "line": 72,
+          "args": [
+            "script"
+          ],
+          "calls": [
+            "get",
+            "isinstance",
+            "loads"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "get_candidates",
+          "line": 79,
+          "args": [],
+          "calls": [
+            "json",
+            "retryable_request"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "fetch_script",
+          "line": 90,
+          "args": [
+            "script_id"
+          ],
+          "calls": [
+            "json",
+            "retryable_request"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "record_error",
+          "line": 101,
+          "args": [
+            "script_id",
+            "text"
+          ],
+          "calls": [
+            "gmtime",
+            "print",
+            "retryable_request",
+            "str",
+            "strftime"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "save_progress",
+          "line": 115,
+          "args": [
+            "script_id",
+            "video_urls",
+            "next_index"
+          ],
+          "calls": [
+            "retryable_request"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "recently_errored",
+          "line": 125,
+          "args": [
+            "script"
+          ],
+          "calls": [
+            "get",
+            "strptime",
+            "time",
+            "timegm"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "get_durations",
+          "line": 136,
+          "args": [
+            "script",
+            "shot_list"
+          ],
+          "calls": [
+            "AudioFileClip",
+            "all",
+            "endswith",
+            "float",
+            "get",
+            "isinstance",
+            "len",
+            "max",
+            "open",
+            "raise_for_status",
+            "sum",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "build_manifest",
+          "line": 154,
+          "args": [
+            "script",
+            "start"
+          ],
+          "calls": [
+            "append",
+            "apply_beat_to_shot",
+            "author_chain_beats",
+            "build_agnes_prompt",
+            "ceil",
+            "encode",
+            "float",
+            "focus_anchor",
+            "get",
+            "get_durations",
+            "hexdigest",
+            "int",
+            "len",
+            "max",
+            "md5",
+            "min",
+            "no_people_clause",
+            "parse_shot_list",
+            "print",
+            "range",
+            "round"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "kernel_status",
+          "line": 196,
+          "args": [
+            "ref"
+          ],
+          "calls": [
+            "lower",
+            "sh"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "push_batch",
+          "line": 214,
+          "args": [
+            "script",
+            "start"
+          ],
+          "calls": [
+            "RuntimeError",
+            "append",
+            "b64encode",
+            "build_manifest",
+            "decode",
+            "dump",
+            "dumps",
+            "encode",
+            "join",
+            "kaggle_user",
+            "len",
+            "lower",
+            "makedirs",
+            "open",
+            "read",
+            "record_error",
+            "replace",
+            "rmtree",
+            "say",
+            "sh",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "scale_clip",
+          "line": 253,
+          "args": [
+            "src",
+            "dst"
+          ],
+          "calls": [
+            "exists",
+            "sh"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "collect",
+          "line": 259,
+          "args": [
+            "script",
+            "ref"
+          ],
+          "calls": [
+            "append",
+            "exists",
+            "get",
+            "join",
+            "list",
+            "load",
+            "makedirs",
+            "open",
+            "remove",
+            "rmtree",
+            "save_progress",
+            "say",
+            "scale_clip",
+            "sh",
+            "sorted",
+            "str",
+            "upload_file"
+          ],
+          "docstring": "Returns (saved_count, reason). reason is 'stale' when the kernel output belongs to an older batch."
+        },
+        {
+          "name": "assemble_if_complete",
+          "line": 295,
+          "args": [
+            "script_id"
+          ],
+          "calls": [
+            "append",
+            "fetch_script",
+            "format_exc",
+            "get",
+            "len",
+            "parse_shot_list",
+            "process_script",
+            "record_error",
+            "say",
+            "type"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "write_summary",
+          "line": 310,
+          "args": [],
+          "calls": [
+            "get",
+            "join",
+            "open",
+            "print",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "run",
+          "line": 326,
+          "args": [],
+          "calls": [
+            "append",
+            "assemble_if_complete",
+            "collect",
+            "fetch_script",
+            "get",
+            "get_candidates",
+            "kaggle_user",
+            "kernel_status",
+            "len",
+            "parse_shot_list",
+            "push_batch",
+            "recently_errored",
+            "record_error",
+            "say"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "main",
+          "line": 385,
+          "args": [],
+          "calls": [
+            "append",
+            "exit",
+            "print_exc",
+            "run",
+            "type",
+            "write_summary"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "GITHUB_STEP_SUMMARY",
+        "KAGGLE_BATCH_SHOTS",
+        "KAGGLE_BUDGET_MINUTES",
+        "KAGGLE_USERNAME"
+      ],
+      "tables": [
+        "scripts"
+      ]
+    },
+    {
+      "path": "scripts/kaggle_clips_kernel.py",
+      "functions": [
+        {
+          "name": "save",
+          "line": 45,
+          "args": [],
+          "calls": [
+            "dump",
+            "join",
+            "open"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "run",
+          "line": 50,
+          "args": [
+            "cmd"
+          ],
+          "calls": [
+            "run"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "free",
+          "line": 67,
+          "args": [],
+          "calls": [
+            "collect",
+            "empty_cache",
+            "is_available"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "load",
+          "line": 73,
+          "args": [],
+          "calls": [
+            "append",
+            "enable_sequential_cpu_offload",
+            "enable_tiling",
+            "free",
+            "from_pretrained",
+            "from_single_file",
+            "save",
+            "str",
+            "type"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "call",
+          "line": 92,
+          "args": [
+            "pipe",
+            "prompt",
+            "seed",
+            "frames",
+            "image"
+          ],
+          "calls": [
+            "Generator",
+            "dict",
+            "items",
+            "manual_seed",
+            "pipe",
+            "set",
+            "signature"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "seg_frames",
+          "line": 108,
+          "args": [
+            "remaining"
+          ],
+          "calls": [
+            "ceil",
+            "max",
+            "min"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "make_shot",
+          "line": 114,
+          "args": [
+            "pipe",
+            "i2v",
+            "job",
+            "attempt"
+          ],
+          "calls": [
+            "RuntimeError",
+            "call",
+            "enumerate",
+            "extend",
+            "free",
+            "int",
+            "len",
+            "max",
+            "round",
+            "seg_frames"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [],
       "tables": []
     },
     {
