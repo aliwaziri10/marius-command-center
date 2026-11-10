@@ -2087,7 +2087,7 @@
       "file_type": "code",
       "norm_label": "call()",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L92"
+      "source_location": "L93"
     },
     {
       "id": "scripts_kaggle_clips_kernel_free",
@@ -2099,7 +2099,7 @@
       "file_type": "code",
       "norm_label": "free()",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L67"
+      "source_location": "L68"
     },
     {
       "id": "scripts_kaggle_clips_kernel_load",
@@ -2111,7 +2111,7 @@
       "file_type": "code",
       "norm_label": "load()",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L73"
+      "source_location": "L74"
     },
     {
       "id": "scripts_kaggle_clips_kernel_make_shot",
@@ -2123,7 +2123,7 @@
       "file_type": "code",
       "norm_label": "make_shot()",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L114"
+      "source_location": "L116"
     },
     {
       "id": "scripts_kaggle_clips_kernel_run",
@@ -2135,7 +2135,7 @@
       "file_type": "code",
       "norm_label": "run()",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L50"
+      "source_location": "L51"
     },
     {
       "id": "scripts_kaggle_clips_kernel_save",
@@ -2147,7 +2147,7 @@
       "file_type": "code",
       "norm_label": "save()",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L45"
+      "source_location": "L46"
     },
     {
       "id": "scripts_kaggle_clips_kernel_seg_frames",
@@ -2159,7 +2159,7 @@
       "file_type": "code",
       "norm_label": "seg_frames()",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L108"
+      "source_location": "L110"
     },
     {
       "id": "scripts_kaggle_video_test_kernel_add_sound",
@@ -5839,12 +5839,12 @@
     },
     {
       "id": "scripts_kaggle_clips_kernel_rationale_1",
-      "label": "Runs ON KAGGLE (free GPU). Marius shot-clip generator (2026-11-10). The GitHub\u2026",
+      "label": "Runs ON KAGGLE (free GPU). Marius shot-clip generator (2026-11-10, rev 2). The\u2026",
       "_origin": "ast",
       "community": 3,
       "community_name": "json",
       "file_type": "rationale",
-      "norm_label": "runs on kaggle (free gpu). marius shot-clip generator (2026-11-10). the github...",
+      "norm_label": "runs on kaggle (free gpu). marius shot-clip generator (2026-11-10, rev 2). the...",
       "source_file": "scripts/kaggle_clips_kernel.py",
       "source_location": "L1"
     },
@@ -6836,6 +6836,18 @@
       "type": "external"
     },
     {
+      "id": "calendar",
+      "label": "calendar",
+      "_origin": "semantic",
+      "community": 2,
+      "community_name": "kaggle_clips.py",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "calendar",
+      "source_file": "",
+      "type": "external"
+    },
+    {
       "id": "ast",
       "label": "ast",
       "_origin": "semantic",
@@ -7132,17 +7144,6 @@
       "external": true,
       "file_type": "concept",
       "norm_label": "requests",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "calendar",
-      "label": "calendar",
-      "community": 2,
-      "community_name": "kaggle_clips.py",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "calendar",
       "source_file": "",
       "type": "external"
     }
@@ -9053,7 +9054,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L103",
+      "source_location": "L105",
       "weight": 1.0
     },
     {
@@ -9065,7 +9066,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L95",
+      "source_location": "L96",
       "weight": 1.0
     },
     {
@@ -9077,7 +9078,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L68",
+      "source_location": "L69",
       "weight": 1.0
     },
     {
@@ -9089,7 +9090,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L87",
+      "source_location": "L88",
       "weight": 1.0
     },
     {
@@ -9101,7 +9102,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L88",
+      "source_location": "L89",
       "weight": 1.0
     },
     {
@@ -9113,7 +9114,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L122",
+      "source_location": "L124",
       "weight": 1.0
     },
     {
@@ -9125,7 +9126,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L125",
+      "source_location": "L127",
       "weight": 1.0
     },
     {
@@ -9137,7 +9138,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L132",
+      "source_location": "L134",
       "weight": 1.0
     },
     {
@@ -9149,7 +9150,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L51",
+      "source_location": "L52",
       "weight": 1.0
     },
     {
@@ -9161,7 +9162,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L47",
+      "source_location": "L48",
       "weight": 1.0
     },
     {
@@ -9173,7 +9174,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L110",
+      "source_location": "L112",
       "weight": 1.0
     },
     {
@@ -14657,7 +14658,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L61",
+      "source_location": "L62",
       "weight": 1.0
     },
     {
@@ -16301,7 +16302,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L63",
+      "source_location": "L64",
       "weight": 1.0
     },
     {
@@ -16313,7 +16314,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L64",
+      "source_location": "L65",
       "weight": 1.0
     },
     {
@@ -18813,7 +18814,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L108",
+      "source_location": "L110",
       "weight": 1.0
     },
     {
@@ -18824,7 +18825,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L114",
+      "source_location": "L116",
       "weight": 1.0
     },
     {
@@ -18835,7 +18836,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L45",
+      "source_location": "L46",
       "weight": 1.0
     },
     {
@@ -18846,7 +18847,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L50",
+      "source_location": "L51",
       "weight": 1.0
     },
     {
@@ -18857,7 +18858,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L67",
+      "source_location": "L68",
       "weight": 1.0
     },
     {
@@ -18868,7 +18869,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L73",
+      "source_location": "L74",
       "weight": 1.0
     },
     {
@@ -18879,7 +18880,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L92",
+      "source_location": "L93",
       "weight": 1.0
     },
     {
@@ -22912,5 +22913,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "d6f5f5ceb8600c49fe478201e2fb78926a31291a"
+  "built_at_commit": "64159e54e8a85e166f4d7a4b1cff4a710fedc2c1"
 }
