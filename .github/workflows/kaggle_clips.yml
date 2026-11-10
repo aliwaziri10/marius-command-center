@@ -1,0 +1,74 @@
+name: Kaggle Video Generation
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *'
+concurrency:
+  group: video-generation
+  cancel-in-progress: false
+permissions:
+  contents: read
+  issues: write
+jobs:
+  kaggle-clips:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME || 'Diawazi' }}
+      KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+      KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt kaggle
+      - name: B2 preflight
+        env:
+          B2_ENDPOINT_URL: ${{ secrets.B2_ENDPOINT_URL }}
+          B2_KEY_ID: ${{ secrets.B2_KEY_ID }}
+          B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
+        run: python scripts/b2_preflight.py
+      - name: Set up Kaggle login
+        run: |
+          mkdir -p ~/.kaggle
+          if [ -n "$KAGGLE_API_TOKEN" ]; then
+            printf '%s' "$KAGGLE_API_TOKEN" | tr -d '[:space:]' > ~/.kaggle/access_token
+            chmod 600 ~/.kaggle/access_token
+          fi
+          if [ -n "$KAGGLE_KEY" ]; then
+            CLEAN_KEY="$(printf '%s' "$KAGGLE_KEY" | tr -d '[:space:]')"
+            printf '{"username":"%s","key":"%s"}' "$KAGGLE_USERNAME" "$CLEAN_KEY" > ~/.kaggle/kaggle.json
+            chmod 600 ~/.kaggle/kaggle.json
+          fi
+      - name: Run Kaggle clip generation
+        env:
+          PYTHONUNBUFFERED: "1"
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          AGNES_API_KEY: ${{ secrets.AGNES_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ACE_MUSIC_API_KEY: ${{ secrets.ACE_MUSIC_API_KEY }}
+          FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          B2_ENDPOINT_URL: ${{ secrets.B2_ENDPOINT_URL }}
+          B2_KEY_ID: ${{ secrets.B2_KEY_ID }}
+          B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
+        run: |
+          export KAGGLE_API_TOKEN="$(printf '%s' "$KAGGLE_API_TOKEN" | tr -d '[:space:]')"
+          export KAGGLE_KEY="$(printf '%s' "$KAGGLE_KEY" | tr -d '[:space:]')"
+          [ -z "$KAGGLE_KEY" ] && unset KAGGLE_KEY
+          [ -z "$KAGGLE_API_TOKEN" ] && unset KAGGLE_API_TOKEN
+          python scripts/kaggle_clips.py
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "Kaggle Video Generation failed - run #${{ github.run_number }}" \
+            --body "Run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
