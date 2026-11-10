@@ -1801,7 +1801,7 @@
       "functions": [
         {
           "name": "save",
-          "line": 45,
+          "line": 46,
           "args": [],
           "calls": [
             "dump",
@@ -1812,7 +1812,7 @@
         },
         {
           "name": "run",
-          "line": 50,
+          "line": 51,
           "args": [
             "cmd"
           ],
@@ -1823,7 +1823,7 @@
         },
         {
           "name": "free",
-          "line": 67,
+          "line": 68,
           "args": [],
           "calls": [
             "collect",
@@ -1834,7 +1834,7 @@
         },
         {
           "name": "load",
-          "line": 73,
+          "line": 74,
           "args": [],
           "calls": [
             "append",
@@ -1851,7 +1851,7 @@
         },
         {
           "name": "call",
-          "line": 92,
+          "line": 93,
           "args": [
             "pipe",
             "prompt",
@@ -1872,7 +1872,7 @@
         },
         {
           "name": "seg_frames",
-          "line": 108,
+          "line": 110,
           "args": [
             "remaining"
           ],
@@ -1885,7 +1885,7 @@
         },
         {
           "name": "make_shot",
-          "line": 114,
+          "line": 116,
           "args": [
             "pipe",
             "i2v",
