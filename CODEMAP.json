@@ -1,6 +1,6 @@
 {
   "generated_by": "generate_codemap.py",
-  "file_count": 35,
+  "file_count": 36,
   "env_vars": [
     "ACE_MUSIC_API_KEY",
     "AGNES_API_KEY",
@@ -26,6 +26,7 @@
     "KAGGLE_TEST_MAX_MINUTES",
     "KAGGLE_USERNAME",
     "PIXABAY_API_KEY",
+    "PROBE_POLL_MAX_SECONDS",
     "STOCK_FALLBACK_AGNES_TRIES",
     "STOCK_FALLBACK_AGNES_WAIT_SECONDS",
     "STOCK_GENERIC_QUERIES",
@@ -279,6 +280,68 @@
       ],
       "env_vars": [
         "AGNES_API_KEY"
+      ],
+      "tables": []
+    },
+    {
+      "path": "scripts/agnes_probe.py",
+      "functions": [
+        {
+          "name": "finish",
+          "line": 36,
+          "args": [
+            "outcome",
+            "detail",
+            "code"
+          ],
+          "calls": [
+            "exit",
+            "get",
+            "gmtime",
+            "open",
+            "print",
+            "strftime",
+            "write"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "extract_url",
+          "line": 55,
+          "args": [
+            "data"
+          ],
+          "calls": [
+            "endswith",
+            "get",
+            "isinstance",
+            "startswith",
+            "values"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "run",
+          "line": 66,
+          "args": [],
+          "calls": [
+            "extract_url",
+            "finish",
+            "get",
+            "json",
+            "post",
+            "print",
+            "sleep",
+            "str",
+            "strip"
+          ],
+          "docstring": ""
+        }
+      ],
+      "env_vars": [
+        "AGNES_API_KEY",
+        "GITHUB_STEP_SUMMARY",
+        "PROBE_POLL_MAX_SECONDS"
       ],
       "tables": []
     },
