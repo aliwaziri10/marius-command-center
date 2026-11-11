@@ -1556,6 +1556,7 @@
           "line": 78,
           "args": [],
           "calls": [
+            "RuntimeError",
             "get",
             "strip"
           ],
@@ -1563,7 +1564,7 @@
         },
         {
           "name": "parse_shot_list",
-          "line": 82,
+          "line": 85,
           "args": [
             "script"
           ],
@@ -1576,7 +1577,7 @@
         },
         {
           "name": "get_candidates",
-          "line": 89,
+          "line": 92,
           "args": [],
           "calls": [
             "json",
@@ -1586,7 +1587,7 @@
         },
         {
           "name": "fetch_script",
-          "line": 100,
+          "line": 103,
           "args": [
             "script_id"
           ],
@@ -1598,7 +1599,7 @@
         },
         {
           "name": "record_error",
-          "line": 111,
+          "line": 114,
           "args": [
             "script_id",
             "text"
@@ -1614,7 +1615,7 @@
         },
         {
           "name": "save_progress",
-          "line": 125,
+          "line": 128,
           "args": [
             "script_id",
             "video_urls",
@@ -1627,7 +1628,7 @@
         },
         {
           "name": "recently_errored",
-          "line": 135,
+          "line": 138,
           "args": [
             "script"
           ],
@@ -1641,7 +1642,7 @@
         },
         {
           "name": "get_durations",
-          "line": 146,
+          "line": 149,
           "args": [
             "script",
             "shot_list"
@@ -1664,7 +1665,7 @@
         },
         {
           "name": "short_anchor",
-          "line": 164,
+          "line": 167,
           "args": [
             "text",
             "limit"
@@ -1679,7 +1680,7 @@
         },
         {
           "name": "ltx_prompt",
-          "line": 173,
+          "line": 176,
           "args": [
             "shot",
             "anchor",
@@ -1698,7 +1699,7 @@
         },
         {
           "name": "build_manifest",
-          "line": 196,
+          "line": 199,
           "args": [
             "script",
             "start"
@@ -1730,7 +1731,7 @@
         },
         {
           "name": "kernel_status",
-          "line": 232,
+          "line": 235,
           "args": [
             "ref"
           ],
@@ -1742,7 +1743,7 @@
         },
         {
           "name": "push_batch",
-          "line": 253,
+          "line": 256,
           "args": [
             "script",
             "start"
@@ -1776,7 +1777,7 @@
         },
         {
           "name": "scale_clip",
-          "line": 300,
+          "line": 303,
           "args": [
             "src",
             "dst"
@@ -1789,7 +1790,7 @@
         },
         {
           "name": "collect",
-          "line": 306,
+          "line": 309,
           "args": [
             "script",
             "ref"
@@ -1817,7 +1818,7 @@
         },
         {
           "name": "assemble_if_complete",
-          "line": 342,
+          "line": 345,
           "args": [
             "script_id"
           ],
@@ -1837,7 +1838,7 @@
         },
         {
           "name": "write_summary",
-          "line": 357,
+          "line": 360,
           "args": [],
           "calls": [
             "get",
@@ -1850,7 +1851,7 @@
         },
         {
           "name": "run",
-          "line": 373,
+          "line": 376,
           "args": [],
           "calls": [
             "append",
@@ -1873,7 +1874,7 @@
         },
         {
           "name": "main",
-          "line": 437,
+          "line": 440,
           "args": [],
           "calls": [
             "append",
