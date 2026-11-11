@@ -1,0 +1,59 @@
+name: Narrator Voice Test
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  voices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install edge-tts
+        run: pip install edge-tts
+      - name: Record the same paragraph in several voices
+        run: |
+          mkdir -p voices
+          python - <<'PY'
+          import asyncio
+          import edge_tts
+
+          TEXT = (
+              "In the winter of nineteen forty-one, a small village on the edge of the forest "
+              "vanished from every map. No one wrote down their names. No one came looking. "
+              "And for eighty years, the silence held. This is the story of the people history "
+              "forgot, and of the one letter that refused to stay buried."
+          )
+          VOICES = [
+              ("1_current_GuyNeural", "en-US-GuyNeural"),
+              ("2_ChristopherNeural", "en-US-ChristopherNeural"),
+              ("3_AndrewMultilingualNeural", "en-US-AndrewMultilingualNeural"),
+              ("4_BrianMultilingualNeural", "en-US-BrianMultilingualNeural"),
+              ("5_RyanBritish", "en-GB-RyanNeural"),
+              ("6_ThomasBritish", "en-GB-ThomasNeural"),
+              ("7_WilliamAustralian", "en-AU-WilliamNeural"),
+          ]
+
+          async def one(label, voice):
+              try:
+                  await edge_tts.Communicate(TEXT, voice, rate="+6%").save(f"voices/{label}.mp3")
+                  print(f"OK    {label} ({voice})")
+              except Exception as e:
+                  print(f"FAILED {label} ({voice}): {e.__class__.__name__}: {e}")
+
+          async def main():
+              for label, voice in VOICES:
+                  await one(label, voice)
+
+          asyncio.run(main())
+          PY
+          ls -la voices
+      - name: Upload the recordings
+        uses: actions/upload-artifact@v4
+        with:
+          name: narrator-voices
+          path: voices/*.mp3
+          if-no-files-found: error
