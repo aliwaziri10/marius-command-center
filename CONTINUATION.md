@@ -1,3 +1,62 @@
+# Marius / Erased - Continuation Notes (2026-11-11 PART 6, NARRATION ORDER + NARRATION STORAGE + THROUGHPUT, read this section FIRST)
+
+Times are UTC. Zia is in India (UTC+5:30), so his "Nov 12" is the evening of 2026-11-11 UTC. Re-verify against live GitHub/Supabase before acting. Supabase project: `iwgocbiqjjhlvkygmcir`.
+
+## NEXT PROFILE START HERE
+1. Did the Kaggle workflow assemble `17fc73b3`? Run:
+```
+select left(id::text,8) as id, status, video_url is not null as has_video, left(coalesce(last_error,''),600) as err from scripts where id::text like '17fc73b3%';
+```
+`video_generated` means the Kaggle assembly path worked for the first time. If not, read `err` (assembly writes its traceback there) and fix only what it shows.
+2. `cb18b7c2` is still `pending` with no narration file. Check whether a Narration run has made it (storage.objects, bucket `narration`, name `narration_cb18b7c2-3fd2-4056-bfed-9fb9b9d1be21.mp3`).
+3. Put the four decisions at the bottom of this section to Zia before building anything.
+
+## What changed this session
+- `c8094f7`: `scripts/narration.py` now picks the pending script with the most clips saved first (`video_next_index` desc, nulls last, then `created_at`). Reviewed: the query is inside the existing try/except, so a bad query exits green with "nothing done", never red.
+- `9854cd0`: cosmetic ellipsis spelling in `narration.py`, no behavior change. A fetch of the live file still shows the literal character, so this commit may not have changed anything.
+- Database, before the commits: scripts `17fc73b3` and `cb18b7c2` set to `pending` so narration rebuilds their lost mp3 files. No clips or other rows touched.
+- No workflow file changed. Nothing else pushed.
+
+## Confirmed live (2026-11-11, about 21:10)
+- `17fc73b3`: a manual Narration run at about 21:08 made `narration_17fc73b3-834f-4ba4-8a8c-fd7a1044d2de.mp3` (15.6 MB, voice ChristopherNeural, 142 sentences). Status is now `images_generated`, 30 of 30 clips saved, 30 `shot_durations` totalling 1020 s (old total 971 s, +5%). No error.
+- `cb18b7c2`: `pending`, 0 clips, 31 shots, 1295 s, no narration file.
+- `narration.yml` says cron `0 * * * *`, but the Actions list (runs #823 to #829) showed runs 4 to 9 hours apart. GitHub is not running it hourly. Each run narrates 1 script (`MAX_SCRIPTS_PER_RUN = 1`).
+- A manual run earlier this session ended in "Startup failure" (GitHub internal error, no step ran, request ID `8aa462dd-de10-11f1-85c4-fcb23d3d51b2`). Not our code. The re-run worked.
+- Narration storage (20:35): 51 files, 634 MB, bucket has no `file_size_limit`. Of 112 `images_generated` scripts, 70 have no narration file (mostly created 2026-09-19 to 2026-10-13) and 42 have one. No code that deletes them was found by code search. Cause unknown.
+- Status counts (20:32): pending 10, images_generated 112, uploaded 20 (older stock-footage path).
+
+## Why videos come out about once a week (arithmetic, NOT measured on Kaggle)
+- Average script: 817 s of narration, about 187 four-second pieces (cap 7 per shot), from `shot_durations`.
+- About 135 s of GPU per piece (one test run, see `HANDOFF_2026-11-10_KAGGLE_CLIPS.md`). That is about 7 h of GPU per video.
+- Kaggle GPU quota is commonly reported as about 30 h/week, but Kaggle's docs give no number. Check Zia's account. Ceiling is about 4 videos a week. A 20-minute video is about 12 h, a 30-minute video about 18 h.
+- The runner stops each Kaggle run at 7 h (`KAGGLE_BUDGET_MINUTES=420`). Kaggle's documented session limit is 12 h.
+- Script Writing adds about 3 scripts a day, so the queue only grows. The 42 narrated scripts already waiting are about 10 weeks of GPU.
+- Until 2026-11-11 11:10 the runner could not save any clip (ffmpeg missing, then the scale step). The Kaggle path has produced zero finished videos so far.
+
+## NOT verified
+- Assembly on the Kaggle path (`video_generation.process_script(script, shot_limit=0)`) has never completed. From reading `assembly_stage.py`: if the last clip is shorter than its shot, it tries `_generate_one_segment` (an Agnes call) and falls back to a freeze-hold on any error. Clips are resized from 1280x704 to WIDTH x HEIGHT (slight stretch), not checked.
+- `17fc73b3` clips were made for the old 971 s timings, narration is now 5% longer. Assembly stretches or holds short clips. Not checked visually.
+- Actions logs: the GitHub connector cannot read them and `web_fetch` refuses run URLs. Use Supabase (`last_error`, `storage.objects`, `query_logs`) and failure issues (`search_issues` "workflow failed"), or ask Zia to paste the log.
+- `narration.py` only prints failures to the run log. It does not save them to `scripts.last_error`, so a failed narration run is invisible from Supabase. NOT fixed. If you add it, clear that error on success: `kaggle_clips.py` `recently_errored()` skips a fully-clipped script for 6 h after any `last_error_at`.
+- Supabase plan and storage cap not confirmed (the free plan is 1 GB). At 12 to 15 MB a file, 634 MB leaves room for about 25 more.
+- Kaggle: real quota, real seconds per piece, whether two T4s can run two jobs at once, whether Zia's account is phone verified.
+- Script Writing fails about every 8 h (issues #1684 to #1693, run #556 at 19:40 on 2026-11-11). Not investigated.
+
+## Do not
+- Do not set the 70 narration-less scripts to `pending`. That is about 870 MB of new files and the Kaggle queue cannot reach them for weeks.
+- Do not let narration run further ahead of GPU capacity without a cap.
+
+## Decisions waiting for Zia (free options only)
+1. Cut GPU cost: cap pieces per shot (`MAX_SEGMENTS` 7 to 3, hold the rest) or keep full length and accept about 4 videos a week at best.
+2. Throttle narration while many narrated scripts wait, and delete a script's mp3 after its video uploads.
+3. Test a stronger model: 3 shots each on Wan 2.2 5B and HunyuanVideo 1.5 on Kaggle, time each clip, Zia judges quality. Web sources say they fit 16 GB only in compressed form. Not tested here.
+4. Test both T4 GPUs at once, one job per card.
+
+## How Zia works
+Non-coder. Full files, every URL, path and secret name in its own code block, 3 to 4 steps at most, one project per session (Marius only, never mix Nova). He gets angry at hedging and probabilities: read the repo, Supabase and issues yourself first, say what is proven, and say plainly what you cannot see. He dictates, so read messages for meaning. Review code critically before pushing and tell him what you checked. No em dashes in anything written for him.
+
+---
+
 # Marius / Erased — Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)
 
 **Re-verify against live GitHub/Supabase before acting. Do not trust this doc at face value.**
