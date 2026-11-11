@@ -23,6 +23,9 @@ REV 2 FIXES (after run #1 failed in 32 s):
 REV 2.1 (2026-11-11): when scale_clip fails, ffmpeg's own error text and an ffprobe of the
 downloaded clip are now saved into scripts.last_error (they were thrown away before).
 
+REV 2.2 (2026-11-11): the run log showed "ffmpeg: not found" on the GitHub runner, which is why
+no clip was ever saved. ensure_ffmpeg() now installs ffmpeg at the start of every run if missing.
+
 State lives in Kaggle's kernel (slug marius-clips) and in Supabase scripts.video_urls, so every
 run is safe to repeat. Needs env: SUPABASE_URL, SUPABASE_SECRET_KEY, B2_*, GEMINI_API_KEY,
 KAGGLE_USERNAME (required, no fallback) and KAGGLE_API_TOKEN or KAGGLE_KEY.
@@ -77,6 +80,28 @@ def sh(cmd):
     out = (p.stdout or "") + (p.stderr or "")
     print(f"$ {cmd}\n{out.strip()[-3000:]}\n")
     return p.returncode, out
+
+
+def ensure_ffmpeg():
+    """The GitHub runner image no longer ships ffmpeg (run log: 'ffmpeg: not found'). Install it."""
+    if shutil.which("ffmpeg"):
+        return True
+    say("ffmpeg is missing on this runner; installing it.")
+    sh("sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg")
+    if shutil.which("ffmpeg"):
+        say("ffmpeg installed.")
+        return True
+    # fallback: the static ffmpeg that ships inside the imageio-ffmpeg pip package
+    sh("pip install -q imageio-ffmpeg")
+    try:
+        import imageio_ffmpeg
+        exe = imageio_ffmpeg.get_ffmpeg_exe()
+        sh(f'sudo ln -sf "{exe}" /usr/local/bin/ffmpeg')
+    except Exception as e:
+        print(f"imageio-ffmpeg fallback failed: {e}")
+    ok = bool(shutil.which("ffmpeg"))
+    say("ffmpeg installed (fallback)." if ok else "ffmpeg could NOT be installed.")
+    return ok
 
 
 def kaggle_user():
@@ -387,6 +412,9 @@ def write_summary():
 def run():
     user = kaggle_user()
     ref = f"{user}/{SLUG}"
+    if not ensure_ffmpeg():
+        FAULTS.append("ffmpeg is not available and could not be installed; clips cannot be resized.")
+        return
     try:
         candidates = get_candidates()
     except Exception as e:
