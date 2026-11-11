@@ -17,7 +17,7 @@ Use free Kaggle GPU video generation (as Marius already does) for Tiny Lawn Tale
 3. Open: LTX quality on a 3D snail, Mimsi consistency, free GPU quota (about 30 h a week, unverified), time per clip.
 
 ## Secrets
-Zia says he saved the Kaggle API token as a secret in `adrian001234/upgraded-journey` (belief: `KAGGLE_API_TOKEN`; Claude cannot read secrets; NOT verified). The token was pasted in chat on 2026-10-25: regenerate it on Kaggle and replace the secret after the first successful render. Marius's workflow falls back to username `Diawazi` for `KAGGLE_USERNAME`.
+Zia says he saved the Kaggle API token as a secret in `adrian001234/upgraded-journey` (belief: `KAGGLE_API_TOKEN`; Claude cannot read secrets; NOT verified). The token was pasted in chat on 2026-10-25: regenerate it on Kaggle and replace the secret after the first successful render.
 
 ## Next steps (one at a time)
 1. Check the secret names at `https://github.com/adrian001234/upgraded-journey/settings/secrets/actions`.
