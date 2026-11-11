@@ -30,6 +30,11 @@ REV 2.3 (2026-11-11): (a) a script that has all its clips but failed assembly in
 skipped instead of being retried (and re-failing the whole run) every 30 minutes; (b) pushing a
 batch to Kaggle now counts as progress, so a healthy run no longer exits red and opens a failure issue.
 
+REV 2.4 (2026-11-11): the September backlog scripts (for example cb18b7c2 and 17fc73b3) have a
+narration_url whose mp3 file no longer exists in Supabase storage (the download answers 400), so
+their clips could never be assembled and Kaggle GPU hours were being spent on them. get_candidates()
+now checks that the narration file really downloads (HTTP 200) and only keeps scripts that pass.
+
 State lives in Kaggle's kernel (slug marius-clips) and in Supabase scripts.video_urls, so every
 run is safe to repeat. Needs env: SUPABASE_URL, SUPABASE_SECRET_KEY, B2_*, GEMINI_API_KEY,
 KAGGLE_USERNAME (required, no fallback) and KAGGLE_API_TOKEN or KAGGLE_KEY.
@@ -67,6 +72,8 @@ MAX_SEGMENTS = 7
 RETRY_COOLDOWN_HOURS = 6
 OUT_W, OUT_H = 1280, 704
 UNREADABLE_MARK = "KAGGLE_STATUS_UNREADABLE"
+CANDIDATE_SCAN = 80   # scripts looked at before the narration check
+CANDIDATE_KEEP = 10   # scripts kept after the narration check
 
 SUMMARY = []
 FAULTS = []
@@ -122,15 +129,38 @@ def parse_shot_list(script):
     return sl or []
 
 
+def narration_ok(url):
+    """True only if the narration file really downloads (HTTP 200). Old September scripts point to
+    mp3 files that were deleted from storage (download answers 400), so they can never be assembled."""
+    if not url:
+        return False
+    try:
+        r = requests.get(url, stream=True, timeout=20)
+        ok = r.status_code == 200
+        r.close()
+        return ok
+    except Exception:
+        return False
+
+
 def get_candidates():
     resp = retryable_request(
         "GET",
         f"{SUPABASE_URL}/rest/v1/scripts?status=eq.images_generated&narration_url=not.is.null"
-        f"&order=video_next_index.desc.nullslast,created_at.asc&limit=10",
+        f"&order=video_next_index.desc.nullslast,created_at.asc&limit={CANDIDATE_SCAN}",
         headers=HEADERS,
         timeout=30,
     )
-    return resp.json()
+    good = []
+    dead = 0
+    for s in resp.json():
+        if narration_ok(s.get("narration_url")):
+            good.append(s)
+        else:
+            dead += 1
+    if dead:
+        say(f"Skipped {dead} script(s) whose narration file no longer exists (cannot be assembled).")
+    return good[:CANDIDATE_KEEP]
 
 
 def fetch_script(script_id):
@@ -432,7 +462,7 @@ def run():
         say(f"Supabase did not answer ({e}); nothing done, next run retries.")
         return
     if not candidates:
-        say("No script is ready for video (needs status images_generated and a narration).")
+        say("No script is ready for video (needs status images_generated and a narration file that downloads).")
         return
 
     # 1) scripts whose clips are all saved just need assembling (skipped for 6 h after a failed assembly)
