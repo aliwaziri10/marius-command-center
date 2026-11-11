@@ -1527,7 +1527,7 @@
       "functions": [
         {
           "name": "say",
-          "line": 70,
+          "line": 73,
           "args": [
             "text"
           ],
@@ -1540,7 +1540,7 @@
         },
         {
           "name": "sh",
-          "line": 75,
+          "line": 78,
           "args": [
             "cmd"
           ],
@@ -1552,8 +1552,22 @@
           "docstring": ""
         },
         {
+          "name": "ensure_ffmpeg",
+          "line": 85,
+          "args": [],
+          "calls": [
+            "bool",
+            "get_ffmpeg_exe",
+            "print",
+            "say",
+            "sh",
+            "which"
+          ],
+          "docstring": "The GitHub runner image no longer ships ffmpeg (run log: 'ffmpeg: not found'). Install it."
+        },
+        {
           "name": "kaggle_user",
-          "line": 82,
+          "line": 107,
           "args": [],
           "calls": [
             "RuntimeError",
@@ -1564,7 +1578,7 @@
         },
         {
           "name": "parse_shot_list",
-          "line": 89,
+          "line": 114,
           "args": [
             "script"
           ],
@@ -1577,7 +1591,7 @@
         },
         {
           "name": "get_candidates",
-          "line": 96,
+          "line": 121,
           "args": [],
           "calls": [
             "json",
@@ -1587,7 +1601,7 @@
         },
         {
           "name": "fetch_script",
-          "line": 107,
+          "line": 132,
           "args": [
             "script_id"
           ],
@@ -1599,7 +1613,7 @@
         },
         {
           "name": "record_error",
-          "line": 118,
+          "line": 143,
           "args": [
             "script_id",
             "text"
@@ -1615,7 +1629,7 @@
         },
         {
           "name": "save_progress",
-          "line": 132,
+          "line": 157,
           "args": [
             "script_id",
             "video_urls",
@@ -1628,7 +1642,7 @@
         },
         {
           "name": "recently_errored",
-          "line": 142,
+          "line": 167,
           "args": [
             "script"
           ],
@@ -1642,7 +1656,7 @@
         },
         {
           "name": "get_durations",
-          "line": 153,
+          "line": 178,
           "args": [
             "script",
             "shot_list"
@@ -1665,7 +1679,7 @@
         },
         {
           "name": "short_anchor",
-          "line": 171,
+          "line": 196,
           "args": [
             "text",
             "limit"
@@ -1680,7 +1694,7 @@
         },
         {
           "name": "ltx_prompt",
-          "line": 180,
+          "line": 205,
           "args": [
             "shot",
             "anchor",
@@ -1699,7 +1713,7 @@
         },
         {
           "name": "build_manifest",
-          "line": 203,
+          "line": 228,
           "args": [
             "script",
             "start"
@@ -1731,7 +1745,7 @@
         },
         {
           "name": "kernel_status",
-          "line": 239,
+          "line": 264,
           "args": [
             "ref"
           ],
@@ -1743,7 +1757,7 @@
         },
         {
           "name": "push_batch",
-          "line": 260,
+          "line": 285,
           "args": [
             "script",
             "start"
@@ -1777,7 +1791,7 @@
         },
         {
           "name": "scale_clip",
-          "line": 307,
+          "line": 332,
           "args": [
             "src",
             "dst"
@@ -1792,7 +1806,7 @@
         },
         {
           "name": "collect",
-          "line": 320,
+          "line": 345,
           "args": [
             "script",
             "ref"
@@ -1820,7 +1834,7 @@
         },
         {
           "name": "assemble_if_complete",
-          "line": 356,
+          "line": 381,
           "args": [
             "script_id"
           ],
@@ -1840,7 +1854,7 @@
         },
         {
           "name": "write_summary",
-          "line": 371,
+          "line": 396,
           "args": [],
           "calls": [
             "get",
@@ -1853,12 +1867,13 @@
         },
         {
           "name": "run",
-          "line": 387,
+          "line": 412,
           "args": [],
           "calls": [
             "append",
             "assemble_if_complete",
             "collect",
+            "ensure_ffmpeg",
             "fetch_script",
             "get",
             "get_candidates",
@@ -1876,7 +1891,7 @@
         },
         {
           "name": "main",
-          "line": 451,
+          "line": 479,
           "args": [],
           "calls": [
             "append",
