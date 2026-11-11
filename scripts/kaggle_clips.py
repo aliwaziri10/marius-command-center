@@ -20,6 +20,9 @@ REV 2 FIXES (after run #1 failed in 32 s):
     ~256 tokens, so the shot's own description would have been cut off. This file now builds a
     short prompt with the shot description FIRST.
 
+REV 2.1 (2026-11-11): when scale_clip fails, ffmpeg's own error text and an ffprobe of the
+downloaded clip are now saved into scripts.last_error (they were thrown away before).
+
 State lives in Kaggle's kernel (slug marius-clips) and in Supabase scripts.video_urls, so every
 run is safe to repeat. Needs env: SUPABASE_URL, SUPABASE_SECRET_KEY, B2_*, GEMINI_API_KEY,
 KAGGLE_USERNAME (required, no fallback) and KAGGLE_API_TOKEN or KAGGLE_KEY.
@@ -61,6 +64,7 @@ UNREADABLE_MARK = "KAGGLE_STATUS_UNREADABLE"
 SUMMARY = []
 FAULTS = []
 PROGRESS = {"shots": 0}
+LAST_FFMPEG = {"text": ""}
 
 
 def say(text):
@@ -303,7 +307,14 @@ def push_batch(script, start):
 def scale_clip(src, dst):
     vf = f"scale=w={OUT_W}:h=-2:flags=lanczos,crop={OUT_W}:{OUT_H},fps=24,format=yuv420p"
     code, out = sh(f'ffmpeg -y -v error -i "{src}" -vf "{vf}" -an -c:v libx264 -crf 20 -preset veryfast "{dst}"')
-    return code == 0 and os.path.exists(dst)
+    ok = code == 0 and os.path.exists(dst)
+    if not ok:
+        size = os.path.getsize(src) if os.path.exists(src) else -1
+        _, probe = sh(f'ffprobe -v error -show_entries stream=codec_name,width,height,nb_frames '
+                      f'-of default=nw=1 "{src}"')
+        LAST_FFMPEG["text"] = (f"exit={code}; src_bytes={size}; ffmpeg said: {out.strip()[-700:]} "
+                               f"| ffprobe said: {probe.strip()[-300:]}")
+    return ok
 
 
 def collect(script, ref):
@@ -329,7 +340,7 @@ def collect(script, ref):
             break
         fixed = f"/tmp/kc_fixed_{idx:03d}.mp4"
         if not scale_clip(src, fixed):
-            return saved, f"ffmpeg could not scale shot {idx + 1}"
+            return saved, f"ffmpeg could not scale shot {idx + 1}: {LAST_FFMPEG['text']}"
         key = storage_b2.upload_file(f"{script_id}/shot_{idx:03d}.mp4", fixed, content_type="video/mp4")
         os.remove(fixed)
         video_urls.append(key)
@@ -423,7 +434,7 @@ def run():
         elif why != "stale":
             failed_collect = True
             record_error(target["id"], f"Kaggle batch gave no clips: {why}")
-            FAULTS.append(f"Kaggle batch for script {target['id']} produced no clips: {why[:400]}")
+            FAULTS.append(f"Kaggle batch for script {target['id']} produced no clips: {why[:1000]}")
 
     target = fetch_script(target["id"]) or target
     total = len(parse_shot_list(target))
