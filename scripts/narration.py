@@ -19,7 +19,7 @@ SUPABASE_SECRET_KEY = os.environ["SUPABASE_SECRET_KEY"]
 # runs stalling ~25 minutes then getting killed by the runner) and off the
 # earlier Kokoro engine before that. Back to edge-tts: a lightweight HTTPS
 # call to Microsoft's Edge TTS service, no local model, no GPU/CPU cost.
-VOICE = "en-US-GuyNeural"
+VOICE = "en-US-ChristopherNeural"
 
 # Speech rate passed directly to edge-tts per sentence. Edge TTS supports a
 # native rate parameter, so no separate ffmpeg atempo pass is needed here
