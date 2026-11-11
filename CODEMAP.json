@@ -1527,7 +1527,7 @@
       "functions": [
         {
           "name": "say",
-          "line": 77,
+          "line": 84,
           "args": [
             "text"
           ],
@@ -1540,7 +1540,7 @@
         },
         {
           "name": "sh",
-          "line": 82,
+          "line": 89,
           "args": [
             "cmd"
           ],
@@ -1553,7 +1553,7 @@
         },
         {
           "name": "ensure_ffmpeg",
-          "line": 89,
+          "line": 96,
           "args": [],
           "calls": [
             "bool",
@@ -1567,7 +1567,7 @@
         },
         {
           "name": "kaggle_user",
-          "line": 111,
+          "line": 118,
           "args": [],
           "calls": [
             "RuntimeError",
@@ -1578,7 +1578,7 @@
         },
         {
           "name": "parse_shot_list",
-          "line": 118,
+          "line": 125,
           "args": [
             "script"
           ],
@@ -1590,18 +1590,34 @@
           "docstring": ""
         },
         {
+          "name": "narration_ok",
+          "line": 132,
+          "args": [
+            "url"
+          ],
+          "calls": [
+            "close",
+            "get"
+          ],
+          "docstring": "True only if the narration file really downloads (HTTP 200). Old September scripts point to"
+        },
+        {
           "name": "get_candidates",
-          "line": 125,
+          "line": 146,
           "args": [],
           "calls": [
+            "append",
+            "get",
             "json",
-            "retryable_request"
+            "narration_ok",
+            "retryable_request",
+            "say"
           ],
           "docstring": ""
         },
         {
           "name": "fetch_script",
-          "line": 136,
+          "line": 166,
           "args": [
             "script_id"
           ],
@@ -1613,7 +1629,7 @@
         },
         {
           "name": "record_error",
-          "line": 147,
+          "line": 177,
           "args": [
             "script_id",
             "text"
@@ -1629,7 +1645,7 @@
         },
         {
           "name": "save_progress",
-          "line": 161,
+          "line": 191,
           "args": [
             "script_id",
             "video_urls",
@@ -1642,7 +1658,7 @@
         },
         {
           "name": "recently_errored",
-          "line": 171,
+          "line": 201,
           "args": [
             "script"
           ],
@@ -1656,7 +1672,7 @@
         },
         {
           "name": "get_durations",
-          "line": 182,
+          "line": 212,
           "args": [
             "script",
             "shot_list"
@@ -1679,7 +1695,7 @@
         },
         {
           "name": "short_anchor",
-          "line": 200,
+          "line": 230,
           "args": [
             "text",
             "limit"
@@ -1694,7 +1710,7 @@
         },
         {
           "name": "ltx_prompt",
-          "line": 209,
+          "line": 239,
           "args": [
             "shot",
             "anchor",
@@ -1713,7 +1729,7 @@
         },
         {
           "name": "build_manifest",
-          "line": 232,
+          "line": 262,
           "args": [
             "script",
             "start"
@@ -1745,7 +1761,7 @@
         },
         {
           "name": "kernel_status",
-          "line": 268,
+          "line": 298,
           "args": [
             "ref"
           ],
@@ -1757,7 +1773,7 @@
         },
         {
           "name": "push_batch",
-          "line": 289,
+          "line": 319,
           "args": [
             "script",
             "start"
@@ -1791,7 +1807,7 @@
         },
         {
           "name": "scale_clip",
-          "line": 337,
+          "line": 367,
           "args": [
             "src",
             "dst"
@@ -1806,7 +1822,7 @@
         },
         {
           "name": "collect",
-          "line": 350,
+          "line": 380,
           "args": [
             "script",
             "ref"
@@ -1834,7 +1850,7 @@
         },
         {
           "name": "assemble_if_complete",
-          "line": 386,
+          "line": 416,
           "args": [
             "script_id"
           ],
@@ -1854,7 +1870,7 @@
         },
         {
           "name": "write_summary",
-          "line": 407,
+          "line": 437,
           "args": [],
           "calls": [
             "get",
@@ -1867,7 +1883,7 @@
         },
         {
           "name": "run",
-          "line": 423,
+          "line": 453,
           "args": [],
           "calls": [
             "append",
@@ -1891,7 +1907,7 @@
         },
         {
           "name": "main",
-          "line": 494,
+          "line": 524,
           "args": [],
           "calls": [
             "append",
