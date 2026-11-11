@@ -26,6 +26,10 @@ downloaded clip are now saved into scripts.last_error (they were thrown away bef
 REV 2.2 (2026-11-11): the run log showed "ffmpeg: not found" on the GitHub runner, which is why
 no clip was ever saved. ensure_ffmpeg() now installs ffmpeg at the start of every run if missing.
 
+REV 2.3 (2026-11-11): (a) a script that has all its clips but failed assembly in the last 6 h is
+skipped instead of being retried (and re-failing the whole run) every 30 minutes; (b) pushing a
+batch to Kaggle now counts as progress, so a healthy run no longer exits red and opens a failure issue.
+
 State lives in Kaggle's kernel (slug marius-clips) and in Supabase scripts.video_urls, so every
 run is safe to repeat. Needs env: SUPABASE_URL, SUPABASE_SECRET_KEY, B2_*, GEMINI_API_KEY,
 KAGGLE_USERNAME (required, no fallback) and KAGGLE_API_TOKEN or KAGGLE_KEY.
@@ -66,7 +70,7 @@ UNREADABLE_MARK = "KAGGLE_STATUS_UNREADABLE"
 
 SUMMARY = []
 FAULTS = []
-PROGRESS = {"shots": 0}
+PROGRESS = {"shots": 0, "pushed": 0}
 LAST_FFMPEG = {"text": ""}
 
 
@@ -317,6 +321,7 @@ def push_batch(script, start):
         record_error(script_id, "Kaggle refused the push: " + out[-1500:])
         FAULTS.append(f"Kaggle refused the push for script {script_id}: {out[-400:]}")
         return False
+    PROGRESS["pushed"] += 1
     say(f"Pushed a Kaggle batch for script {script_id}: shots {start + 1} to {start + len(manifest['jobs'])}.")
     time.sleep(8)
     after = kernel_status(f"{user}/{SLUG}")
@@ -388,6 +393,12 @@ def assemble_if_complete(script_id):
         try:
             import video_generation
             video_generation.process_script(script, shot_limit=0)
+            after = fetch_script(script_id) or {}
+            if after.get("status") == "video_generated":
+                say(f"Script {script_id} is assembled (status video_generated). YouTube Upload picks it up next.")
+            else:
+                last = (after.get("last_error") or "")[-600:]
+                FAULTS.append(f"Script {script_id} was not assembled. Last error: {last or 'none recorded'}")
         except Exception as e:
             record_error(script_id, traceback.format_exc())
             FAULTS.append(f"Assembly failed for script {script_id}: {type(e).__name__}: {e}")
@@ -424,10 +435,14 @@ def run():
         say("No script is ready for video (needs status images_generated and a narration).")
         return
 
-    # 1) scripts whose clips are all saved just need assembling
+    # 1) scripts whose clips are all saved just need assembling (skipped for 6 h after a failed assembly)
     for s in candidates:
         total = len(parse_shot_list(s))
         if total and (s.get("video_next_index") or 0) >= total:
+            if recently_errored(s):
+                say(f"Script {s['id']} has all its clips but failed assembly in the last "
+                    f"{RETRY_COOLDOWN_HOURS} h; skipping it for now (error is saved on the script).")
+                continue
             assemble_if_complete(s["id"])
 
     target = None
@@ -484,7 +499,7 @@ def main():
         traceback.print_exc()
     finally:
         write_summary()
-    if FAULTS and PROGRESS["shots"] == 0:
+    if FAULTS and PROGRESS["shots"] == 0 and PROGRESS["pushed"] == 0:
         sys.exit(1)
 
 
