@@ -35,6 +35,10 @@ narration_url whose mp3 file no longer exists in Supabase storage (the download 
 their clips could never be assembled and Kaggle GPU hours were being spent on them. get_candidates()
 now checks that the narration file really downloads (HTTP 200) and only keeps scripts that pass.
 
+REV 2.5 (2026-11-11): a notebook run that a person cancelled on Kaggle is now its own state
+("cancelled"): the runner sends a fresh batch straight away instead of treating the missing output
+as a crash and waiting 6 hours.
+
 State lives in Kaggle's kernel (slug marius-clips) and in Supabase scripts.video_urls, so every
 run is safe to repeat. Needs env: SUPABASE_URL, SUPABASE_SECRET_KEY, B2_*, GEMINI_API_KEY,
 KAGGLE_USERNAME (required, no fallback) and KAGGLE_API_TOKEN or KAGGLE_KEY.
@@ -309,7 +313,9 @@ def kernel_status(ref):
         return "running"
     if "queued" in low or "queue" in low:
         return "queued"
-    if "error" in low or "cancel" in low or "failed" in low:
+    if "cancel" in low:
+        return "cancelled"
+    if "error" in low or "failed" in low:
         return "error"
     if "has status" in low:
         return "running"  # a status word we do not know: be safe and wait
@@ -493,6 +499,8 @@ def run():
     if state == "unknown":
         FAULTS.append("Could not read the Kaggle notebook status (unexpected answer, see the log). Nothing pushed.")
         return
+    if state == "cancelled":
+        say("The last Kaggle run was cancelled; sending a fresh batch.")
     if (state == "none" and (target.get("last_error") or "").startswith(UNREADABLE_MARK)
             and recently_errored(target)):
         say(f"A batch was pushed earlier but its status cannot be read; waiting up to {RETRY_COOLDOWN_HOURS} h "
