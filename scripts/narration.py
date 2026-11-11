@@ -117,7 +117,7 @@ def split_into_segments(narration_text):
     buffer = ""
     for piece in raw_pieces:
         buffer = f"{buffer} {piece}".strip() if buffer else piece
-        if buffer.endswith("...") or buffer.endswith("\u2026"):
+        if buffer.endswith("...") or buffer.endswith("…"):
             continue  # an ellipsis is a trailing-off beat, not a sentence end
         match = re.search(r"([A-Za-z]+)\.$", buffer)
         if match:
@@ -354,8 +354,22 @@ def main():
     # way, reported as a hard failure even though no script here did
     # anything wrong. Now treated like every other infra hiccup in this
     # pipeline: log it and exit cleanly so the next scheduled run retries.
+    # CLOSEST-TO-DONE-FIRST (2026-11-12): this query had no ORDER BY, so
+    # which pending script got narrated was arbitrary. Scripts 17fc73b3
+    # (30/30 clips saved) and cb18b7c2 had lost their narration mp3 from
+    # Supabase storage (download answered 400, saved in scripts.last_error)
+    # and were put back to 'pending' to be re-narrated. A script that
+    # already has clips must be narrated before a script with none, or its
+    # finished clips sit idle behind the backlog. Order: most clips saved
+    # first (video_next_index desc, nulls last), then oldest.
     try:
-        result = supabase.table("scripts").select("*").eq("status", "pending").limit(MAX_SCRIPTS_PER_RUN).execute()
+        result = (
+            supabase.table("scripts").select("*").eq("status", "pending")
+            .order("video_next_index", desc=True, nullsfirst=False)
+            .order("created_at")
+            .limit(MAX_SCRIPTS_PER_RUN)
+            .execute()
+        )
     except Exception as e:
         print(f"Supabase infra failure fetching pending scripts - not any script's fault, "
               f"exiting cleanly so the next scheduled run retries: {e}")
