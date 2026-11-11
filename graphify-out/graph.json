@@ -7,13 +7,26 @@
   },
   "nodes": [
     {
+      "id": "scripts_llm_client_dailyquotaexhausted",
+      "label": "DailyQuotaExhausted",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "call_llm",
+      "file_type": "code",
+      "norm_label": "dailyquotaexhausted",
+      "source_file": "scripts/llm_client.py",
+      "source_location": "L219"
+    },
+    {
       "id": "scripts_llm_client_infrafailure",
       "label": "InfraFailure",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 0,
-      "community_name": "narration_stage.py",
+      "community_name": "call_llm",
       "file_type": "code",
       "norm_label": "infrafailure",
       "source_file": "scripts/llm_client.py",
@@ -72,19 +85,6 @@
       "source_location": "L42"
     },
     {
-      "id": "scripts_llm_client_dailyquotaexhausted",
-      "label": "DailyQuotaExhausted",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "call_llm",
-      "file_type": "code",
-      "norm_label": "dailyquotaexhausted",
-      "source_file": "scripts/llm_client.py",
-      "source_location": "L219"
-    },
-    {
       "id": "scripts_stock_fallback_stockonlyerror",
       "label": "StockOnlyError",
       "_callable": true,
@@ -98,12 +98,24 @@
       "source_location": "L66"
     },
     {
+      "id": "scripts_llm_client_call_llm",
+      "label": "call_llm()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "call_llm",
+      "file_type": "code",
+      "norm_label": "call_llm()",
+      "source_file": "scripts/llm_client.py",
+      "source_location": "L283"
+    },
+    {
       "id": "scripts_narration_stage_build_narration_continuation_prompt",
       "label": "build_narration_continuation_prompt()",
       "_callable": true,
       "_origin": "ast",
       "community": 0,
-      "community_name": "narration_stage.py",
+      "community_name": "call_llm",
       "file_type": "code",
       "norm_label": "build_narration_continuation_prompt()",
       "source_file": "scripts/narration_stage.py",
@@ -115,7 +127,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 0,
-      "community_name": "narration_stage.py",
+      "community_name": "call_llm",
       "file_type": "code",
       "norm_label": "build_narration_prompt()",
       "source_file": "scripts/narration_stage.py",
@@ -127,7 +139,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 0,
-      "community_name": "narration_stage.py",
+      "community_name": "call_llm",
       "file_type": "code",
       "norm_label": "generate_narration()",
       "source_file": "scripts/narration_stage.py",
@@ -139,7 +151,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 0,
-      "community_name": "narration_stage.py",
+      "community_name": "call_llm",
       "file_type": "code",
       "norm_label": "narration_has_engagement_cta()",
       "source_file": "scripts/narration_stage.py",
@@ -151,11 +163,47 @@
       "_callable": true,
       "_origin": "ast",
       "community": 0,
-      "community_name": "narration_stage.py",
+      "community_name": "call_llm",
       "file_type": "code",
       "norm_label": "grade_narration()",
       "source_file": "scripts/quality_checker.py",
       "source_location": "L131"
+    },
+    {
+      "id": "scripts_quality_checker_grade_shot_breakdown",
+      "label": "grade_shot_breakdown()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "call_llm",
+      "file_type": "code",
+      "norm_label": "grade_shot_breakdown()",
+      "source_file": "scripts/quality_checker.py",
+      "source_location": "L196"
+    },
+    {
+      "id": "scripts_quality_checker_run_grader",
+      "label": "_run_grader()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "call_llm",
+      "file_type": "code",
+      "norm_label": "_run_grader()",
+      "source_file": "scripts/quality_checker.py",
+      "source_location": "L44"
+    },
+    {
+      "id": "scripts_shot_breakdown_stage_generate_shot_breakdown",
+      "label": "generate_shot_breakdown()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "call_llm",
+      "file_type": "code",
+      "norm_label": "generate_shot_breakdown()",
+      "source_file": "scripts/shot_breakdown_stage.py",
+      "source_location": "L1467"
     },
     {
       "id": "scripts_agnes_client_create_agnes_task",
@@ -458,6 +506,18 @@
       "source_location": "L474"
     },
     {
+      "id": "scripts_beat_director_apply_beat_to_shot",
+      "label": "apply_beat_to_shot()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "clip_generation.py",
+      "file_type": "code",
+      "norm_label": "apply_beat_to_shot()",
+      "source_file": "scripts/beat_director.py",
+      "source_location": "L166"
+    },
+    {
       "id": "scripts_clip_generation_derive_seed",
       "label": "_derive_seed()",
       "_callable": true,
@@ -614,30 +674,6 @@
       "source_location": "L324"
     },
     {
-      "id": "scripts_storage_b2_download_to_file",
-      "label": "download_to_file()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "download_to_file()",
-      "source_file": "scripts/storage_b2.py",
-      "source_location": "L360"
-    },
-    {
-      "id": "scripts_storage_b2_presigned_url",
-      "label": "presigned_url()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "code",
-      "norm_label": "presigned_url()",
-      "source_file": "scripts/storage_b2.py",
-      "source_location": "L282"
-    },
-    {
       "id": "scripts_thumbnail_generation_derive_hook_text",
       "label": "derive_hook_text()",
       "_callable": true,
@@ -782,16 +818,28 @@
       "source_location": "L643"
     },
     {
-      "id": "scripts_kaggle_video_test_kernel_load",
-      "label": "load()",
+      "id": "scripts_b2_preflight_main",
+      "label": "main()",
       "_callable": true,
       "_origin": "ast",
       "community": 11,
       "community_name": "time",
       "file_type": "code",
-      "norm_label": "load()",
-      "source_file": "scripts/kaggle_video_test/kernel.py",
-      "source_location": "L154"
+      "norm_label": "main()",
+      "source_file": "scripts/b2_preflight.py",
+      "source_location": "L53"
+    },
+    {
+      "id": "scripts_b2_preflight_probe",
+      "label": "probe()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "time",
+      "file_type": "code",
+      "norm_label": "probe()",
+      "source_file": "scripts/b2_preflight.py",
+      "source_location": "L41"
     },
     {
       "id": "scripts_llm_client_retryable_request",
@@ -804,18 +852,6 @@
       "norm_label": "retryable_request()",
       "source_file": "scripts/llm_client.py",
       "source_location": "L231"
-    },
-    {
-      "id": "scripts_storage_b2_upload_file",
-      "label": "upload_file()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 11,
-      "community_name": "time",
-      "file_type": "code",
-      "norm_label": "upload_file()",
-      "source_file": "scripts/storage_b2.py",
-      "source_location": "L217"
     },
     {
       "id": "scripts_video_generation_clear_error",
@@ -1226,30 +1262,6 @@
       "source_location": "L38"
     },
     {
-      "id": "scripts_b2_preflight_main",
-      "label": "main()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 13,
-      "community_name": "storage_b2.py",
-      "file_type": "code",
-      "norm_label": "main()",
-      "source_file": "scripts/b2_preflight.py",
-      "source_location": "L53"
-    },
-    {
-      "id": "scripts_b2_preflight_probe",
-      "label": "probe()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 13,
-      "community_name": "storage_b2.py",
-      "file_type": "code",
-      "norm_label": "probe()",
-      "source_file": "scripts/b2_preflight.py",
-      "source_location": "L41"
-    },
-    {
       "id": "scripts_cleanup_b2_uploaded_fetch_script_ids",
       "label": "fetch_script_ids()",
       "_callable": true,
@@ -1332,6 +1344,18 @@
       "norm_label": "delete_object()",
       "source_file": "scripts/storage_b2.py",
       "source_location": "L407"
+    },
+    {
+      "id": "scripts_storage_b2_download_to_file",
+      "label": "download_to_file()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "storage_b2.py",
+      "file_type": "code",
+      "norm_label": "download_to_file()",
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L360"
     },
     {
       "id": "scripts_storage_b2_ffmpeg_exe",
@@ -1418,6 +1442,18 @@
       "source_location": "L233"
     },
     {
+      "id": "scripts_storage_b2_presigned_url",
+      "label": "presigned_url()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "storage_b2.py",
+      "file_type": "code",
+      "norm_label": "presigned_url()",
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L282"
+    },
+    {
       "id": "scripts_storage_b2_region_from_endpoint",
       "label": "_region_from_endpoint()",
       "_callable": true,
@@ -1454,6 +1490,18 @@
       "source_location": "L184"
     },
     {
+      "id": "scripts_storage_b2_upload_file",
+      "label": "upload_file()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "storage_b2.py",
+      "file_type": "code",
+      "norm_label": "upload_file()",
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L217"
+    },
+    {
       "id": "scripts_storage_b2_url_is_fetchable",
       "label": "_url_is_fetchable()",
       "_callable": true,
@@ -1466,24 +1514,12 @@
       "source_location": "L270"
     },
     {
-      "id": "scripts_beat_director_apply_beat_to_shot",
-      "label": "apply_beat_to_shot()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "kaggle_clips.py",
-      "file_type": "code",
-      "norm_label": "apply_beat_to_shot()",
-      "source_file": "scripts/beat_director.py",
-      "source_location": "L166"
-    },
-    {
       "id": "scripts_beat_director_author_chain_beats",
       "label": "author_chain_beats()",
       "_callable": true,
       "_origin": "ast",
-      "community": 2,
-      "community_name": "kaggle_clips.py",
+      "community": 14,
+      "community_name": "beat_director.py",
       "file_type": "code",
       "norm_label": "author_chain_beats()",
       "source_file": "scripts/beat_director.py",
@@ -1494,8 +1530,8 @@
       "label": "_build_prompt()",
       "_callable": true,
       "_origin": "ast",
-      "community": 2,
-      "community_name": "kaggle_clips.py",
+      "community": 14,
+      "community_name": "beat_director.py",
       "file_type": "code",
       "norm_label": "_build_prompt()",
       "source_file": "scripts/beat_director.py",
@@ -1506,8 +1542,8 @@
       "label": "_call_gemini_once()",
       "_callable": true,
       "_origin": "ast",
-      "community": 2,
-      "community_name": "kaggle_clips.py",
+      "community": 14,
+      "community_name": "beat_director.py",
       "file_type": "code",
       "norm_label": "_call_gemini_once()",
       "source_file": "scripts/beat_director.py",
@@ -1518,8 +1554,8 @@
       "label": "_validate_beats()",
       "_callable": true,
       "_origin": "ast",
-      "community": 2,
-      "community_name": "kaggle_clips.py",
+      "community": 14,
+      "community_name": "beat_director.py",
       "file_type": "code",
       "norm_label": "_validate_beats()",
       "source_file": "scripts/beat_director.py",
@@ -1607,7 +1643,7 @@
       "file_type": "code",
       "norm_label": "assemble_if_complete()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L345"
+      "source_location": "L356"
     },
     {
       "id": "scripts_kaggle_clips_build_manifest",
@@ -1619,7 +1655,7 @@
       "file_type": "code",
       "norm_label": "build_manifest()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L199"
+      "source_location": "L203"
     },
     {
       "id": "scripts_kaggle_clips_collect",
@@ -1631,7 +1667,7 @@
       "file_type": "code",
       "norm_label": "collect()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L309"
+      "source_location": "L320"
     },
     {
       "id": "scripts_kaggle_clips_fetch_script",
@@ -1643,7 +1679,7 @@
       "file_type": "code",
       "norm_label": "fetch_script()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L103"
+      "source_location": "L107"
     },
     {
       "id": "scripts_kaggle_clips_get_candidates",
@@ -1655,7 +1691,7 @@
       "file_type": "code",
       "norm_label": "get_candidates()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L92"
+      "source_location": "L96"
     },
     {
       "id": "scripts_kaggle_clips_get_durations",
@@ -1667,7 +1703,7 @@
       "file_type": "code",
       "norm_label": "get_durations()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L149"
+      "source_location": "L153"
     },
     {
       "id": "scripts_kaggle_clips_kaggle_user",
@@ -1679,7 +1715,7 @@
       "file_type": "code",
       "norm_label": "kaggle_user()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L78"
+      "source_location": "L82"
     },
     {
       "id": "scripts_kaggle_clips_kernel_status",
@@ -1691,7 +1727,7 @@
       "file_type": "code",
       "norm_label": "kernel_status()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L235"
+      "source_location": "L239"
     },
     {
       "id": "scripts_kaggle_clips_ltx_prompt",
@@ -1703,7 +1739,7 @@
       "file_type": "code",
       "norm_label": "ltx_prompt()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L176"
+      "source_location": "L180"
     },
     {
       "id": "scripts_kaggle_clips_main",
@@ -1715,7 +1751,7 @@
       "file_type": "code",
       "norm_label": "main()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L440"
+      "source_location": "L451"
     },
     {
       "id": "scripts_kaggle_clips_parse_shot_list",
@@ -1727,7 +1763,7 @@
       "file_type": "code",
       "norm_label": "parse_shot_list()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L85"
+      "source_location": "L89"
     },
     {
       "id": "scripts_kaggle_clips_push_batch",
@@ -1739,7 +1775,7 @@
       "file_type": "code",
       "norm_label": "push_batch()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L256"
+      "source_location": "L260"
     },
     {
       "id": "scripts_kaggle_clips_recently_errored",
@@ -1751,7 +1787,7 @@
       "file_type": "code",
       "norm_label": "recently_errored()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L138"
+      "source_location": "L142"
     },
     {
       "id": "scripts_kaggle_clips_record_error",
@@ -1763,7 +1799,7 @@
       "file_type": "code",
       "norm_label": "record_error()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L114"
+      "source_location": "L118"
     },
     {
       "id": "scripts_kaggle_clips_run",
@@ -1775,7 +1811,7 @@
       "file_type": "code",
       "norm_label": "run()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L376"
+      "source_location": "L387"
     },
     {
       "id": "scripts_kaggle_clips_save_progress",
@@ -1787,7 +1823,7 @@
       "file_type": "code",
       "norm_label": "save_progress()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L128"
+      "source_location": "L132"
     },
     {
       "id": "scripts_kaggle_clips_say",
@@ -1799,7 +1835,7 @@
       "file_type": "code",
       "norm_label": "say()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L66"
+      "source_location": "L70"
     },
     {
       "id": "scripts_kaggle_clips_scale_clip",
@@ -1811,7 +1847,7 @@
       "file_type": "code",
       "norm_label": "scale_clip()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L303"
+      "source_location": "L307"
     },
     {
       "id": "scripts_kaggle_clips_sh",
@@ -1823,7 +1859,7 @@
       "file_type": "code",
       "norm_label": "sh()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L71"
+      "source_location": "L75"
     },
     {
       "id": "scripts_kaggle_clips_short_anchor",
@@ -1835,7 +1871,7 @@
       "file_type": "code",
       "norm_label": "short_anchor()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L167"
+      "source_location": "L171"
     },
     {
       "id": "scripts_kaggle_clips_write_summary",
@@ -1847,7 +1883,7 @@
       "file_type": "code",
       "norm_label": "write_summary()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L360"
+      "source_location": "L371"
     },
     {
       "id": "scripts_prompt_focus_focus_anchor",
@@ -1910,76 +1946,16 @@
       "source_location": "L49"
     },
     {
-      "id": "scripts_llm_client_call_llm",
-      "label": "call_llm()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "call_llm",
-      "file_type": "code",
-      "norm_label": "call_llm()",
-      "source_file": "scripts/llm_client.py",
-      "source_location": "L283"
-    },
-    {
-      "id": "scripts_quality_checker_grade_shot_breakdown",
-      "label": "grade_shot_breakdown()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "call_llm",
-      "file_type": "code",
-      "norm_label": "grade_shot_breakdown()",
-      "source_file": "scripts/quality_checker.py",
-      "source_location": "L196"
-    },
-    {
-      "id": "scripts_quality_checker_run_grader",
-      "label": "_run_grader()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "call_llm",
-      "file_type": "code",
-      "norm_label": "_run_grader()",
-      "source_file": "scripts/quality_checker.py",
-      "source_location": "L44"
-    },
-    {
       "id": "scripts_shot_breakdown_stage_build_shot_breakdown_chunk_prompt",
       "label": "build_shot_breakdown_chunk_prompt()",
       "_callable": true,
       "_origin": "ast",
       "community": 23,
-      "community_name": "call_llm",
+      "community_name": "build_shot_breakdown_chunk_prompt",
       "file_type": "code",
       "norm_label": "build_shot_breakdown_chunk_prompt()",
       "source_file": "scripts/shot_breakdown_stage.py",
       "source_location": "L1281"
-    },
-    {
-      "id": "scripts_shot_breakdown_stage_generate_shot_breakdown",
-      "label": "generate_shot_breakdown()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "call_llm",
-      "file_type": "code",
-      "norm_label": "generate_shot_breakdown()",
-      "source_file": "scripts/shot_breakdown_stage.py",
-      "source_location": "L1467"
-    },
-    {
-      "id": "scripts_shot_breakdown_stage_split_narration_into_chunks",
-      "label": "split_narration_into_chunks()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "call_llm",
-      "file_type": "code",
-      "norm_label": "split_narration_into_chunks()",
-      "source_file": "scripts/shot_breakdown_stage.py",
-      "source_location": "L355"
     },
     {
       "id": "scripts_script_writing_generate_script",
@@ -2102,16 +2078,100 @@
       "source_location": "L435"
     },
     {
-      "id": "scripts_shot_breakdown_stage_build_shot_breakdown_response_schema",
-      "label": "build_shot_breakdown_response_schema()",
+      "id": "scripts_topic_research_collect_approved_topics",
+      "label": "collect_approved_topics()",
       "_callable": true,
       "_origin": "ast",
       "community": 27,
-      "community_name": "build_shot_breakdown_response_schema",
+      "community_name": "topic_research.py",
       "file_type": "code",
-      "norm_label": "build_shot_breakdown_response_schema()",
+      "norm_label": "collect_approved_topics()",
+      "source_file": "scripts/topic_research.py",
+      "source_location": "L282"
+    },
+    {
+      "id": "scripts_topic_research_generate_topic_candidates",
+      "label": "generate_topic_candidates()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "topic_research.py",
+      "file_type": "code",
+      "norm_label": "generate_topic_candidates()",
+      "source_file": "scripts/topic_research.py",
+      "source_location": "L170"
+    },
+    {
+      "id": "scripts_topic_research_get_existing_titles",
+      "label": "get_existing_titles()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "topic_research.py",
+      "file_type": "code",
+      "norm_label": "get_existing_titles()",
+      "source_file": "scripts/topic_research.py",
+      "source_location": "L141"
+    },
+    {
+      "id": "scripts_topic_research_get_recent_trend_signals",
+      "label": "get_recent_trend_signals()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "topic_research.py",
+      "file_type": "code",
+      "norm_label": "get_recent_trend_signals()",
+      "source_file": "scripts/topic_research.py",
+      "source_location": "L151"
+    },
+    {
+      "id": "scripts_topic_research_grade_topic_candidates",
+      "label": "grade_topic_candidates()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "topic_research.py",
+      "file_type": "code",
+      "norm_label": "grade_topic_candidates()",
+      "source_file": "scripts/topic_research.py",
+      "source_location": "L226"
+    },
+    {
+      "id": "scripts_topic_research_main",
+      "label": "main()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "topic_research.py",
+      "file_type": "code",
+      "norm_label": "main()",
+      "source_file": "scripts/topic_research.py",
+      "source_location": "L340"
+    },
+    {
+      "id": "scripts_topic_research_save_topic",
+      "label": "save_topic()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "topic_research.py",
+      "file_type": "code",
+      "norm_label": "save_topic()",
+      "source_file": "scripts/topic_research.py",
+      "source_location": "L329"
+    },
+    {
+      "id": "scripts_shot_breakdown_stage_split_narration_into_chunks",
+      "label": "split_narration_into_chunks()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 29,
+      "community_name": "split_narration_into_chunks",
+      "file_type": "code",
+      "norm_label": "split_narration_into_chunks()",
       "source_file": "scripts/shot_breakdown_stage.py",
-      "source_location": "L1244"
+      "source_location": "L355"
     },
     {
       "id": "scripts_kaggle_clips_kernel_call",
@@ -2160,6 +2220,18 @@
       "norm_label": "make_shot()",
       "source_file": "scripts/kaggle_clips_kernel.py",
       "source_location": "L116"
+    },
+    {
+      "id": "scripts_kaggle_clips_kernel_run",
+      "label": "run()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 3,
+      "community_name": "json",
+      "file_type": "code",
+      "norm_label": "run()",
+      "source_file": "scripts/kaggle_clips_kernel.py",
+      "source_location": "L51"
     },
     {
       "id": "scripts_kaggle_clips_kernel_save",
@@ -2244,6 +2316,18 @@
       "norm_label": "has_audio()",
       "source_file": "scripts/kaggle_video_test/kernel.py",
       "source_location": "L142"
+    },
+    {
+      "id": "scripts_kaggle_video_test_kernel_load",
+      "label": "load()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 3,
+      "community_name": "json",
+      "file_type": "code",
+      "norm_label": "load()",
+      "source_file": "scripts/kaggle_video_test/kernel.py",
+      "source_location": "L154"
     },
     {
       "id": "scripts_kaggle_video_test_kernel_load_mimsi",
@@ -2376,6 +2460,18 @@
       "norm_label": "auto_repair_missing_onscreen_text()",
       "source_file": "scripts/shot_breakdown_stage.py",
       "source_location": "L547"
+    },
+    {
+      "id": "scripts_shot_breakdown_stage_build_shot_breakdown_response_schema",
+      "label": "build_shot_breakdown_response_schema()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "shot_breakdown_stage.py",
+      "file_type": "code",
+      "norm_label": "build_shot_breakdown_response_schema()",
+      "source_file": "scripts/shot_breakdown_stage.py",
+      "source_location": "L1244"
     },
     {
       "id": "scripts_shot_breakdown_stage_find_anachronistic_object_shots",
@@ -2592,18 +2688,6 @@
       "norm_label": "validate_and_normalize_shot_response()",
       "source_file": "scripts/shot_breakdown_stage.py",
       "source_location": "L735"
-    },
-    {
-      "id": "scripts_kaggle_clips_kernel_run",
-      "label": "run()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "stock_fallback.py",
-      "file_type": "code",
-      "norm_label": "run()",
-      "source_file": "scripts/kaggle_clips_kernel.py",
-      "source_location": "L51"
     },
     {
       "id": "scripts_stock_fallback_concat",
@@ -3290,90 +3374,6 @@
       "source_location": "L51"
     },
     {
-      "id": "scripts_topic_research_collect_approved_topics",
-      "label": "collect_approved_topics()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
-      "file_type": "code",
-      "norm_label": "collect_approved_topics()",
-      "source_file": "scripts/topic_research.py",
-      "source_location": "L282"
-    },
-    {
-      "id": "scripts_topic_research_generate_topic_candidates",
-      "label": "generate_topic_candidates()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
-      "file_type": "code",
-      "norm_label": "generate_topic_candidates()",
-      "source_file": "scripts/topic_research.py",
-      "source_location": "L170"
-    },
-    {
-      "id": "scripts_topic_research_get_existing_titles",
-      "label": "get_existing_titles()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
-      "file_type": "code",
-      "norm_label": "get_existing_titles()",
-      "source_file": "scripts/topic_research.py",
-      "source_location": "L141"
-    },
-    {
-      "id": "scripts_topic_research_get_recent_trend_signals",
-      "label": "get_recent_trend_signals()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
-      "file_type": "code",
-      "norm_label": "get_recent_trend_signals()",
-      "source_file": "scripts/topic_research.py",
-      "source_location": "L151"
-    },
-    {
-      "id": "scripts_topic_research_grade_topic_candidates",
-      "label": "grade_topic_candidates()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
-      "file_type": "code",
-      "norm_label": "grade_topic_candidates()",
-      "source_file": "scripts/topic_research.py",
-      "source_location": "L226"
-    },
-    {
-      "id": "scripts_topic_research_main",
-      "label": "main()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
-      "file_type": "code",
-      "norm_label": "main()",
-      "source_file": "scripts/topic_research.py",
-      "source_location": "L340"
-    },
-    {
-      "id": "scripts_topic_research_save_topic",
-      "label": "save_topic()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
-      "file_type": "code",
-      "norm_label": "save_topic()",
-      "source_file": "scripts/topic_research.py",
-      "source_location": "L329"
-    },
-    {
       "id": "scripts_trend_research_fetch_top_articles",
       "label": "fetch_top_articles()",
       "_callable": true,
@@ -3558,7 +3558,7 @@
       "label": "RuntimeError",
       "_origin": "ast",
       "community": 0,
-      "community_name": "narration_stage.py",
+      "community_name": "call_llm",
       "file_type": "code",
       "norm_label": "runtimeerror",
       "source_file": "",
@@ -3569,10 +3569,21 @@
       "label": "narration_stage.py",
       "_origin": "ast",
       "community": 0,
-      "community_name": "narration_stage.py",
+      "community_name": "call_llm",
       "file_type": "code",
       "norm_label": "narration_stage.py",
       "source_file": "scripts/narration_stage.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "scripts_quality_checker",
+      "label": "quality_checker.py",
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "call_llm",
+      "file_type": "code",
+      "norm_label": "quality_checker.py",
+      "source_file": "scripts/quality_checker.py",
       "source_location": "L1"
     },
     {
@@ -3580,18 +3591,40 @@
       "label": "Raised when Gemini never returned a usable response within the infra retry\u2026",
       "_origin": "ast",
       "community": 0,
-      "community_name": "narration_stage.py",
+      "community_name": "call_llm",
       "file_type": "rationale",
       "norm_label": "raised when gemini never returned a usable response within the infra retry...",
       "source_file": "scripts/llm_client.py",
       "source_location": "L210"
     },
     {
+      "id": "scripts_llm_client_rationale_220",
+      "label": "PROVIDER SWITCH (2026-08-17): replaces Groq's SuspectedDailyQuotaExhausted\u2026",
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "call_llm",
+      "file_type": "rationale",
+      "norm_label": "provider switch (2026-08-17): replaces groq's suspecteddailyquotaexhausted...",
+      "source_file": "scripts/llm_client.py",
+      "source_location": "L220"
+    },
+    {
+      "id": "scripts_llm_client_rationale_284",
+      "label": "PROVIDER SWITCH (2026-08-17): Groq replaced with Gemini (gemini-3.5-flash-\u2026",
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "call_llm",
+      "file_type": "rationale",
+      "norm_label": "provider switch (2026-08-17): groq replaced with gemini (gemini-3.5-flash-...",
+      "source_file": "scripts/llm_client.py",
+      "source_location": "L284"
+    },
+    {
       "id": "scripts_narration_stage_rationale_1",
       "label": "Marius Command Center - Narration Stage Stage 1 of script generation: produce a\u2026",
       "_origin": "ast",
       "community": 0,
-      "community_name": "narration_stage.py",
+      "community_name": "call_llm",
       "file_type": "rationale",
       "norm_label": "marius command center - narration stage stage 1 of script generation: produce a...",
       "source_file": "scripts/narration_stage.py",
@@ -3602,7 +3635,7 @@
       "label": "Stage 1: produce a narration that already clears the word-count and CTA bar\u2026",
       "_origin": "ast",
       "community": 0,
-      "community_name": "narration_stage.py",
+      "community_name": "call_llm",
       "file_type": "rationale",
       "norm_label": "stage 1: produce a narration that already clears the word-count and cta bar...",
       "source_file": "scripts/narration_stage.py",
@@ -3613,11 +3646,44 @@
       "label": "CTA-WINDOW FALSE-NEGATIVE FIX (2026-09-12): see module docstring. Previously\u2026",
       "_origin": "ast",
       "community": 0,
-      "community_name": "narration_stage.py",
+      "community_name": "call_llm",
       "file_type": "rationale",
       "norm_label": "cta-window false-negative fix (2026-09-12): see module docstring. previously...",
       "source_file": "scripts/narration_stage.py",
       "source_location": "L63"
+    },
+    {
+      "id": "scripts_quality_checker_rationale_1",
+      "label": "Marius Command Center - Quality Checker (Loop Skill 2: writer/checker split) A\u2026",
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "call_llm",
+      "file_type": "rationale",
+      "norm_label": "marius command center - quality checker (loop skill 2: writer/checker split) a...",
+      "source_file": "scripts/quality_checker.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "scripts_quality_checker_rationale_45",
+      "label": "Shared grading-call wrapper. Returns (passed: bool, reason: str). Fails OPEN\u2026",
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "call_llm",
+      "file_type": "rationale",
+      "norm_label": "shared grading-call wrapper. returns (passed: bool, reason: str). fails open...",
+      "source_file": "scripts/quality_checker.py",
+      "source_location": "L45"
+    },
+    {
+      "id": "scripts_shot_breakdown_stage_rationale_1468",
+      "label": "CHUNKED (2026-08-15): splits narration into NUM_SHOT_CHUNKS pieces and makes\u2026",
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "call_llm",
+      "file_type": "rationale",
+      "norm_label": "chunked (2026-08-15): splits narration into num_shot_chunks pieces and makes...",
+      "source_file": "scripts/shot_breakdown_stage.py",
+      "source_location": "L1468"
     },
     {
       "id": "scripts_agnes_client",
@@ -3674,6 +3740,18 @@
       "norm_label": "what was found and fixed (2026-09-21)",
       "source_file": "CONTINUATION.md",
       "source_location": "L11"
+    },
+    {
+      "id": "handoff_2026_10_18_free_video_fallback_what_was_learned_this_session",
+      "label": "What was learned this session",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "clip_generation.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "what was learned this session",
+      "source_file": "HANDOFF_2026-10-18_FREE_VIDEO_FALLBACK.md",
+      "source_location": "L16"
     },
     {
       "id": "scripts_agnes_client_rationale_1",
@@ -3753,6 +3831,17 @@
       "source_location": "L291"
     },
     {
+      "id": "scripts_beat_director_rationale_167",
+      "label": "Returns a COPY of shot with the beat's action/camera/shot_type swapped in.\u2026",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "clip_generation.py",
+      "file_type": "rationale",
+      "norm_label": "returns a copy of shot with the beat's action/camera/shot_type swapped in....",
+      "source_file": "scripts/beat_director.py",
+      "source_location": "L167"
+    },
+    {
       "id": "scripts_clip_generation_rationale_1",
       "label": "Marius Command Center - clip generation (split from video_generation.py,\u2026",
       "_origin": "ast",
@@ -3773,28 +3862,6 @@
       "norm_label": "protagonist-everywhere fix + clip qa (2026-10-09), zia's report: protagonist in...",
       "source_file": "scripts/clip_generation.py",
       "source_location": "L237"
-    },
-    {
-      "id": "scripts_storage_b2_rationale_283",
-      "label": "Generates a fresh, short-lived presigned GET URL for object_key and PROVES it\u2026",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "rationale",
-      "norm_label": "generates a fresh, short-lived presigned get url for object_key and proves it...",
-      "source_file": "scripts/storage_b2.py",
-      "source_location": "L283"
-    },
-    {
-      "id": "scripts_storage_b2_rationale_361",
-      "label": "Downloads object_key directly to local_path via the B2 API (no presigned URL\u2026",
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "file_type": "rationale",
-      "norm_label": "downloads object_key directly to local_path via the b2 api (no presigned url...",
-      "source_file": "scripts/storage_b2.py",
-      "source_location": "L361"
     },
     {
       "id": "scripts_thumbnail_generation",
@@ -3907,6 +3974,17 @@
       "source_location": "L262"
     },
     {
+      "id": "scripts_b2_preflight",
+      "label": "b2_preflight.py",
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "time",
+      "file_type": "code",
+      "norm_label": "b2_preflight.py",
+      "source_file": "scripts/b2_preflight.py",
+      "source_location": "L1"
+    },
+    {
       "id": "scripts_video_generation",
       "label": "video_generation.py",
       "_origin": "ast",
@@ -3927,6 +4005,17 @@
       "norm_label": "returns the b2 object key (not a url) - stored in scripts.video_url. storage...",
       "source_file": "scripts/assembly_stage.py",
       "source_location": "L644"
+    },
+    {
+      "id": "scripts_b2_preflight_rationale_1",
+      "label": "Marius Command Center - B2 preflight (2026-09-19) WHY THIS EXISTS: Video\u2026",
+      "_origin": "ast",
+      "community": 11,
+      "community_name": "time",
+      "file_type": "rationale",
+      "norm_label": "marius command center - b2 preflight (2026-09-19) why this exists: video...",
+      "source_file": "scripts/b2_preflight.py",
+      "source_location": "L1"
     },
     {
       "id": "scripts_llm_client_rationale_232",
@@ -4271,17 +4360,6 @@
       "source_location": "L112"
     },
     {
-      "id": "scripts_b2_preflight",
-      "label": "b2_preflight.py",
-      "_origin": "ast",
-      "community": 13,
-      "community_name": "storage_b2.py",
-      "file_type": "code",
-      "norm_label": "b2_preflight.py",
-      "source_file": "scripts/b2_preflight.py",
-      "source_location": "L1"
-    },
-    {
       "id": "scripts_cleanup_b2_uploaded",
       "label": "cleanup_b2_uploaded.py",
       "_origin": "ast",
@@ -4304,78 +4382,6 @@
       "source_location": "L1"
     },
     {
-      "id": "continuation_2026_09_19_session_b2_agnes_fixes_landed_throughput_math_checked_agnes_replacement_researched",
-      "label": "2026-09-19 session \u2014 B2/Agnes fixes landed, throughput math checked, Agnes-replacement researched",
-      "_origin": "ast",
-      "community": 13,
-      "community_name": "storage_b2.py",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "2026-09-19 session \u2014 b2/agnes fixes landed, throughput math checked, agnes-replacement researched",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L192"
-    },
-    {
-      "id": "continuation_agnes_replacement_research_requested_by_ali_generate_video_on_a",
-      "label": "Agnes-replacement research (requested by Ali \u2014 \"generate video on a",
-      "_origin": "ast",
-      "community": 13,
-      "community_name": "storage_b2.py",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "agnes-replacement research (requested by ali \u2014 \"generate video on a",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L230"
-    },
-    {
-      "id": "continuation_current_state_as_of_handoff",
-      "label": "CURRENT STATE (as of handoff)",
-      "_origin": "ast",
-      "community": 13,
-      "community_name": "storage_b2.py",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "current state (as of handoff)",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L94"
-    },
-    {
-      "id": "continuation_exact_next_steps_for_whoever_picks_this_up_152",
-      "label": "EXACT NEXT STEPS for whoever picks this up",
-      "_origin": "ast",
-      "community": 13,
-      "community_name": "storage_b2.py",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "exact next steps for whoever picks this up",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L152"
-    },
-    {
-      "id": "continuation_marius_erased_continuation_notes_2026_09_19_part_1_throughput_agnes_replacement_session",
-      "label": "Marius / Erased \u2014 Continuation Notes (2026-09-19 PART 1, THROUGHPUT + AGNES-REPLACEMENT SESSION)",
-      "_origin": "ast",
-      "community": 13,
-      "community_name": "storage_b2.py",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "marius / erased \u2014 continuation notes (2026-09-19 part 1, throughput + agnes-replacement session)",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L181"
-    },
-    {
-      "id": "continuation_marius_erased_continuation_notes_2026_09_19_part_2_live_handoff",
-      "label": "Marius / Erased \u2014 Continuation Notes (2026-09-19 PART 2, LIVE HANDOFF)",
-      "_origin": "ast",
-      "community": 13,
-      "community_name": "storage_b2.py",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "marius / erased \u2014 continuation notes (2026-09-19 part 2, live handoff)",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L87"
-    },
-    {
       "id": "continuation_what_s_confirmed_this_session",
       "label": "What's CONFIRMED this session",
       "_origin": "ast",
@@ -4386,29 +4392,6 @@
       "norm_label": "what's confirmed this session",
       "source_file": "CONTINUATION.md",
       "source_location": "L194"
-    },
-    {
-      "id": "continuation_why_this_matters_the_live_open_question_at_handoff",
-      "label": "WHY this matters \u2014 the live open question at handoff",
-      "_origin": "ast",
-      "community": 13,
-      "community_name": "storage_b2.py",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "why this matters \u2014 the live open question at handoff",
-      "source_file": "CONTINUATION.md",
-      "source_location": "L131"
-    },
-    {
-      "id": "scripts_b2_preflight_rationale_1",
-      "label": "Marius Command Center - B2 preflight (2026-09-19) WHY THIS EXISTS: Video\u2026",
-      "_origin": "ast",
-      "community": 13,
-      "community_name": "storage_b2.py",
-      "file_type": "rationale",
-      "norm_label": "marius command center - b2 preflight (2026-09-19) why this exists: video...",
-      "source_file": "scripts/b2_preflight.py",
-      "source_location": "L1"
     },
     {
       "id": "scripts_cleanup_b2_uploaded_rationale_1",
@@ -4499,6 +4482,17 @@
       "source_location": "L271"
     },
     {
+      "id": "scripts_storage_b2_rationale_283",
+      "label": "Generates a fresh, short-lived presigned GET URL for object_key and PROVES it\u2026",
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "storage_b2.py",
+      "file_type": "rationale",
+      "norm_label": "generates a fresh, short-lived presigned get url for object_key and proves it...",
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L283"
+    },
+    {
       "id": "scripts_storage_b2_rationale_305",
       "label": "Same ffmpeg binary moviepy itself uses, so the cleanup below sees exactly what\u2026",
       "_origin": "ast",
@@ -4519,6 +4513,17 @@
       "norm_label": "timecode-track fix (2026-11-09): see module docstring. if the .mp4 at...",
       "source_file": "scripts/storage_b2.py",
       "source_location": "L317"
+    },
+    {
+      "id": "scripts_storage_b2_rationale_361",
+      "label": "Downloads object_key directly to local_path via the B2 API (no presigned URL\u2026",
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "storage_b2.py",
+      "file_type": "rationale",
+      "norm_label": "downloads object_key directly to local_path via the b2 api (no presigned url...",
+      "source_file": "scripts/storage_b2.py",
+      "source_location": "L361"
     },
     {
       "id": "scripts_storage_b2_rationale_375",
@@ -4554,11 +4559,22 @@
       "source_location": "L408"
     },
     {
+      "id": "scripts_beat_director",
+      "label": "beat_director.py",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "beat_director.py",
+      "file_type": "code",
+      "norm_label": "beat_director.py",
+      "source_file": "scripts/beat_director.py",
+      "source_location": "L1"
+    },
+    {
       "id": "continuation",
       "label": "CONTINUATION.md",
       "_origin": "ast",
       "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "community_name": "beat_director.py",
       "file_type": "document",
       "node_kind": "page",
       "norm_label": "continuation.md",
@@ -4566,11 +4582,35 @@
       "source_location": "L1"
     },
     {
+      "id": "continuation_2026_09_19_session_b2_agnes_fixes_landed_throughput_math_checked_agnes_replacement_researched",
+      "label": "2026-09-19 session \u2014 B2/Agnes fixes landed, throughput math checked, Agnes-replacement researched",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "beat_director.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "2026-09-19 session \u2014 b2/agnes fixes landed, throughput math checked, agnes-replacement researched",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L192"
+    },
+    {
+      "id": "continuation_agnes_replacement_research_requested_by_ali_generate_video_on_a",
+      "label": "Agnes-replacement research (requested by Ali \u2014 \"generate video on a",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "beat_director.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "agnes-replacement research (requested by ali \u2014 \"generate video on a",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L230"
+    },
+    {
       "id": "continuation_correction_to_part_4_important_do_not_delete_these_files",
       "label": "Correction to PART 4 (important \u2014 do NOT delete these files)",
       "_origin": "ast",
       "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "community_name": "beat_director.py",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "correction to part 4 (important \u2014 do not delete these files)",
@@ -4578,11 +4618,23 @@
       "source_location": "L8"
     },
     {
+      "id": "continuation_current_state_as_of_handoff",
+      "label": "CURRENT STATE (as of handoff)",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "beat_director.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "current state (as of handoff)",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L94"
+    },
+    {
       "id": "continuation_declutter_done_2026_09_19_verified_before_deleting",
       "label": "Declutter done (2026-09-19, verified before deleting)",
       "_origin": "ast",
       "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "community_name": "beat_director.py",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "declutter done (2026-09-19, verified before deleting)",
@@ -4594,7 +4646,7 @@
       "label": "EXACT NEXT STEPS",
       "_origin": "ast",
       "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "community_name": "beat_director.py",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "exact next steps",
@@ -4606,7 +4658,7 @@
       "label": "EXACT NEXT STEPS for whoever picks this up",
       "_origin": "ast",
       "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "community_name": "beat_director.py",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "exact next steps for whoever picks this up",
@@ -4614,11 +4666,47 @@
       "source_location": "L46"
     },
     {
+      "id": "continuation_exact_next_steps_for_whoever_picks_this_up_152",
+      "label": "EXACT NEXT STEPS for whoever picks this up",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "beat_director.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "exact next steps for whoever picks this up",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L152"
+    },
+    {
+      "id": "continuation_marius_erased_continuation_notes_2026_09_19_part_1_throughput_agnes_replacement_session",
+      "label": "Marius / Erased \u2014 Continuation Notes (2026-09-19 PART 1, THROUGHPUT + AGNES-REPLACEMENT SESSION)",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "beat_director.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "marius / erased \u2014 continuation notes (2026-09-19 part 1, throughput + agnes-replacement session)",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L181"
+    },
+    {
+      "id": "continuation_marius_erased_continuation_notes_2026_09_19_part_2_live_handoff",
+      "label": "Marius / Erased \u2014 Continuation Notes (2026-09-19 PART 2, LIVE HANDOFF)",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "beat_director.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "marius / erased \u2014 continuation notes (2026-09-19 part 2, live handoff)",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L87"
+    },
+    {
       "id": "continuation_marius_erased_continuation_notes_2026_09_19_part_3_chain_beats_read_this_section_first",
       "label": "Marius / Erased \u2014 Continuation Notes (2026-09-19 PART 3, CHAIN BEATS \u2014 read this section FIRST)",
       "_origin": "ast",
       "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "community_name": "beat_director.py",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "marius / erased \u2014 continuation notes (2026-09-19 part 3, chain beats \u2014 read this section first)",
@@ -4630,7 +4718,7 @@
       "label": "Marius / Erased \u2014 Continuation Notes (2026-09-19 PART 4, SKILLS + DECLUTTER, read this section FIRST)",
       "_origin": "ast",
       "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "community_name": "beat_director.py",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "marius / erased \u2014 continuation notes (2026-09-19 part 4, skills + declutter, read this section first)",
@@ -4642,7 +4730,7 @@
       "label": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
       "_origin": "ast",
       "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "community_name": "beat_director.py",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "marius / erased \u2014 continuation notes (2026-09-21 part 5, agnes create-timeout fix + part 4 correction, read this section first)",
@@ -4654,7 +4742,7 @@
       "label": "NOT verified",
       "_origin": "ast",
       "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "community_name": "beat_director.py",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "not verified",
@@ -4666,7 +4754,7 @@
       "label": "NOT verified",
       "_origin": "ast",
       "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "community_name": "beat_director.py",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "not verified",
@@ -4678,7 +4766,7 @@
       "label": "Standing role (from Zia, 2026-09-21)",
       "_origin": "ast",
       "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "community_name": "beat_director.py",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "standing role (from zia, 2026-09-21)",
@@ -4690,7 +4778,7 @@
       "label": "Tests run (sandbox, mocked Agnes/moviepy)",
       "_origin": "ast",
       "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "community_name": "beat_director.py",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "tests run (sandbox, mocked agnes/moviepy)",
@@ -4702,7 +4790,7 @@
       "label": "Verified live on `main` (2026-09-19)",
       "_origin": "ast",
       "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "community_name": "beat_director.py",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "verified live on `main` (2026-09-19)",
@@ -4714,7 +4802,7 @@
       "label": "What happened this session",
       "_origin": "ast",
       "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "community_name": "beat_director.py",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "what happened this session",
@@ -4726,12 +4814,46 @@
       "label": "Where the next profile should look",
       "_origin": "ast",
       "community": 14,
-      "community_name": "Marius / Erased \u2014 Continuation Notes (2026-09-21 PART 5, AGNES CREATE-TIMEOUT FIX + PART 4 CORRECTION, read this section FIRST)",
+      "community_name": "beat_director.py",
       "file_type": "document",
       "node_kind": "heading",
       "norm_label": "where the next profile should look",
       "source_file": "CONTINUATION.md",
       "source_location": "L52"
+    },
+    {
+      "id": "continuation_why_this_matters_the_live_open_question_at_handoff",
+      "label": "WHY this matters \u2014 the live open question at handoff",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "beat_director.py",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "why this matters \u2014 the live open question at handoff",
+      "source_file": "CONTINUATION.md",
+      "source_location": "L131"
+    },
+    {
+      "id": "scripts_beat_director_rationale_1",
+      "label": "Marius Command Center - beat director (2026-09-19). PROBLEM: a shot longer than\u2026",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "beat_director.py",
+      "file_type": "rationale",
+      "norm_label": "marius command center - beat director (2026-09-19). problem: a shot longer than...",
+      "source_file": "scripts/beat_director.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "scripts_beat_director_rationale_139",
+      "label": "Returns a list of exactly num_beats dicts ({\"action\", \"camera_movement\",\u2026",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "beat_director.py",
+      "file_type": "rationale",
+      "norm_label": "returns a list of exactly num_beats dicts ({\"action\", \"camera_movement\",...",
+      "source_file": "scripts/beat_director.py",
+      "source_location": "L139"
     },
     {
       "id": "docs_marius_handoff",
@@ -5238,17 +5360,6 @@
       "source_location": "L82"
     },
     {
-      "id": "scripts_beat_director",
-      "label": "beat_director.py",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "kaggle_clips.py",
-      "file_type": "code",
-      "norm_label": "beat_director.py",
-      "source_file": "scripts/beat_director.py",
-      "source_location": "L1"
-    },
-    {
       "id": "scripts_clip_qa",
       "label": "clip_qa.py",
       "_origin": "ast",
@@ -5294,39 +5405,6 @@
       "source_location": "L11"
     },
     {
-      "id": "scripts_beat_director_rationale_1",
-      "label": "Marius Command Center - beat director (2026-09-19). PROBLEM: a shot longer than\u2026",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "kaggle_clips.py",
-      "file_type": "rationale",
-      "norm_label": "marius command center - beat director (2026-09-19). problem: a shot longer than...",
-      "source_file": "scripts/beat_director.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "scripts_beat_director_rationale_139",
-      "label": "Returns a list of exactly num_beats dicts ({\"action\", \"camera_movement\",\u2026",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "kaggle_clips.py",
-      "file_type": "rationale",
-      "norm_label": "returns a list of exactly num_beats dicts ({\"action\", \"camera_movement\",...",
-      "source_file": "scripts/beat_director.py",
-      "source_location": "L139"
-    },
-    {
-      "id": "scripts_beat_director_rationale_167",
-      "label": "Returns a COPY of shot with the beat's action/camera/shot_type swapped in.\u2026",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "kaggle_clips.py",
-      "file_type": "rationale",
-      "norm_label": "returns a copy of shot with the beat's action/camera/shot_type swapped in....",
-      "source_file": "scripts/beat_director.py",
-      "source_location": "L167"
-    },
-    {
       "id": "scripts_clip_qa_rationale_1",
       "label": "Marius Command Center - clip QA (2026-10-09). Zia's requirement: there must be\u2026",
       "_origin": "ast",
@@ -5360,7 +5438,7 @@
       "source_location": "L1"
     },
     {
-      "id": "scripts_kaggle_clips_rationale_177",
+      "id": "scripts_kaggle_clips_rationale_181",
       "label": "Short prompt for LTX (reads ~256 tokens): the shot description comes FIRST.",
       "_origin": "ast",
       "community": 2,
@@ -5368,10 +5446,10 @@
       "file_type": "rationale",
       "norm_label": "short prompt for ltx (reads ~256 tokens): the shot description comes first.",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L177"
+      "source_location": "L181"
     },
     {
-      "id": "scripts_kaggle_clips_rationale_310",
+      "id": "scripts_kaggle_clips_rationale_321",
       "label": "Returns (saved_count, reason). reason is 'stale' when the kernel output belongs\u2026",
       "_origin": "ast",
       "community": 2,
@@ -5379,7 +5457,7 @@
       "file_type": "rationale",
       "norm_label": "returns (saved_count, reason). reason is 'stale' when the kernel output belongs...",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L310"
+      "source_location": "L321"
     },
     {
       "id": "scripts_prompt_focus_rationale_1",
@@ -5594,92 +5672,15 @@
       "source_location": "L1"
     },
     {
-      "id": "scripts_quality_checker",
-      "label": "quality_checker.py",
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "call_llm",
-      "file_type": "code",
-      "norm_label": "quality_checker.py",
-      "source_file": "scripts/quality_checker.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "scripts_llm_client_rationale_220",
-      "label": "PROVIDER SWITCH (2026-08-17): replaces Groq's SuspectedDailyQuotaExhausted\u2026",
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "call_llm",
-      "file_type": "rationale",
-      "norm_label": "provider switch (2026-08-17): replaces groq's suspecteddailyquotaexhausted...",
-      "source_file": "scripts/llm_client.py",
-      "source_location": "L220"
-    },
-    {
-      "id": "scripts_llm_client_rationale_284",
-      "label": "PROVIDER SWITCH (2026-08-17): Groq replaced with Gemini (gemini-3.5-flash-\u2026",
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "call_llm",
-      "file_type": "rationale",
-      "norm_label": "provider switch (2026-08-17): groq replaced with gemini (gemini-3.5-flash-...",
-      "source_file": "scripts/llm_client.py",
-      "source_location": "L284"
-    },
-    {
-      "id": "scripts_quality_checker_rationale_1",
-      "label": "Marius Command Center - Quality Checker (Loop Skill 2: writer/checker split) A\u2026",
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "call_llm",
-      "file_type": "rationale",
-      "norm_label": "marius command center - quality checker (loop skill 2: writer/checker split) a...",
-      "source_file": "scripts/quality_checker.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "scripts_quality_checker_rationale_45",
-      "label": "Shared grading-call wrapper. Returns (passed: bool, reason: str). Fails OPEN\u2026",
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "call_llm",
-      "file_type": "rationale",
-      "norm_label": "shared grading-call wrapper. returns (passed: bool, reason: str). fails open...",
-      "source_file": "scripts/quality_checker.py",
-      "source_location": "L45"
-    },
-    {
       "id": "scripts_shot_breakdown_stage_rationale_1287",
       "label": "Builds the prompt for ONE narration chunk's shot breakdown. The first chunk\u2026",
       "_origin": "ast",
       "community": 23,
-      "community_name": "call_llm",
+      "community_name": "build_shot_breakdown_chunk_prompt",
       "file_type": "rationale",
       "norm_label": "builds the prompt for one narration chunk's shot breakdown. the first chunk...",
       "source_file": "scripts/shot_breakdown_stage.py",
       "source_location": "L1287"
-    },
-    {
-      "id": "scripts_shot_breakdown_stage_rationale_1468",
-      "label": "CHUNKED (2026-08-15): splits narration into NUM_SHOT_CHUNKS pieces and makes\u2026",
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "call_llm",
-      "file_type": "rationale",
-      "norm_label": "chunked (2026-08-15): splits narration into num_shot_chunks pieces and makes...",
-      "source_file": "scripts/shot_breakdown_stage.py",
-      "source_location": "L1468"
-    },
-    {
-      "id": "scripts_shot_breakdown_stage_rationale_356",
-      "label": "Splits narration into num_chunks pieces, breaking only at sentence boundaries\u2026",
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "call_llm",
-      "file_type": "rationale",
-      "norm_label": "splits narration into num_chunks pieces, breaking only at sentence boundaries...",
-      "source_file": "scripts/shot_breakdown_stage.py",
-      "source_location": "L356"
     },
     {
       "id": "scripts_script_writing",
@@ -5887,27 +5888,166 @@
       "source_location": "L13"
     },
     {
-      "id": "handoff_2026_10_18_free_video_fallback_what_was_learned_this_session",
-      "label": "What was learned this session",
-      "_origin": "ast",
-      "community": 26,
-      "community_name": "HANDOFF 2026-10-18: Free backup video generator (Agnes queue full)",
-      "file_type": "document",
-      "node_kind": "heading",
-      "norm_label": "what was learned this session",
-      "source_file": "HANDOFF_2026-10-18_FREE_VIDEO_FALLBACK.md",
-      "source_location": "L16"
-    },
-    {
-      "id": "scripts_shot_breakdown_stage_rationale_1245",
-      "label": "UNUSED as of 2026-09-14 - see module docstring's SCHEMA-CONSTRAINED GENERATION\u2026",
+      "id": "scripts_topic_research",
+      "label": "topic_research.py",
       "_origin": "ast",
       "community": 27,
-      "community_name": "build_shot_breakdown_response_schema",
+      "community_name": "topic_research.py",
+      "file_type": "code",
+      "norm_label": "topic_research.py",
+      "source_file": "scripts/topic_research.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "scripts_topic_research_rationale_1",
+      "label": "Marius Command Center - Topic Research Agent Generates new \"Forgotten Names\"\u2026",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "topic_research.py",
       "file_type": "rationale",
-      "norm_label": "unused as of 2026-09-14 - see module docstring's schema-constrained generation...",
+      "norm_label": "marius command center - topic research agent generates new \"forgotten names\"...",
+      "source_file": "scripts/topic_research.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "scripts_topic_research_rationale_152",
+      "label": "Best-effort only: trend_signals is optional grounding, not a requirement, so if\u2026",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "topic_research.py",
+      "file_type": "rationale",
+      "norm_label": "best-effort only: trend_signals is optional grounding, not a requirement, so if...",
+      "source_file": "scripts/topic_research.py",
+      "source_location": "L152"
+    },
+    {
+      "id": "scripts_topic_research_rationale_227",
+      "label": "WRITER/CHECKER SPLIT (2026-09-13): same pattern already proven for narration\u2026",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "topic_research.py",
+      "file_type": "rationale",
+      "norm_label": "writer/checker split (2026-09-13): same pattern already proven for narration...",
+      "source_file": "scripts/topic_research.py",
+      "source_location": "L227"
+    },
+    {
+      "id": "scripts_topic_research_rationale_283",
+      "label": "Loops up to MAX_GENERATION_ATTEMPTS times, oversampling candidates and grading\u2026",
+      "_origin": "ast",
+      "community": 27,
+      "community_name": "topic_research.py",
+      "file_type": "rationale",
+      "norm_label": "loops up to max_generation_attempts times, oversampling candidates and grading...",
+      "source_file": "scripts/topic_research.py",
+      "source_location": "L283"
+    },
+    {
+      "id": "handoff_2026_11_11_kaggle_clips",
+      "label": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "HANDOFF 2026-11-11 (Marius only): Kaggle clips, where it stands",
+      "file_type": "document",
+      "node_kind": "page",
+      "norm_label": "handoff_2026-11-11_kaggle_clips.md",
+      "source_file": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "handoff_2026_11_11_kaggle_clips_fix_in_progress_this_session",
+      "label": "Fix in progress (this session)",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "HANDOFF 2026-11-11 (Marius only): Kaggle clips, where it stands",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "fix in progress (this session)",
+      "source_file": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "source_location": "L19"
+    },
+    {
+      "id": "handoff_2026_11_11_kaggle_clips_handoff_2026_11_11_marius_only_kaggle_clips_where_it_stands",
+      "label": "HANDOFF 2026-11-11 (Marius only): Kaggle clips, where it stands",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "HANDOFF 2026-11-11 (Marius only): Kaggle clips, where it stands",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "handoff 2026-11-11 (marius only): kaggle clips, where it stands",
+      "source_file": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "handoff_2026_11_11_kaggle_clips_rules",
+      "label": "Rules",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "HANDOFF 2026-11-11 (Marius only): Kaggle clips, where it stands",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "rules",
+      "source_file": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "source_location": "L30"
+    },
+    {
+      "id": "handoff_2026_11_11_kaggle_clips_state_of_repo_verified_by_direct_read",
+      "label": "State of repo (verified by direct read)",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "HANDOFF 2026-11-11 (Marius only): Kaggle clips, where it stands",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "state of repo (verified by direct read)",
+      "source_file": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "source_location": "L14"
+    },
+    {
+      "id": "handoff_2026_11_11_kaggle_clips_still_open",
+      "label": "Still open",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "HANDOFF 2026-11-11 (Marius only): Kaggle clips, where it stands",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "still open",
+      "source_file": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "source_location": "L24"
+    },
+    {
+      "id": "handoff_2026_11_11_kaggle_clips_what_fails_live_data_2026_11_11",
+      "label": "What fails (live data, 2026-11-11)",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "HANDOFF 2026-11-11 (Marius only): Kaggle clips, where it stands",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "what fails (live data, 2026-11-11)",
+      "source_file": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "source_location": "L8"
+    },
+    {
+      "id": "handoff_2026_11_11_kaggle_clips_what_works_proven",
+      "label": "What works (proven)",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "HANDOFF 2026-11-11 (Marius only): Kaggle clips, where it stands",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "what works (proven)",
+      "source_file": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "source_location": "L5"
+    },
+    {
+      "id": "scripts_shot_breakdown_stage_rationale_356",
+      "label": "Splits narration into num_chunks pieces, breaking only at sentence boundaries\u2026",
+      "_origin": "ast",
+      "community": 29,
+      "community_name": "split_narration_into_chunks",
+      "file_type": "rationale",
+      "norm_label": "splits narration into num_chunks pieces, breaking only at sentence boundaries...",
       "source_file": "scripts/shot_breakdown_stage.py",
-      "source_location": "L1245"
+      "source_location": "L356"
     },
     {
       "id": "scripts_kaggle_clips_kernel",
@@ -5996,6 +6136,17 @@
       "norm_label": "marius command center - shot breakdown stage stage 2 of script generation: from...",
       "source_file": "scripts/shot_breakdown_stage.py",
       "source_location": "L1"
+    },
+    {
+      "id": "scripts_shot_breakdown_stage_rationale_1245",
+      "label": "UNUSED as of 2026-09-14 - see module docstring's SCHEMA-CONSTRAINED GENERATION\u2026",
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "shot_breakdown_stage.py",
+      "file_type": "rationale",
+      "norm_label": "unused as of 2026-09-14 - see module docstring's schema-constrained generation...",
+      "source_file": "scripts/shot_breakdown_stage.py",
+      "source_location": "L1245"
     },
     {
       "id": "scripts_shot_breakdown_stage_rationale_517",
@@ -6631,17 +6782,6 @@
       "source_location": "L1"
     },
     {
-      "id": "scripts_topic_research",
-      "label": "topic_research.py",
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
-      "file_type": "code",
-      "norm_label": "topic_research.py",
-      "source_file": "scripts/topic_research.py",
-      "source_location": "L1"
-    },
-    {
       "id": "scripts_trend_research",
       "label": "trend_research.py",
       "_origin": "ast",
@@ -6673,50 +6813,6 @@
       "norm_label": "marius command center - automatic backblaze b2 sweep (2026-11-03) why:...",
       "source_file": "scripts/b2_sweep.py",
       "source_location": "L1"
-    },
-    {
-      "id": "scripts_topic_research_rationale_1",
-      "label": "Marius Command Center - Topic Research Agent Generates new \"Forgotten Names\"\u2026",
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
-      "file_type": "rationale",
-      "norm_label": "marius command center - topic research agent generates new \"forgotten names\"...",
-      "source_file": "scripts/topic_research.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "scripts_topic_research_rationale_152",
-      "label": "Best-effort only: trend_signals is optional grounding, not a requirement, so if\u2026",
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
-      "file_type": "rationale",
-      "norm_label": "best-effort only: trend_signals is optional grounding, not a requirement, so if...",
-      "source_file": "scripts/topic_research.py",
-      "source_location": "L152"
-    },
-    {
-      "id": "scripts_topic_research_rationale_227",
-      "label": "WRITER/CHECKER SPLIT (2026-09-13): same pattern already proven for narration\u2026",
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
-      "file_type": "rationale",
-      "norm_label": "writer/checker split (2026-09-13): same pattern already proven for narration...",
-      "source_file": "scripts/topic_research.py",
-      "source_location": "L227"
-    },
-    {
-      "id": "scripts_topic_research_rationale_283",
-      "label": "Loops up to MAX_GENERATION_ATTEMPTS times, oversampling candidates and grading\u2026",
-      "_origin": "ast",
-      "community": 9,
-      "community_name": "requests",
-      "file_type": "rationale",
-      "norm_label": "loops up to max_generation_attempts times, oversampling candidates and grading...",
-      "source_file": "scripts/topic_research.py",
-      "source_location": "L283"
     },
     {
       "id": "scripts_trend_research_rationale_1",
@@ -6797,18 +6893,6 @@
       "type": "external"
     },
     {
-      "id": "moviepy",
-      "label": "moviepy",
-      "_origin": "semantic",
-      "community": 1,
-      "community_name": "clip_generation.py",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "moviepy",
-      "source_file": "",
-      "type": "external"
-    },
-    {
       "id": "moviepy_audio_fx",
       "label": "moviepy_audio_fx",
       "_origin": "semantic",
@@ -6857,6 +6941,42 @@
       "type": "external"
     },
     {
+      "id": "io",
+      "label": "io",
+      "_origin": "semantic",
+      "community": 10,
+      "community_name": "thumbnail_generation.py",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "io",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "boto3",
+      "label": "boto3",
+      "_origin": "semantic",
+      "community": 11,
+      "community_name": "time",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "boto3",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "botocore",
+      "label": "botocore",
+      "_origin": "semantic",
+      "community": 11,
+      "community_name": "time",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "botocore",
+      "source_file": "",
+      "type": "external"
+    },
+    {
       "id": "time",
       "label": "time",
       "_origin": "semantic",
@@ -6865,18 +6985,6 @@
       "external": true,
       "file_type": "concept",
       "norm_label": "time",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "traceback",
-      "label": "traceback",
-      "_origin": "semantic",
-      "community": 11,
-      "community_name": "time",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "traceback",
       "source_file": "",
       "type": "external"
     },
@@ -6901,30 +7009,6 @@
       "external": true,
       "file_type": "concept",
       "norm_label": "re",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "boto3",
-      "label": "boto3",
-      "_origin": "semantic",
-      "community": 13,
-      "community_name": "storage_b2.py",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "boto3",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "botocore",
-      "label": "botocore",
-      "_origin": "semantic",
-      "community": 13,
-      "community_name": "storage_b2.py",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "botocore",
       "source_file": "",
       "type": "external"
     },
@@ -6973,18 +7057,6 @@
       "external": true,
       "file_type": "concept",
       "norm_label": "calendar",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "io",
-      "label": "io",
-      "_origin": "semantic",
-      "community": 2,
-      "community_name": "kaggle_clips.py",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "io",
       "source_file": "",
       "type": "external"
     },
@@ -7073,6 +7145,18 @@
       "type": "external"
     },
     {
+      "id": "subprocess",
+      "label": "subprocess",
+      "_origin": "semantic",
+      "community": 3,
+      "community_name": "json",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "subprocess",
+      "source_file": "",
+      "type": "external"
+    },
+    {
       "id": "torch",
       "label": "torch",
       "_origin": "semantic",
@@ -7081,6 +7165,18 @@
       "external": true,
       "file_type": "concept",
       "norm_label": "torch",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "traceback",
+      "label": "traceback",
+      "_origin": "semantic",
+      "community": 3,
+      "community_name": "json",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "traceback",
       "source_file": "",
       "type": "external"
     },
@@ -7121,18 +7217,6 @@
       "type": "external"
     },
     {
-      "id": "subprocess",
-      "label": "subprocess",
-      "_origin": "semantic",
-      "community": 5,
-      "community_name": "stock_fallback.py",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "subprocess",
-      "source_file": "",
-      "type": "external"
-    },
-    {
       "id": "argparse",
       "label": "argparse",
       "_origin": "semantic",
@@ -7153,6 +7237,18 @@
       "external": true,
       "file_type": "concept",
       "norm_label": "datetime",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "moviepy",
+      "label": "moviepy",
+      "_origin": "semantic",
+      "community": 7,
+      "community_name": "os",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "moviepy",
       "source_file": "",
       "type": "external"
     },
@@ -8931,7 +9027,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L346",
+      "source_location": "L357",
       "weight": 1.0
     },
     {
@@ -8943,7 +9039,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L349",
+      "source_location": "L360",
       "weight": 1.0
     },
     {
@@ -8955,7 +9051,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L351",
+      "source_location": "L362",
       "weight": 1.0
     },
     {
@@ -8967,7 +9063,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L356",
+      "source_location": "L367",
       "weight": 1.0
     },
     {
@@ -8979,7 +9075,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L356",
+      "source_location": "L367",
       "weight": 1.0
     },
     {
@@ -8991,7 +9087,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L201",
+      "source_location": "L205",
       "weight": 1.0
     },
     {
@@ -9003,7 +9099,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L203",
+      "source_location": "L207",
       "weight": 1.0
     },
     {
@@ -9015,7 +9111,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L211",
+      "source_location": "L215",
       "weight": 1.0
     },
     {
@@ -9027,7 +9123,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L212",
+      "source_location": "L216",
       "weight": 1.0
     },
     {
@@ -9039,7 +9135,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L213",
+      "source_location": "L217",
       "weight": 1.0
     },
     {
@@ -9051,7 +9147,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L214",
+      "source_location": "L218",
       "weight": 1.0
     },
     {
@@ -9063,7 +9159,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L219",
+      "source_location": "L223",
       "weight": 1.0
     },
     {
@@ -9075,7 +9171,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L226",
+      "source_location": "L230",
       "weight": 1.0
     },
     {
@@ -9087,7 +9183,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L230",
+      "source_location": "L234",
       "weight": 1.0
     },
     {
@@ -9099,7 +9195,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L312",
+      "source_location": "L323",
       "weight": 1.0
     },
     {
@@ -9111,7 +9207,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L313",
+      "source_location": "L324",
       "weight": 1.0
     },
     {
@@ -9123,7 +9219,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L314",
+      "source_location": "L325",
       "weight": 1.0
     },
     {
@@ -9135,7 +9231,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L318",
+      "source_location": "L329",
       "weight": 1.0
     },
     {
@@ -9147,7 +9243,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L331",
+      "source_location": "L342",
       "weight": 1.0
     },
     {
@@ -9159,7 +9255,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L333",
+      "source_location": "L344",
       "weight": 1.0
     },
     {
@@ -9171,7 +9267,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L337",
+      "source_location": "L348",
       "weight": 1.0
     },
     {
@@ -9183,7 +9279,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L341",
+      "source_location": "L352",
       "weight": 1.0
     },
     {
@@ -9195,7 +9291,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L104",
+      "source_location": "L108",
       "weight": 1.0
     },
     {
@@ -9207,7 +9303,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L93",
+      "source_location": "L97",
       "weight": 1.0
     },
     {
@@ -9219,7 +9315,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L157",
+      "source_location": "L161",
       "weight": 1.0
     },
     {
@@ -9363,7 +9459,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L236",
+      "source_location": "L240",
       "weight": 1.0
     },
     {
@@ -9375,7 +9471,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L186",
+      "source_location": "L190",
       "weight": 1.0
     },
     {
@@ -9387,7 +9483,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L442",
+      "source_location": "L453",
       "weight": 1.0
     },
     {
@@ -9399,7 +9495,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L445",
+      "source_location": "L456",
       "weight": 1.0
     },
     {
@@ -9411,7 +9507,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L447",
+      "source_location": "L458",
       "weight": 1.0
     },
     {
@@ -9423,7 +9519,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L449",
+      "source_location": "L460",
       "weight": 1.0
     },
     {
@@ -9435,7 +9531,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L88",
+      "source_location": "L92",
       "weight": 1.0
     },
     {
@@ -9447,7 +9543,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L258",
+      "source_location": "L262",
       "weight": 1.0
     },
     {
@@ -9459,7 +9555,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L260",
+      "source_location": "L264",
       "weight": 1.0
     },
     {
@@ -9471,7 +9567,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L262",
+      "source_location": "L266",
       "weight": 1.0
     },
     {
@@ -9483,7 +9579,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L262",
+      "source_location": "L266",
       "weight": 1.0
     },
     {
@@ -9495,7 +9591,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L266",
+      "source_location": "L270",
       "weight": 1.0
     },
     {
@@ -9507,7 +9603,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L267",
+      "source_location": "L271",
       "weight": 1.0
     },
     {
@@ -9519,7 +9615,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L270",
+      "source_location": "L274",
       "weight": 1.0
     },
     {
@@ -9531,24 +9627,12 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L286",
+      "source_location": "L290",
       "weight": 1.0
     },
     {
       "source": "scripts_kaggle_clips_push_batch",
       "target": "scripts_kaggle_clips_record_error",
-      "relation": "calls",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "call",
-      "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L288",
-      "weight": 1.0
-    },
-    {
-      "source": "scripts_kaggle_clips_push_batch",
-      "target": "time",
       "relation": "calls",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -9560,6 +9644,18 @@
     },
     {
       "source": "scripts_kaggle_clips_push_batch",
+      "target": "time",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "scripts/kaggle_clips.py",
+      "source_location": "L296",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_kaggle_clips_push_batch",
       "target": "scripts_kaggle_clips_kernel_status",
       "relation": "calls",
       "_origin": "ast",
@@ -9567,7 +9663,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L293",
+      "source_location": "L297",
       "weight": 1.0
     },
     {
@@ -9579,7 +9675,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L143",
+      "source_location": "L147",
       "weight": 1.0
     },
     {
@@ -9591,7 +9687,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L143",
+      "source_location": "L147",
       "weight": 1.0
     },
     {
@@ -9603,7 +9699,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L116",
+      "source_location": "L120",
       "weight": 1.0
     },
     {
@@ -9615,7 +9711,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L121",
+      "source_location": "L125",
       "weight": 1.0
     },
     {
@@ -9627,7 +9723,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L377",
+      "source_location": "L388",
       "weight": 1.0
     },
     {
@@ -9639,7 +9735,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L380",
+      "source_location": "L391",
       "weight": 1.0
     },
     {
@@ -9651,7 +9747,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L382",
+      "source_location": "L393",
       "weight": 1.0
     },
     {
@@ -9663,7 +9759,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L390",
+      "source_location": "L401",
       "weight": 1.0
     },
     {
@@ -9675,7 +9771,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L392",
+      "source_location": "L403",
       "weight": 1.0
     },
     {
@@ -9687,7 +9783,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L404",
+      "source_location": "L415",
       "weight": 1.0
     },
     {
@@ -9699,7 +9795,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L413",
+      "source_location": "L424",
       "weight": 1.0
     },
     {
@@ -9711,7 +9807,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L420",
+      "source_location": "L431",
       "weight": 1.0
     },
     {
@@ -9723,7 +9819,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L422",
+      "source_location": "L433",
       "weight": 1.0
     },
     {
@@ -9735,7 +9831,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L425",
+      "source_location": "L436",
       "weight": 1.0
     },
     {
@@ -9747,7 +9843,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L437",
+      "source_location": "L448",
       "weight": 1.0
     },
     {
@@ -9759,7 +9855,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L129",
+      "source_location": "L133",
       "weight": 1.0
     },
     {
@@ -9771,7 +9867,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L305",
+      "source_location": "L309",
       "weight": 1.0
     },
     {
@@ -9783,7 +9879,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L72",
+      "source_location": "L76",
       "weight": 1.0
     },
     {
@@ -14583,7 +14679,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L27",
+      "source_location": "L30",
       "weight": 1.0
     },
     {
@@ -14595,7 +14691,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L28",
+      "source_location": "L31",
       "weight": 1.0
     },
     {
@@ -14607,7 +14703,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L29",
+      "source_location": "L32",
       "weight": 1.0
     },
     {
@@ -14619,7 +14715,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L30",
+      "source_location": "L33",
       "weight": 1.0
     },
     {
@@ -14631,7 +14727,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L31",
+      "source_location": "L34",
       "weight": 1.0
     },
     {
@@ -14643,7 +14739,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L32",
+      "source_location": "L35",
       "weight": 1.0
     },
     {
@@ -14655,7 +14751,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L33",
+      "source_location": "L36",
       "weight": 1.0
     },
     {
@@ -14667,7 +14763,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L34",
+      "source_location": "L37",
       "weight": 1.0
     },
     {
@@ -14679,7 +14775,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L35",
+      "source_location": "L38",
       "weight": 1.0
     },
     {
@@ -14691,7 +14787,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L36",
+      "source_location": "L39",
       "weight": 1.0
     },
     {
@@ -14703,7 +14799,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L37",
+      "source_location": "L40",
       "weight": 1.0
     },
     {
@@ -14715,7 +14811,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L39",
+      "source_location": "L42",
       "weight": 1.0
     },
     {
@@ -14727,7 +14823,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L41",
+      "source_location": "L44",
       "weight": 1.0
     },
     {
@@ -14739,7 +14835,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L42",
+      "source_location": "L45",
       "weight": 1.0
     },
     {
@@ -14751,7 +14847,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L44",
+      "source_location": "L47",
       "weight": 1.0
     },
     {
@@ -14763,7 +14859,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L44",
+      "source_location": "L47",
       "weight": 1.0
     },
     {
@@ -14775,7 +14871,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L45",
+      "source_location": "L48",
       "weight": 1.0
     },
     {
@@ -14787,7 +14883,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L45",
+      "source_location": "L48",
       "weight": 1.0
     },
     {
@@ -16503,7 +16599,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L42",
+      "source_location": "L45",
       "weight": 1.0
     },
     {
@@ -16515,7 +16611,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L43",
+      "source_location": "L46",
       "weight": 1.0
     },
     {
@@ -16527,7 +16623,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L44",
+      "source_location": "L47",
       "weight": 1.0
     },
     {
@@ -16539,7 +16635,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L45",
+      "source_location": "L48",
       "weight": 1.0
     },
     {
@@ -17956,6 +18052,83 @@
       "weight": 1.0
     },
     {
+      "source": "handoff_2026_11_11_kaggle_clips",
+      "target": "handoff_2026_11_11_kaggle_clips_handoff_2026_11_11_marius_only_kaggle_clips_where_it_stands",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "handoff_2026_11_11_kaggle_clips_handoff_2026_11_11_marius_only_kaggle_clips_where_it_stands",
+      "target": "handoff_2026_11_11_kaggle_clips_state_of_repo_verified_by_direct_read",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "source_location": "L14",
+      "weight": 1.0
+    },
+    {
+      "source": "handoff_2026_11_11_kaggle_clips_handoff_2026_11_11_marius_only_kaggle_clips_where_it_stands",
+      "target": "handoff_2026_11_11_kaggle_clips_fix_in_progress_this_session",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "source_location": "L19",
+      "weight": 1.0
+    },
+    {
+      "source": "handoff_2026_11_11_kaggle_clips_handoff_2026_11_11_marius_only_kaggle_clips_where_it_stands",
+      "target": "handoff_2026_11_11_kaggle_clips_still_open",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "source_location": "L24",
+      "weight": 1.0
+    },
+    {
+      "source": "handoff_2026_11_11_kaggle_clips_handoff_2026_11_11_marius_only_kaggle_clips_where_it_stands",
+      "target": "handoff_2026_11_11_kaggle_clips_rules",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "handoff_2026_11_11_kaggle_clips_handoff_2026_11_11_marius_only_kaggle_clips_where_it_stands",
+      "target": "handoff_2026_11_11_kaggle_clips_what_works_proven",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "handoff_2026_11_11_kaggle_clips_handoff_2026_11_11_marius_only_kaggle_clips_where_it_stands",
+      "target": "handoff_2026_11_11_kaggle_clips_what_fails_live_data_2026_11_11",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
       "source": "playbook",
       "target": "playbook_marius_playbook_rarely_changes_read_alongside_status_md",
       "relation": "contains",
@@ -18898,7 +19071,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L103",
+      "source_location": "L107",
       "weight": 1.0
     },
     {
@@ -18909,7 +19082,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L114",
+      "source_location": "L118",
       "weight": 1.0
     },
     {
@@ -18920,7 +19093,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L128",
+      "source_location": "L132",
       "weight": 1.0
     },
     {
@@ -18931,7 +19104,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L138",
+      "source_location": "L142",
       "weight": 1.0
     },
     {
@@ -18942,7 +19115,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L149",
+      "source_location": "L153",
       "weight": 1.0
     },
     {
@@ -18953,7 +19126,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L167",
+      "source_location": "L171",
       "weight": 1.0
     },
     {
@@ -18964,7 +19137,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L176",
+      "source_location": "L180",
       "weight": 1.0
     },
     {
@@ -18975,7 +19148,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L199",
+      "source_location": "L203",
       "weight": 1.0
     },
     {
@@ -18986,7 +19159,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L235",
+      "source_location": "L239",
       "weight": 1.0
     },
     {
@@ -18997,7 +19170,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L256",
+      "source_location": "L260",
       "weight": 1.0
     },
     {
@@ -19008,7 +19181,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L303",
+      "source_location": "L307",
       "weight": 1.0
     },
     {
@@ -19019,7 +19192,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L309",
+      "source_location": "L320",
       "weight": 1.0
     },
     {
@@ -19030,7 +19203,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L345",
+      "source_location": "L356",
       "weight": 1.0
     },
     {
@@ -19041,7 +19214,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L360",
+      "source_location": "L371",
       "weight": 1.0
     },
     {
@@ -19052,7 +19225,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L376",
+      "source_location": "L387",
       "weight": 1.0
     },
     {
@@ -19063,7 +19236,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L440",
+      "source_location": "L451",
       "weight": 1.0
     },
     {
@@ -19074,7 +19247,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L66",
+      "source_location": "L70",
       "weight": 1.0
     },
     {
@@ -19085,7 +19258,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L71",
+      "source_location": "L75",
       "weight": 1.0
     },
     {
@@ -19096,7 +19269,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L78",
+      "source_location": "L82",
       "weight": 1.0
     },
     {
@@ -19107,7 +19280,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L85",
+      "source_location": "L89",
       "weight": 1.0
     },
     {
@@ -19118,7 +19291,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L92",
+      "source_location": "L96",
       "weight": 1.0
     },
     {
@@ -21619,25 +21792,25 @@
       "weight": 1.0
     },
     {
-      "source": "scripts_kaggle_clips_rationale_177",
+      "source": "scripts_kaggle_clips_rationale_181",
       "target": "scripts_kaggle_clips_ltx_prompt",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L177",
+      "source_location": "L181",
       "weight": 1.0
     },
     {
-      "source": "scripts_kaggle_clips_rationale_310",
+      "source": "scripts_kaggle_clips_rationale_321",
       "target": "scripts_kaggle_clips_collect",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L310",
+      "source_location": "L321",
       "weight": 1.0
     },
     {
@@ -23128,6 +23301,18 @@
       "weight": 1.0
     },
     {
+      "source": "handoff_2026_11_11_kaggle_clips_what_fails_live_data_2026_11_11",
+      "target": "scripts_kaggle_clips_scale_clip",
+      "relation": "references",
+      "_origin": "ast",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "context": "scale_clip()",
+      "source_file": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
       "source": "continuation_exact_next_steps_for_whoever_picks_this_up_152",
       "target": "scripts_storage_b2_upload_bytes",
       "relation": "references",
@@ -23161,6 +23346,18 @@
       "context": "upload_bytes",
       "source_file": "CONTINUATION.md",
       "source_location": "L198",
+      "weight": 1.0
+    },
+    {
+      "source": "handoff_2026_11_11_kaggle_clips_still_open",
+      "target": "scripts_video_generation_process_script",
+      "relation": "references",
+      "_origin": "ast",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "context": "video_generation.process_script",
+      "source_file": "HANDOFF_2026-11-11_KAGGLE_CLIPS.md",
+      "source_location": "L27",
       "weight": 1.0
     },
     {
@@ -23286,5 +23483,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "423943d925092e886d3cce4a16cb74aed993211d"
+  "built_at_commit": "b51ac036e4a8134bb4acaa097f36565968f1e9b5"
 }
