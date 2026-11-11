@@ -1655,7 +1655,7 @@
       "file_type": "code",
       "norm_label": "assemble_if_complete()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L381"
+      "source_location": "L386"
     },
     {
       "id": "scripts_kaggle_clips_build_manifest",
@@ -1667,7 +1667,7 @@
       "file_type": "code",
       "norm_label": "build_manifest()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L228"
+      "source_location": "L232"
     },
     {
       "id": "scripts_kaggle_clips_collect",
@@ -1679,7 +1679,7 @@
       "file_type": "code",
       "norm_label": "collect()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L345"
+      "source_location": "L350"
     },
     {
       "id": "scripts_kaggle_clips_ensure_ffmpeg",
@@ -1691,7 +1691,7 @@
       "file_type": "code",
       "norm_label": "ensure_ffmpeg()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L85"
+      "source_location": "L89"
     },
     {
       "id": "scripts_kaggle_clips_fetch_script",
@@ -1703,7 +1703,7 @@
       "file_type": "code",
       "norm_label": "fetch_script()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L132"
+      "source_location": "L136"
     },
     {
       "id": "scripts_kaggle_clips_get_candidates",
@@ -1715,7 +1715,7 @@
       "file_type": "code",
       "norm_label": "get_candidates()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L121"
+      "source_location": "L125"
     },
     {
       "id": "scripts_kaggle_clips_get_durations",
@@ -1727,7 +1727,7 @@
       "file_type": "code",
       "norm_label": "get_durations()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L178"
+      "source_location": "L182"
     },
     {
       "id": "scripts_kaggle_clips_kaggle_user",
@@ -1739,7 +1739,7 @@
       "file_type": "code",
       "norm_label": "kaggle_user()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L107"
+      "source_location": "L111"
     },
     {
       "id": "scripts_kaggle_clips_kernel_status",
@@ -1751,7 +1751,7 @@
       "file_type": "code",
       "norm_label": "kernel_status()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L264"
+      "source_location": "L268"
     },
     {
       "id": "scripts_kaggle_clips_ltx_prompt",
@@ -1763,7 +1763,7 @@
       "file_type": "code",
       "norm_label": "ltx_prompt()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L205"
+      "source_location": "L209"
     },
     {
       "id": "scripts_kaggle_clips_main",
@@ -1775,7 +1775,7 @@
       "file_type": "code",
       "norm_label": "main()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L479"
+      "source_location": "L494"
     },
     {
       "id": "scripts_kaggle_clips_parse_shot_list",
@@ -1787,7 +1787,7 @@
       "file_type": "code",
       "norm_label": "parse_shot_list()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L114"
+      "source_location": "L118"
     },
     {
       "id": "scripts_kaggle_clips_push_batch",
@@ -1799,7 +1799,7 @@
       "file_type": "code",
       "norm_label": "push_batch()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L285"
+      "source_location": "L289"
     },
     {
       "id": "scripts_kaggle_clips_recently_errored",
@@ -1811,7 +1811,7 @@
       "file_type": "code",
       "norm_label": "recently_errored()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L167"
+      "source_location": "L171"
     },
     {
       "id": "scripts_kaggle_clips_record_error",
@@ -1823,7 +1823,7 @@
       "file_type": "code",
       "norm_label": "record_error()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L143"
+      "source_location": "L147"
     },
     {
       "id": "scripts_kaggle_clips_run",
@@ -1835,7 +1835,7 @@
       "file_type": "code",
       "norm_label": "run()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L412"
+      "source_location": "L423"
     },
     {
       "id": "scripts_kaggle_clips_save_progress",
@@ -1847,7 +1847,7 @@
       "file_type": "code",
       "norm_label": "save_progress()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L157"
+      "source_location": "L161"
     },
     {
       "id": "scripts_kaggle_clips_say",
@@ -1859,7 +1859,7 @@
       "file_type": "code",
       "norm_label": "say()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L73"
+      "source_location": "L77"
     },
     {
       "id": "scripts_kaggle_clips_scale_clip",
@@ -1871,7 +1871,7 @@
       "file_type": "code",
       "norm_label": "scale_clip()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L332"
+      "source_location": "L337"
     },
     {
       "id": "scripts_kaggle_clips_sh",
@@ -1883,7 +1883,7 @@
       "file_type": "code",
       "norm_label": "sh()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L78"
+      "source_location": "L82"
     },
     {
       "id": "scripts_kaggle_clips_short_anchor",
@@ -1895,7 +1895,7 @@
       "file_type": "code",
       "norm_label": "short_anchor()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L196"
+      "source_location": "L200"
     },
     {
       "id": "scripts_kaggle_clips_write_summary",
@@ -1907,7 +1907,7 @@
       "file_type": "code",
       "norm_label": "write_summary()",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L396"
+      "source_location": "L407"
     },
     {
       "id": "scripts_assembly_stage_apply_safety_limiter",
@@ -5697,7 +5697,7 @@
       "source_location": "L1"
     },
     {
-      "id": "scripts_kaggle_clips_rationale_206",
+      "id": "scripts_kaggle_clips_rationale_210",
       "label": "Short prompt for LTX (reads ~256 tokens): the shot description comes FIRST.",
       "_origin": "ast",
       "community": 2,
@@ -5705,10 +5705,10 @@
       "file_type": "rationale",
       "norm_label": "short prompt for ltx (reads ~256 tokens): the shot description comes first.",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L206"
+      "source_location": "L210"
     },
     {
-      "id": "scripts_kaggle_clips_rationale_346",
+      "id": "scripts_kaggle_clips_rationale_351",
       "label": "Returns (saved_count, reason). reason is 'stale' when the kernel output belongs\u2026",
       "_origin": "ast",
       "community": 2,
@@ -5716,10 +5716,10 @@
       "file_type": "rationale",
       "norm_label": "returns (saved_count, reason). reason is 'stale' when the kernel output belongs...",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L346"
+      "source_location": "L351"
     },
     {
-      "id": "scripts_kaggle_clips_rationale_86",
+      "id": "scripts_kaggle_clips_rationale_90",
       "label": "The GitHub runner image no longer ships ffmpeg (run log: 'ffmpeg: not found').\u2026",
       "_origin": "ast",
       "community": 2,
@@ -5727,7 +5727,7 @@
       "file_type": "rationale",
       "norm_label": "the github runner image no longer ships ffmpeg (run log: 'ffmpeg: not found')....",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L86"
+      "source_location": "L90"
     },
     {
       "id": "debugging_standards",
@@ -9050,7 +9050,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L382",
+      "source_location": "L387",
       "weight": 1.0
     },
     {
@@ -9062,7 +9062,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L385",
+      "source_location": "L390",
       "weight": 1.0
     },
     {
@@ -9074,7 +9074,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L387",
+      "source_location": "L392",
       "weight": 1.0
     },
     {
@@ -9086,7 +9086,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L392",
+      "source_location": "L403",
       "weight": 1.0
     },
     {
@@ -9098,7 +9098,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L392",
+      "source_location": "L403",
       "weight": 1.0
     },
     {
@@ -9110,7 +9110,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L230",
+      "source_location": "L234",
       "weight": 1.0
     },
     {
@@ -9122,7 +9122,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L232",
+      "source_location": "L236",
       "weight": 1.0
     },
     {
@@ -9134,7 +9134,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L240",
+      "source_location": "L244",
       "weight": 1.0
     },
     {
@@ -9146,7 +9146,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L241",
+      "source_location": "L245",
       "weight": 1.0
     },
     {
@@ -9158,7 +9158,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L242",
+      "source_location": "L246",
       "weight": 1.0
     },
     {
@@ -9170,7 +9170,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L243",
+      "source_location": "L247",
       "weight": 1.0
     },
     {
@@ -9182,7 +9182,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L248",
+      "source_location": "L252",
       "weight": 1.0
     },
     {
@@ -9194,7 +9194,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L255",
+      "source_location": "L259",
       "weight": 1.0
     },
     {
@@ -9206,7 +9206,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L259",
+      "source_location": "L263",
       "weight": 1.0
     },
     {
@@ -9218,7 +9218,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L348",
+      "source_location": "L353",
       "weight": 1.0
     },
     {
@@ -9230,7 +9230,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L349",
+      "source_location": "L354",
       "weight": 1.0
     },
     {
@@ -9242,7 +9242,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L350",
+      "source_location": "L355",
       "weight": 1.0
     },
     {
@@ -9254,7 +9254,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L354",
+      "source_location": "L359",
       "weight": 1.0
     },
     {
@@ -9266,7 +9266,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L367",
+      "source_location": "L372",
       "weight": 1.0
     },
     {
@@ -9278,7 +9278,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L369",
+      "source_location": "L374",
       "weight": 1.0
     },
     {
@@ -9290,7 +9290,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L373",
+      "source_location": "L378",
       "weight": 1.0
     },
     {
@@ -9302,7 +9302,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L377",
+      "source_location": "L382",
       "weight": 1.0
     },
     {
@@ -9314,7 +9314,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L87",
+      "source_location": "L91",
       "weight": 1.0
     },
     {
@@ -9326,7 +9326,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L89",
+      "source_location": "L93",
       "weight": 1.0
     },
     {
@@ -9338,7 +9338,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L90",
+      "source_location": "L94",
       "weight": 1.0
     },
     {
@@ -9350,7 +9350,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L133",
+      "source_location": "L137",
       "weight": 1.0
     },
     {
@@ -9362,7 +9362,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L122",
+      "source_location": "L126",
       "weight": 1.0
     },
     {
@@ -9374,7 +9374,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L186",
+      "source_location": "L190",
       "weight": 1.0
     },
     {
@@ -9518,7 +9518,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L265",
+      "source_location": "L269",
       "weight": 1.0
     },
     {
@@ -9530,7 +9530,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L215",
+      "source_location": "L219",
       "weight": 1.0
     },
     {
@@ -9542,7 +9542,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L481",
+      "source_location": "L496",
       "weight": 1.0
     },
     {
@@ -9554,7 +9554,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L484",
+      "source_location": "L499",
       "weight": 1.0
     },
     {
@@ -9566,7 +9566,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L486",
+      "source_location": "L501",
       "weight": 1.0
     },
     {
@@ -9578,7 +9578,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L488",
+      "source_location": "L503",
       "weight": 1.0
     },
     {
@@ -9590,7 +9590,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L117",
+      "source_location": "L121",
       "weight": 1.0
     },
     {
@@ -9602,7 +9602,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L287",
+      "source_location": "L291",
       "weight": 1.0
     },
     {
@@ -9614,7 +9614,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L289",
+      "source_location": "L293",
       "weight": 1.0
     },
     {
@@ -9626,7 +9626,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L291",
+      "source_location": "L295",
       "weight": 1.0
     },
     {
@@ -9638,7 +9638,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L291",
+      "source_location": "L295",
       "weight": 1.0
     },
     {
@@ -9650,7 +9650,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L295",
+      "source_location": "L299",
       "weight": 1.0
     },
     {
@@ -9662,7 +9662,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L296",
+      "source_location": "L300",
       "weight": 1.0
     },
     {
@@ -9674,7 +9674,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L299",
+      "source_location": "L303",
       "weight": 1.0
     },
     {
@@ -9686,24 +9686,12 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L315",
+      "source_location": "L319",
       "weight": 1.0
     },
     {
       "source": "scripts_kaggle_clips_push_batch",
       "target": "scripts_kaggle_clips_record_error",
-      "relation": "calls",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "call",
-      "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L317",
-      "weight": 1.0
-    },
-    {
-      "source": "scripts_kaggle_clips_push_batch",
-      "target": "time",
       "relation": "calls",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -9715,6 +9703,18 @@
     },
     {
       "source": "scripts_kaggle_clips_push_batch",
+      "target": "time",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "scripts/kaggle_clips.py",
+      "source_location": "L326",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_kaggle_clips_push_batch",
       "target": "scripts_kaggle_clips_kernel_status",
       "relation": "calls",
       "_origin": "ast",
@@ -9722,7 +9722,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L322",
+      "source_location": "L327",
       "weight": 1.0
     },
     {
@@ -9734,7 +9734,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L172",
+      "source_location": "L176",
       "weight": 1.0
     },
     {
@@ -9746,7 +9746,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L172",
+      "source_location": "L176",
       "weight": 1.0
     },
     {
@@ -9758,7 +9758,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L145",
+      "source_location": "L149",
       "weight": 1.0
     },
     {
@@ -9770,7 +9770,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L150",
+      "source_location": "L154",
       "weight": 1.0
     },
     {
@@ -9782,7 +9782,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L413",
+      "source_location": "L424",
       "weight": 1.0
     },
     {
@@ -9794,7 +9794,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L415",
+      "source_location": "L426",
       "weight": 1.0
     },
     {
@@ -9806,7 +9806,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L419",
+      "source_location": "L430",
       "weight": 1.0
     },
     {
@@ -9818,7 +9818,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L421",
+      "source_location": "L432",
       "weight": 1.0
     },
     {
@@ -9830,31 +9830,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L429",
-      "weight": 1.0
-    },
-    {
-      "source": "scripts_kaggle_clips_run",
-      "target": "scripts_kaggle_clips_assemble_if_complete",
-      "relation": "calls",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "call",
-      "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L431",
-      "weight": 1.0
-    },
-    {
-      "source": "scripts_kaggle_clips_run",
-      "target": "scripts_kaggle_clips_kernel_status",
-      "relation": "calls",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "call",
-      "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L443",
+      "source_location": "L440",
       "weight": 1.0
     },
     {
@@ -9866,7 +9842,31 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L452",
+      "source_location": "L442",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_kaggle_clips_run",
+      "target": "scripts_kaggle_clips_assemble_if_complete",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "scripts/kaggle_clips.py",
+      "source_location": "L446",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_kaggle_clips_run",
+      "target": "scripts_kaggle_clips_kernel_status",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "scripts/kaggle_clips.py",
+      "source_location": "L458",
       "weight": 1.0
     },
     {
@@ -9878,7 +9878,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L459",
+      "source_location": "L474",
       "weight": 1.0
     },
     {
@@ -9890,7 +9890,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L461",
+      "source_location": "L476",
       "weight": 1.0
     },
     {
@@ -9902,7 +9902,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L464",
+      "source_location": "L479",
       "weight": 1.0
     },
     {
@@ -9914,7 +9914,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L476",
+      "source_location": "L491",
       "weight": 1.0
     },
     {
@@ -9926,7 +9926,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L158",
+      "source_location": "L162",
       "weight": 1.0
     },
     {
@@ -9938,7 +9938,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L334",
+      "source_location": "L339",
       "weight": 1.0
     },
     {
@@ -9950,7 +9950,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L79",
+      "source_location": "L83",
       "weight": 1.0
     },
     {
@@ -14750,7 +14750,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L33",
+      "source_location": "L37",
       "weight": 1.0
     },
     {
@@ -14762,7 +14762,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L34",
+      "source_location": "L38",
       "weight": 1.0
     },
     {
@@ -14774,7 +14774,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L35",
+      "source_location": "L39",
       "weight": 1.0
     },
     {
@@ -14786,7 +14786,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L36",
+      "source_location": "L40",
       "weight": 1.0
     },
     {
@@ -14798,7 +14798,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L37",
+      "source_location": "L41",
       "weight": 1.0
     },
     {
@@ -14810,7 +14810,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L38",
+      "source_location": "L42",
       "weight": 1.0
     },
     {
@@ -14822,7 +14822,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L39",
+      "source_location": "L43",
       "weight": 1.0
     },
     {
@@ -14834,7 +14834,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L40",
+      "source_location": "L44",
       "weight": 1.0
     },
     {
@@ -14846,7 +14846,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L41",
+      "source_location": "L45",
       "weight": 1.0
     },
     {
@@ -14858,7 +14858,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L42",
+      "source_location": "L46",
       "weight": 1.0
     },
     {
@@ -14870,7 +14870,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L43",
+      "source_location": "L47",
       "weight": 1.0
     },
     {
@@ -14882,7 +14882,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L45",
+      "source_location": "L49",
       "weight": 1.0
     },
     {
@@ -14894,7 +14894,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L47",
+      "source_location": "L51",
       "weight": 1.0
     },
     {
@@ -14906,7 +14906,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L48",
+      "source_location": "L52",
       "weight": 1.0
     },
     {
@@ -14918,7 +14918,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L50",
+      "source_location": "L54",
       "weight": 1.0
     },
     {
@@ -14930,7 +14930,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L50",
+      "source_location": "L54",
       "weight": 1.0
     },
     {
@@ -14942,7 +14942,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L51",
+      "source_location": "L55",
       "weight": 1.0
     },
     {
@@ -14954,7 +14954,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L51",
+      "source_location": "L55",
       "weight": 1.0
     },
     {
@@ -16670,7 +16670,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L48",
+      "source_location": "L52",
       "weight": 1.0
     },
     {
@@ -16682,7 +16682,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L49",
+      "source_location": "L53",
       "weight": 1.0
     },
     {
@@ -16694,7 +16694,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L50",
+      "source_location": "L54",
       "weight": 1.0
     },
     {
@@ -16706,7 +16706,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L51",
+      "source_location": "L55",
       "weight": 1.0
     },
     {
@@ -19142,7 +19142,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L107",
+      "source_location": "L111",
       "weight": 1.0
     },
     {
@@ -19153,7 +19153,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L114",
+      "source_location": "L118",
       "weight": 1.0
     },
     {
@@ -19164,7 +19164,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L121",
+      "source_location": "L125",
       "weight": 1.0
     },
     {
@@ -19175,7 +19175,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L132",
+      "source_location": "L136",
       "weight": 1.0
     },
     {
@@ -19186,7 +19186,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L143",
+      "source_location": "L147",
       "weight": 1.0
     },
     {
@@ -19197,7 +19197,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L157",
+      "source_location": "L161",
       "weight": 1.0
     },
     {
@@ -19208,7 +19208,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L167",
+      "source_location": "L171",
       "weight": 1.0
     },
     {
@@ -19219,7 +19219,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L178",
+      "source_location": "L182",
       "weight": 1.0
     },
     {
@@ -19230,7 +19230,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L196",
+      "source_location": "L200",
       "weight": 1.0
     },
     {
@@ -19241,7 +19241,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L205",
+      "source_location": "L209",
       "weight": 1.0
     },
     {
@@ -19252,7 +19252,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L228",
+      "source_location": "L232",
       "weight": 1.0
     },
     {
@@ -19263,7 +19263,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L264",
+      "source_location": "L268",
       "weight": 1.0
     },
     {
@@ -19274,7 +19274,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L285",
+      "source_location": "L289",
       "weight": 1.0
     },
     {
@@ -19285,7 +19285,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L332",
+      "source_location": "L337",
       "weight": 1.0
     },
     {
@@ -19296,7 +19296,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L345",
+      "source_location": "L350",
       "weight": 1.0
     },
     {
@@ -19307,7 +19307,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L381",
+      "source_location": "L386",
       "weight": 1.0
     },
     {
@@ -19318,7 +19318,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L396",
+      "source_location": "L407",
       "weight": 1.0
     },
     {
@@ -19329,7 +19329,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L412",
+      "source_location": "L423",
       "weight": 1.0
     },
     {
@@ -19340,7 +19340,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L479",
+      "source_location": "L494",
       "weight": 1.0
     },
     {
@@ -19351,7 +19351,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L73",
+      "source_location": "L77",
       "weight": 1.0
     },
     {
@@ -19362,7 +19362,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L78",
+      "source_location": "L82",
       "weight": 1.0
     },
     {
@@ -19373,7 +19373,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L85",
+      "source_location": "L89",
       "weight": 1.0
     },
     {
@@ -21874,36 +21874,36 @@
       "weight": 1.0
     },
     {
-      "source": "scripts_kaggle_clips_rationale_206",
+      "source": "scripts_kaggle_clips_rationale_210",
       "target": "scripts_kaggle_clips_ltx_prompt",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L206",
+      "source_location": "L210",
       "weight": 1.0
     },
     {
-      "source": "scripts_kaggle_clips_rationale_346",
+      "source": "scripts_kaggle_clips_rationale_351",
       "target": "scripts_kaggle_clips_collect",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L346",
+      "source_location": "L351",
       "weight": 1.0
     },
     {
-      "source": "scripts_kaggle_clips_rationale_86",
+      "source": "scripts_kaggle_clips_rationale_90",
       "target": "scripts_kaggle_clips_ensure_ffmpeg",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/kaggle_clips.py",
-      "source_location": "L86",
+      "source_location": "L90",
       "weight": 1.0
     },
     {
@@ -23576,5 +23576,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "d95c60bbb1c24f84b6011e941ca9dbbcb0c131b0"
+  "built_at_commit": "d9daef5b673570193d872b409a07385b38ce1743"
 }
