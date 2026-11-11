@@ -22,7 +22,7 @@ REV 2 FIXES (after run #1 failed in 32 s):
 
 State lives in Kaggle's kernel (slug marius-clips) and in Supabase scripts.video_urls, so every
 run is safe to repeat. Needs env: SUPABASE_URL, SUPABASE_SECRET_KEY, B2_*, GEMINI_API_KEY,
-KAGGLE_USERNAME (falls back to Diawazi) and KAGGLE_API_TOKEN or KAGGLE_KEY.
+KAGGLE_USERNAME (required, no fallback) and KAGGLE_API_TOKEN or KAGGLE_KEY.
 """
 import os
 import sys
@@ -76,7 +76,10 @@ def sh(cmd):
 
 
 def kaggle_user():
-    return os.environ.get("KAGGLE_USERNAME", "").strip() or "Diawazi"
+    user = os.environ.get("KAGGLE_USERNAME", "").strip()
+    if not user:
+        raise RuntimeError("KAGGLE_USERNAME is missing. Add it as a repository secret.")
+    return user
 
 
 def parse_shot_list(script):
