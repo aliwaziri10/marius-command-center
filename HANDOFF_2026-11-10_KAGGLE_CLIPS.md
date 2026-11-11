@@ -3,7 +3,7 @@
 Zia's decision: Marius clips are AI-generated on Kaggle's free GPU. NO stock footage, NO Agnes. Re-verify everything live before trusting this file.
 
 ## Files (all on main, compile-checked)
-- `scripts/kaggle_clips.py` (runner, rev 2, commit 6ccaf6c). One action per run: wait if Kaggle running/queued, collect finished clips (ffmpeg scale+crop to 1280x704, upload to B2, save `video_urls` + `video_next_index`), or push the next 30 shots of the most-advanced `images_generated` script to Kaggle notebook `Diawazi/marius-clips`. When all shots are saved it calls `video_generation.process_script(script, shot_limit=0)` (existing assembly).
+- `scripts/kaggle_clips.py` (runner, rev 2, commit 6ccaf6c). One action per run: wait if Kaggle running/queued, collect finished clips (ffmpeg scale+crop to 1280x704, upload to B2, save `video_urls` + `video_next_index`), or push the next 30 shots of the most-advanced `images_generated` script to the Kaggle notebook `<KAGGLE_USERNAME>/marius-clips`. When all shots are saved it calls `video_generation.process_script(script, shot_limit=0)` (existing assembly).
 - `scripts/kaggle_clips_kernel.py` (runs on Kaggle, rev 2, commit 64159e5). LTX-Video 2B 0.9.8 distilled, 704x480, 24 fps, 256 prompt tokens. Piece 1 text-to-video, longer shots chained picture-to-video from the last frame using beat_director beats. Silent clips. Stops at first shot that fails twice or after 420 min.
 - `.github/workflows/kaggle_clips.yml` (Zia pasted it; live, cron every 30 min, concurrency group `video-generation`, run name "Kaggle Video Generation").
 - Old `Video Generation` workflow (`video_generation.yml`) must be DISABLED by Zia (Actions page, ⋯, Disable workflow). NOT confirmed done. Until it is disabled, Agnes/stock footage can still run.
@@ -22,7 +22,7 @@ Zia's decision: Marius clips are AI-generated on Kaggle's free GPU. NO stock foo
 6. Continuity between shots is NOT used (each shot is text-to-video).
 
 ## Secrets (names only, Claude cannot read them)
-KAGGLE_USERNAME (falls back to Diawazi), KAGGLE_API_TOKEN or KAGGLE_KEY, SUPABASE_URL, SUPABASE_SECRET_KEY, B2_ENDPOINT_URL, B2_KEY_ID, B2_APPLICATION_KEY, GEMINI_API_KEY, AGNES_API_KEY (imports only), FREESOUND_API_KEY, ACE_MUSIC_API_KEY, HF_TOKEN. The Kaggle token was pasted in chat on 2026-10-25: ask Zia to regenerate it and replace the secret.
+KAGGLE_USERNAME (required, no fallback), KAGGLE_API_TOKEN or KAGGLE_KEY, SUPABASE_URL, SUPABASE_SECRET_KEY, B2_ENDPOINT_URL, B2_KEY_ID, B2_APPLICATION_KEY, GEMINI_API_KEY, AGNES_API_KEY (imports only), FREESOUND_API_KEY, ACE_MUSIC_API_KEY, HF_TOKEN. The Kaggle token was pasted in chat on 2026-10-25: ask Zia to regenerate it and replace the secret.
 
 ## Next steps, in order
 1. Read the latest run of `https://github.com/aliwaziri10/marius-command-center/actions/workflows/kaggle_clips.yml`; fix only what the log shows.
