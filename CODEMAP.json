@@ -1527,7 +1527,7 @@
       "functions": [
         {
           "name": "say",
-          "line": 84,
+          "line": 88,
           "args": [
             "text"
           ],
@@ -1540,7 +1540,7 @@
         },
         {
           "name": "sh",
-          "line": 89,
+          "line": 93,
           "args": [
             "cmd"
           ],
@@ -1553,7 +1553,7 @@
         },
         {
           "name": "ensure_ffmpeg",
-          "line": 96,
+          "line": 100,
           "args": [],
           "calls": [
             "bool",
@@ -1567,7 +1567,7 @@
         },
         {
           "name": "kaggle_user",
-          "line": 118,
+          "line": 122,
           "args": [],
           "calls": [
             "RuntimeError",
@@ -1578,7 +1578,7 @@
         },
         {
           "name": "parse_shot_list",
-          "line": 125,
+          "line": 129,
           "args": [
             "script"
           ],
@@ -1591,7 +1591,7 @@
         },
         {
           "name": "narration_ok",
-          "line": 132,
+          "line": 136,
           "args": [
             "url"
           ],
@@ -1603,7 +1603,7 @@
         },
         {
           "name": "get_candidates",
-          "line": 146,
+          "line": 150,
           "args": [],
           "calls": [
             "append",
@@ -1617,7 +1617,7 @@
         },
         {
           "name": "fetch_script",
-          "line": 166,
+          "line": 170,
           "args": [
             "script_id"
           ],
@@ -1629,7 +1629,7 @@
         },
         {
           "name": "record_error",
-          "line": 177,
+          "line": 181,
           "args": [
             "script_id",
             "text"
@@ -1645,7 +1645,7 @@
         },
         {
           "name": "save_progress",
-          "line": 191,
+          "line": 195,
           "args": [
             "script_id",
             "video_urls",
@@ -1658,7 +1658,7 @@
         },
         {
           "name": "recently_errored",
-          "line": 201,
+          "line": 205,
           "args": [
             "script"
           ],
@@ -1672,7 +1672,7 @@
         },
         {
           "name": "get_durations",
-          "line": 212,
+          "line": 216,
           "args": [
             "script",
             "shot_list"
@@ -1695,7 +1695,7 @@
         },
         {
           "name": "short_anchor",
-          "line": 230,
+          "line": 234,
           "args": [
             "text",
             "limit"
@@ -1710,7 +1710,7 @@
         },
         {
           "name": "ltx_prompt",
-          "line": 239,
+          "line": 243,
           "args": [
             "shot",
             "anchor",
@@ -1729,7 +1729,7 @@
         },
         {
           "name": "build_manifest",
-          "line": 262,
+          "line": 266,
           "args": [
             "script",
             "start"
@@ -1761,7 +1761,7 @@
         },
         {
           "name": "kernel_status",
-          "line": 298,
+          "line": 302,
           "args": [
             "ref"
           ],
@@ -1773,7 +1773,7 @@
         },
         {
           "name": "push_batch",
-          "line": 319,
+          "line": 325,
           "args": [
             "script",
             "start"
@@ -1807,7 +1807,7 @@
         },
         {
           "name": "scale_clip",
-          "line": 367,
+          "line": 373,
           "args": [
             "src",
             "dst"
@@ -1822,7 +1822,7 @@
         },
         {
           "name": "collect",
-          "line": 380,
+          "line": 386,
           "args": [
             "script",
             "ref"
@@ -1850,7 +1850,7 @@
         },
         {
           "name": "assemble_if_complete",
-          "line": 416,
+          "line": 422,
           "args": [
             "script_id"
           ],
@@ -1870,7 +1870,7 @@
         },
         {
           "name": "write_summary",
-          "line": 437,
+          "line": 443,
           "args": [],
           "calls": [
             "get",
@@ -1883,7 +1883,7 @@
         },
         {
           "name": "run",
-          "line": 453,
+          "line": 459,
           "args": [],
           "calls": [
             "append",
@@ -1907,7 +1907,7 @@
         },
         {
           "name": "main",
-          "line": 524,
+          "line": 532,
           "args": [],
           "calls": [
             "append",
