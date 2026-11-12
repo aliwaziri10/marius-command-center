@@ -4884,7 +4884,7 @@
       "functions": [
         {
           "name": "fetch_scripts",
-          "line": 91,
+          "line": 143,
           "args": [
             "status",
             "limit",
@@ -4899,7 +4899,7 @@
         },
         {
           "name": "check_url_alive",
-          "line": 102,
+          "line": 154,
           "args": [
             "url",
             "min_bytes"
@@ -4913,7 +4913,7 @@
         },
         {
           "name": "check_b2_key_alive",
-          "line": 123,
+          "line": 175,
           "args": [
             "object_key",
             "min_bytes"
@@ -4924,27 +4924,98 @@
           "docstring": "ADDED (2026-09-02): the B2-key equivalent of check_url_alive, for"
         },
         {
+          "name": "_parse_created_at",
+          "line": 193,
+          "args": [
+            "script"
+          ],
+          "calls": [
+            "fromisoformat",
+            "get",
+            "replace"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_protagonist_name",
+          "line": 203,
+          "args": [
+            "anchor"
+          ],
+          "calls": [
+            "group",
+            "search",
+            "strip"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_names_protagonist",
+          "line": 208,
+          "args": [
+            "shot",
+            "name"
+          ],
+          "calls": [
+            "escape",
+            "get",
+            "join",
+            "lower",
+            "search"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "verify_planner_rewrite_rules",
+          "line": 215,
+          "args": [
+            "script",
+            "shot_list"
+          ],
+          "calls": [
+            "_names_protagonist",
+            "_parse_created_at",
+            "_protagonist_name",
+            "any",
+            "append",
+            "enumerate",
+            "get",
+            "int",
+            "isinstance",
+            "len",
+            "lower",
+            "max",
+            "search",
+            "split",
+            "strip",
+            "sum"
+          ],
+          "docstring": "ADDED (2026-11-12): re-checks the documentary-quality rules the new"
+        },
+        {
           "name": "verify_shot_breakdown_script",
-          "line": 141,
+          "line": 304,
           "args": [
             "script"
           ],
           "calls": [
             "append",
             "enumerate",
+            "extend",
             "fromisoformat",
             "get",
             "isinstance",
             "len",
             "loads",
             "replace",
-            "strip"
+            "strip",
+            "verify_planner_rewrite_rules"
           ],
           "docstring": "Any script that has passed shot breakdown (status images_generated"
         },
         {
           "name": "verify_video_generated_script",
-          "line": 194,
+          "line": 358,
           "args": [
             "script"
           ],
@@ -4961,7 +5032,7 @@
         },
         {
           "name": "check_stalled_scripts",
-          "line": 232,
+          "line": 396,
           "args": [],
           "calls": [
             "append",
@@ -4973,7 +5044,7 @@
         },
         {
           "name": "run_verification",
-          "line": 247,
+          "line": 411,
           "args": [
             "stage"
           ],
@@ -4993,7 +5064,7 @@
         },
         {
           "name": "main",
-          "line": 276,
+          "line": 440,
           "args": [],
           "calls": [
             "ArgumentParser",
