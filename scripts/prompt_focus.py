@@ -16,12 +16,24 @@ This module keeps the protagonist sentence only for shots that actually
 name or tag the protagonist, and tells the model when a shot has no
 people. Fails SAFE: if no protagonist name can be found in the anchor, the
 anchor is returned unchanged (the old behaviour).
+
+NAME-DETECTION FIX (2026-11-12): script 17fc73b3 described its protagonist as
+"Greta Mueller is a 38-year-old woman ..." (no "recurring protagonist"
+wording), so protagonist_name() returned None, the fail-safe sent Greta in
+EVERY shot - including the HQ facade and the Berlin Wall - and the clips
+showed one woman for 17 minutes. protagonist_name() now also recognises
+"<Name> [Surname] is a <N>-year-old ..." introductions.
 """
 
 import re
 
 _NAME_RE = re.compile(
     r"recurring (?:protagonist|character)(?:,?\s+(?:is|named|called))?\s+(?:named\s+|called\s+)?([A-Z][^\s,.;:]+)"
+)
+
+# "Greta Müller is a 38-year-old woman ..." / "Renee is a nineteen-year-old ..."
+_INTRO_RE = re.compile(
+    r"\b([A-Z][^\s,.;:]+)(?:\s+[A-Z][^\s,.;:]+)?\s+is\s+an?\s+[\w-]*year[\w-]*old"
 )
 
 _PEOPLE_RE = re.compile(
@@ -43,6 +55,8 @@ NO_PEOPLE_CLAUSE = (
 
 def protagonist_name(anchor):
     match = _NAME_RE.search(anchor or "")
+    if not match:
+        match = _INTRO_RE.search(anchor or "")
     return match.group(1).strip() if match else None
 
 
