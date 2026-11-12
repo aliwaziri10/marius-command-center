@@ -3000,8 +3000,59 @@
       "path": "scripts/shot_breakdown_stage.py",
       "functions": [
         {
+          "name": "estimate_seconds",
+          "line": 173,
+          "args": [
+            "text"
+          ],
+          "calls": [
+            "len",
+            "split"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "plan_chunking",
+          "line": 177,
+          "args": [
+            "narration_text"
+          ],
+          "calls": [
+            "estimate_seconds",
+            "int",
+            "max",
+            "round"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "shot_bounds",
+          "line": 182,
+          "args": [
+            "seconds"
+          ],
+          "calls": [
+            "ceil",
+            "int",
+            "max"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "protagonist_cap",
+          "line": 188,
+          "args": [
+            "shot_count"
+          ],
+          "calls": [
+            "int",
+            "max"
+          ],
+          "docstring": ""
+        },
+        {
           "name": "split_narration_into_chunks",
-          "line": 355,
+          "line": 192,
           "args": [
             "narration_text",
             "num_chunks"
@@ -3014,11 +3065,11 @@
             "strip",
             "sum"
           ],
-          "docstring": "Splits narration into num_chunks pieces, breaking only at sentence"
+          "docstring": "Splits narration into num_chunks pieces at sentence boundaries,"
         },
         {
           "name": "normalize_shot",
-          "line": 385,
+          "line": 215,
           "args": [
             "shot",
             "index"
@@ -3031,7 +3082,7 @@
         },
         {
           "name": "normalize_hook_text",
-          "line": 433,
+          "line": 256,
           "args": [
             "result"
           ],
@@ -3046,7 +3097,7 @@
         },
         {
           "name": "hook_text_matches_prompt_example",
-          "line": 449,
+          "line": 270,
           "args": [
             "hook_text"
           ],
@@ -3060,7 +3111,7 @@
         },
         {
           "name": "hook_text_too_long_to_glance",
-          "line": 456,
+          "line": 276,
           "args": [
             "hook_text"
           ],
@@ -3072,7 +3123,7 @@
         },
         {
           "name": "hook_text_matches_story",
-          "line": 461,
+          "line": 280,
           "args": [
             "hook_text",
             "narration_text"
@@ -3088,9 +3139,9 @@
         },
         {
           "name": "find_duplicate_shots",
-          "line": 475,
+          "line": 293,
           "args": [
-            "normalized_shots"
+            "shots"
           ],
           "calls": [
             "Counter",
@@ -3102,9 +3153,9 @@
         },
         {
           "name": "find_empty_shots",
-          "line": 487,
+          "line": 301,
           "args": [
-            "normalized_shots"
+            "shots"
           ],
           "calls": [
             "enumerate",
@@ -3113,49 +3164,79 @@
           "docstring": ""
         },
         {
-          "name": "find_continuation_language_shots",
-          "line": 494,
+          "name": "_phrase_hits",
+          "line": 308,
           "args": [
-            "normalized_shots"
+            "shots",
+            "phrases"
           ],
           "calls": [
             "append",
             "enumerate",
             "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_continuation_language_shots",
+          "line": 319,
+          "args": [
+            "shots"
+          ],
+          "calls": [
+            "_phrase_hits"
           ],
           "docstring": ""
         },
         {
           "name": "find_loitering_shots",
-          "line": 505,
+          "line": 323,
           "args": [
-            "normalized_shots"
+            "shots"
           ],
           "calls": [
-            "append",
-            "enumerate",
-            "lower"
+            "_phrase_hits"
           ],
           "docstring": ""
         },
         {
           "name": "find_idle_crowd_shots",
-          "line": 516,
+          "line": 327,
           "args": [
-            "normalized_shots"
+            "shots"
           ],
           "calls": [
-            "append",
-            "enumerate",
-            "lower"
+            "_phrase_hits"
           ],
-          "docstring": "IDLE-CROWD KEYWORD GATE (2026-09-10): see module docstring."
+          "docstring": ""
+        },
+        {
+          "name": "find_anachronistic_object_shots",
+          "line": 331,
+          "args": [
+            "shots"
+          ],
+          "calls": [
+            "_phrase_hits"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "find_duplicate_character_shots",
+          "line": 335,
+          "args": [
+            "shots"
+          ],
+          "calls": [
+            "_phrase_hits"
+          ],
+          "docstring": ""
         },
         {
           "name": "find_missing_onscreen_text_shots",
-          "line": 528,
+          "line": 339,
           "args": [
-            "normalized_shots",
+            "shots",
             "skip_indices"
           ],
           "calls": [
@@ -3165,55 +3246,53 @@
             "lower",
             "set"
           ],
-          "docstring": "ONSCREEN-TEXT AUTO-REPAIR SELF-DEFEAT FIX (2026-09-13): accepts an"
+          "docstring": ""
         },
         {
-          "name": "auto_repair_missing_onscreen_text",
-          "line": 547,
+          "name": "shot_mentions_protagonist",
+          "line": 351,
           "args": [
-            "normalized_shots"
+            "shot",
+            "name"
           ],
           "calls": [
-            "add",
-            "any",
-            "enumerate",
+            "escape",
+            "get",
+            "join",
             "lower",
-            "rstrip",
-            "set"
+            "search"
           ],
-          "docstring": "ONSCREEN-TEXT AUTO-REPAIR (2026-09-12): see module docstring. For"
+          "docstring": ""
         },
         {
-          "name": "find_anachronistic_object_shots",
-          "line": 571,
+          "name": "protagonist_shot_indices",
+          "line": 358,
           "args": [
-            "normalized_shots"
+            "shots",
+            "name"
           ],
           "calls": [
-            "append",
             "enumerate",
-            "lower"
+            "shot_mentions_protagonist"
           ],
-          "docstring": "ANACHRONISM KEYWORD GATE (2026-08-24): catches shots whose own"
+          "docstring": ""
         },
         {
-          "name": "find_duplicate_character_shots",
-          "line": 587,
+          "name": "seconds_for_excerpt",
+          "line": 362,
           "args": [
-            "normalized_shots"
+            "excerpt"
           ],
           "calls": [
-            "append",
-            "enumerate",
-            "lower"
+            "estimate_seconds"
           ],
-          "docstring": "DUPLICATE-CHARACTER KEYWORD GATE (2026-08-25): see module docstring"
+          "docstring": ""
         },
         {
           "name": "find_dominant_subject",
-          "line": 600,
+          "line": 366,
           "args": [
-            "normalized_shots"
+            "shots"
           ],
           "calls": [
             "Counter",
@@ -3225,9 +3304,9 @@
         },
         {
           "name": "find_excessive_consecutive_subject",
-          "line": 613,
+          "line": 377,
           "args": [
-            "normalized_shots"
+            "shots"
           ],
           "calls": [
             "enumerate",
@@ -3236,10 +3315,40 @@
           "docstring": ""
         },
         {
-          "name": "auto_repair_excessive_consecutive_subject",
-          "line": 628,
+          "name": "find_location_change_without_establishing",
+          "line": 391,
           "args": [
-            "normalized_shots"
+            "shots",
+            "prev_location"
+          ],
+          "calls": [
+            "append",
+            "enumerate",
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "auto_repair_missing_onscreen_text",
+          "line": 405,
+          "args": [
+            "shots"
+          ],
+          "calls": [
+            "add",
+            "any",
+            "enumerate",
+            "lower",
+            "rstrip",
+            "set"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "auto_repair_excessive_consecutive_subject",
+          "line": 415,
+          "args": [
+            "shots"
           ],
           "calls": [
             "add",
@@ -3247,13 +3356,13 @@
             "lower",
             "set"
           ],
-          "docstring": "CONSECUTIVE-SUBJECT AUTO-REPAIR (2026-09-13): mirrors the onscreen-"
+          "docstring": ""
         },
         {
           "name": "auto_repair_dominant_subject",
-          "line": 658,
+          "line": 432,
           "args": [
-            "normalized_shots"
+            "shots"
           ],
           "calls": [
             "Counter",
@@ -3265,26 +3374,14 @@
             "most_common",
             "set"
           ],
-          "docstring": "DOMINANT-SUBJECT AUTO-REPAIR (2026-09-13): same reasoning as above -"
-        },
-        {
-          "name": "find_location_change_without_establishing",
-          "line": 688,
-          "args": [
-            "normalized_shots"
-          ],
-          "calls": [
-            "append",
-            "enumerate",
-            "lower"
-          ],
-          "docstring": "DIRECTOR FEATURE (2026-08-20): whenever location_tag changes between"
+          "docstring": ""
         },
         {
           "name": "auto_repair_location_change_without_establishing",
-          "line": 705,
+          "line": 452,
           "args": [
-            "normalized_shots"
+            "shots",
+            "prev_location"
           ],
           "calls": [
             "add",
@@ -3292,116 +3389,330 @@
             "lower",
             "set"
           ],
-          "docstring": "LOCATION-ESTABLISHING AUTO-REPAIR (2026-09-14): see module docstring -"
+          "docstring": ""
+        },
+        {
+          "name": "auto_repair_zoom_discipline",
+          "line": 467,
+          "args": [
+            "shots"
+          ],
+          "calls": [
+            "add",
+            "enumerate",
+            "int",
+            "len",
+            "set",
+            "sum",
+            "zoomy"
+          ],
+          "docstring": "Breaks zoom runs and trims the zoom share to MAX_ZOOM_SHOT_RATIO by"
+        },
+        {
+          "name": "auto_repair_face_closeups",
+          "line": 498,
+          "args": [
+            "shots"
+          ],
+          "calls": [
+            "add",
+            "any",
+            "enumerate",
+            "lower",
+            "search",
+            "set",
+            "visual_has_people"
+          ],
+          "docstring": "The video model draws faces badly: a close-up whose description is"
+        },
+        {
+          "name": "scrub_protagonist",
+          "line": 514,
+          "args": [
+            "shot",
+            "name"
+          ],
+          "calls": [
+            "escape",
+            "sub"
+          ],
+          "docstring": "LAST RESORT when a segment still names the protagonist too often:"
+        },
+        {
+          "name": "enforce_protagonist_cap",
+          "line": 526,
+          "args": [
+            "shots",
+            "name"
+          ],
+          "calls": [
+            "any",
+            "len",
+            "lower",
+            "protagonist_cap",
+            "protagonist_shot_indices",
+            "scrub_protagonist"
+          ],
+          "docstring": "Scrubs the middle occurrences until the cap holds. Returns the count scrubbed."
+        },
+        {
+          "name": "anchor_problem",
+          "line": 546,
+          "args": [
+            "setting",
+            "palette"
+          ],
+          "calls": [
+            "len"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "anchor_declares_no_protagonist",
+          "line": 557,
+          "args": [
+            "anchor"
+          ],
+          "calls": [
+            "lower"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "hook_problem",
+          "line": 562,
+          "args": [
+            "parsed",
+            "shot_list_raw",
+            "narration_text"
+          ],
+          "calls": [
+            "get",
+            "hook_text_matches_prompt_example",
+            "hook_text_matches_story",
+            "hook_text_too_long_to_glance",
+            "len",
+            "normalize_hook_text",
+            "split"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "content_problems",
+          "line": 573,
+          "args": [
+            "shots"
+          ],
+          "calls": [
+            "find_anachronistic_object_shots",
+            "find_continuation_language_shots",
+            "find_duplicate_character_shots",
+            "find_duplicate_shots",
+            "find_empty_shots",
+            "find_idle_crowd_shots",
+            "find_loitering_shots",
+            "len",
+            "max"
+          ],
+          "docstring": "Hard content checks shared by segment and whole-list validation."
+        },
+        {
+          "name": "validate_chunk",
+          "line": 608,
+          "args": [
+            "raw_shots",
+            "chunk_text",
+            "name",
+            "prev_location"
+          ],
+          "calls": [
+            "auto_repair_face_closeups",
+            "auto_repair_location_change_without_establishing",
+            "auto_repair_missing_onscreen_text",
+            "content_problems",
+            "enumerate",
+            "estimate_seconds",
+            "int",
+            "join",
+            "len",
+            "max",
+            "normalize_shot",
+            "protagonist_cap",
+            "protagonist_shot_indices",
+            "round",
+            "seconds_for_excerpt",
+            "shot_bounds",
+            "split",
+            "str",
+            "sum"
+          ],
+          "docstring": "Validates ONE segment. Returns (ok, reason_or_None, normalized_shots)."
         },
         {
           "name": "validate_and_normalize_shot_response",
-          "line": 735,
+          "line": 653,
           "args": [
             "result",
             "narration_text"
           ],
           "calls": [
+            "anchor_problem",
             "auto_repair_dominant_subject",
             "auto_repair_excessive_consecutive_subject",
+            "auto_repair_face_closeups",
             "auto_repair_location_change_without_establishing",
             "auto_repair_missing_onscreen_text",
+            "auto_repair_zoom_discipline",
+            "ceil",
+            "content_problems",
+            "enforce_protagonist_cap",
             "enumerate",
-            "find_anachronistic_object_shots",
-            "find_continuation_language_shots",
-            "find_dominant_subject",
-            "find_duplicate_character_shots",
-            "find_duplicate_shots",
-            "find_empty_shots",
-            "find_excessive_consecutive_subject",
-            "find_idle_crowd_shots",
-            "find_location_change_without_establishing",
-            "find_loitering_shots",
-            "find_missing_onscreen_text_shots",
+            "estimate_seconds",
             "get",
-            "hook_text_matches_prompt_example",
-            "hook_text_matches_story",
-            "hook_text_too_long_to_glance",
+            "int",
             "isinstance",
             "len",
             "max",
+            "min",
             "normalize_hook_text",
             "normalize_shot",
             "print",
-            "split",
-            "strip",
-            "sum"
+            "protagonist_name",
+            "protagonist_shot_indices",
+            "shot_bounds",
+            "strip"
           ],
-          "docstring": "Validates everything EXCEPT narration_text/CTA, since those were"
+          "docstring": "Whole-list validation after all segments are stitched. Mostly"
         },
         {
-          "name": "build_shot_breakdown_response_schema",
-          "line": 1244,
+          "name": "build_shot_rules_block",
+          "line": 720,
           "args": [
-            "min_shots",
-            "max_shots",
-            "include_anchor_fields"
+            "target",
+            "lo",
+            "hi",
+            "cap",
+            "name"
           ],
-          "calls": [
-            "extend",
-            "update"
-          ],
-          "docstring": "UNUSED as of 2026-09-14 - see module docstring's SCHEMA-CONSTRAINED"
+          "calls": [],
+          "docstring": ""
         },
         {
           "name": "build_shot_breakdown_chunk_prompt",
-          "line": 1281,
+          "line": 820,
           "args": [
             "title",
             "angle",
             "chunk_text",
             "chunk_index",
             "num_chunks",
-            "min_shots_chunk",
-            "max_shots_chunk",
             "setting_and_characters",
             "color_palette",
+            "name",
             "prior_last_subject",
-            "prior_last_movement"
+            "prior_last_movement",
+            "feedback"
           ],
           "calls": [
             "append",
-            "format",
-            "join"
+            "build_shot_rules_block",
+            "estimate_seconds",
+            "int",
+            "join",
+            "max",
+            "protagonist_cap",
+            "round",
+            "shot_bounds"
           ],
-          "docstring": "Builds the prompt for ONE narration chunk's shot breakdown. The"
+          "docstring": ""
+        },
+        {
+          "name": "_call_with_infra_retry",
+          "line": 949,
+          "args": [
+            "prompt",
+            "state"
+          ],
+          "calls": [
+            "InfraFailure",
+            "RuntimeError",
+            "call_llm",
+            "print",
+            "sleep"
+          ],
+          "docstring": "One LLM call; infra failures (timeouts, 5xx) are retried with backoff"
+        },
+        {
+          "name": "_build_full_plan",
+          "line": 972,
+          "args": [
+            "title",
+            "angle",
+            "narration_text",
+            "chunks",
+            "state"
+          ],
+          "calls": [
+            "ChunkFailure",
+            "_call_with_infra_retry",
+            "anchor_declares_no_protagonist",
+            "anchor_problem",
+            "build_shot_breakdown_chunk_prompt",
+            "enumerate",
+            "extend",
+            "extract_json",
+            "get",
+            "hook_problem",
+            "isinstance",
+            "len",
+            "next",
+            "print",
+            "protagonist_name",
+            "range",
+            "reversed",
+            "sleep",
+            "strip",
+            "validate_chunk"
+          ],
+          "docstring": ""
+        },
+        {
+          "name": "_checker_sample",
+          "line": 1068,
+          "args": [
+            "shots"
+          ],
+          "calls": [
+            "len"
+          ],
+          "docstring": "The checker reads three windows (start, middle, end) so its prompt"
         },
         {
           "name": "generate_shot_breakdown",
-          "line": 1467,
+          "line": 1077,
           "args": [
             "title",
             "angle",
             "narration_text"
           ],
           "calls": [
-            "InfraFailure",
             "RuntimeError",
-            "build_shot_breakdown_chunk_prompt",
-            "call_llm",
-            "enumerate",
-            "extend",
-            "extract_json",
-            "get",
+            "_build_full_plan",
+            "_checker_sample",
             "grade_shot_breakdown",
-            "isinstance",
             "len",
+            "plan_chunking",
             "print",
-            "sleep",
+            "range",
             "split_narration_into_chunks",
-            "strip",
+            "str",
             "validate_and_normalize_shot_response"
           ],
-          "docstring": "CHUNKED (2026-08-15): splits narration into NUM_SHOT_CHUNKS pieces and"
+          "docstring": ""
         },
         {
           "name": "_simplify",
-          "line": 450,
+          "line": 271,
           "args": [
             "s"
           ],
@@ -3410,6 +3721,15 @@
             "join",
             "lower"
           ],
+          "docstring": ""
+        },
+        {
+          "name": "zoomy",
+          "line": 482,
+          "args": [
+            "s"
+          ],
+          "calls": [],
           "docstring": ""
         }
       ],
