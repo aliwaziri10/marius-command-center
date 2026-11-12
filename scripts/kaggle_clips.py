@@ -39,6 +39,19 @@ REV 2.5 (2026-11-11): a notebook run that a person cancelled on Kaggle is now it
 ("cancelled"): the runner sends a fresh batch straight away instead of treating the missing output
 as a crash and waiting 6 hours.
 
+REV 2.6 (2026-11-12, quality fix plan step 2):
+  - Shots are now ~5 s (new planner), so SEG_SECONDS is 5.3 and the kernel makes up to 129 frames
+    in ONE piece: a normal shot is no longer chained from the previous piece's last frame (chaining
+    is what made faces and objects morph). Only a shot longer than ~5.3 s still chains.
+  - The prompt now starts with quality words (cinematic documentary footage, sharp focus), then the
+    shot, and ends with stability words (steady camera, consistent faces, no morphing).
+  - A short NEGATIVE_PROMPT travels in the manifest. NOTE: the distilled LTX model runs at
+    guidance 1.0, where a negative prompt has NO effect (diffusers switches it off at 1.0). It only
+    takes effect if LTX_GUIDANCE is raised above 1.0 (which needs a non-distilled model; untested).
+  - BATCH_SHOTS default 30 -> 120, because shots are now about 7 times shorter (30 shots would be
+    only 2.5 minutes of video per Kaggle round trip).
+  - The Kaggle GPU name and count are written into the run report.
+
 State lives in Kaggle's kernel (slug marius-clips) and in Supabase scripts.video_urls, so every
 run is safe to repeat. Needs env: SUPABASE_URL, SUPABASE_SECRET_KEY, B2_*, GEMINI_API_KEY,
 KAGGLE_USERNAME (required, no fallback) and KAGGLE_API_TOKEN or KAGGLE_KEY.
@@ -69,15 +82,22 @@ SLUG = "marius-clips"
 WORK = "/tmp/kaggle_clips_push"
 OUT_DIR = "/tmp/kaggle_clips_out"
 
-BATCH_SHOTS = int(os.environ.get("KAGGLE_BATCH_SHOTS", "30"))
+BATCH_SHOTS = int(os.environ.get("KAGGLE_BATCH_SHOTS", "120"))
 BUDGET_MIN = int(os.environ.get("KAGGLE_BUDGET_MINUTES", "420"))
-SEG_SECONDS = 4.0
+SEG_SECONDS = 5.3          # one piece covers up to ~5.3 s (129 frames at 24 fps); longer shots chain
 MAX_SEGMENTS = 7
 RETRY_COOLDOWN_HOURS = 6
 OUT_W, OUT_H = 1280, 704
 UNREADABLE_MARK = "KAGGLE_STATUS_UNREADABLE"
 CANDIDATE_SCAN = 80   # scripts looked at before the narration check
 CANDIDATE_KEEP = 10   # scripts kept after the narration check
+
+# LTX settings sent to the Kaggle notebook. The distilled model needs guidance 1.0 and ~8 steps.
+# A negative prompt only works when LTX_GUIDANCE is above 1.0 (needs a non-distilled model).
+LTX_STEPS = 8
+LTX_GUIDANCE = 1.0
+NEGATIVE_PROMPT = ("morphing, deformed face, cross-eyed, distorted eyes, extra limbs, melting, "
+                   "warping, flicker, jitter, blurry, low quality, watermark, text")
 
 SUMMARY = []
 FAULTS = []
@@ -241,24 +261,24 @@ def short_anchor(text, limit=300):
 
 
 def ltx_prompt(shot, anchor, extra=""):
-    """Short prompt for LTX (reads ~256 tokens): the shot description comes FIRST."""
+    """Short prompt for LTX (reads ~256 tokens): quality words first, then the shot description,
+    then the setting, lighting and stability words."""
     visual = (shot.get("visual_description") or "").strip()
     shot_type = (shot.get("shot_type") or "medium").replace("_", " ")
     cam = (shot.get("camera_movement") or "static").replace("_", " ")
     key = shot.get("lighting") or DEFAULT_LIGHTING_KEY
     lighting = LIGHTING_PROMPT_MAP.get(key, LIGHTING_PROMPT_MAP[DEFAULT_LIGHTING_KEY])
-    parts = [f"{shot_type} shot. {visual}"]
+    parts = [f"Cinematic documentary footage, sharp focus. {shot_type} shot. {visual}"]
     if extra:
         parts.append(extra[:200])
     a = short_anchor(anchor)
     if a:
         parts.append(a)
     parts.append(lighting)
-    parts.append("photorealistic cinematic documentary footage, natural skin texture, "
-                 "historically accurate, no modern objects")
+    parts.append("photorealistic, natural skin texture, historically accurate, no modern objects")
     if cam != "static":
-        parts.append(f"camera {cam}")
-    parts.append("smooth continuous motion")
+        parts.append(f"camera {cam}, slow and smooth")
+    parts.append("steady camera, consistent faces, objects keep their shape, no morphing")
     text = ". ".join(p.strip().rstrip(".") for p in parts if p and p.strip())
     return text[:1100]
 
@@ -296,7 +316,9 @@ def build_manifest(script, start):
                 prompts.append(p)
         seed = int(hashlib.md5(f"{script_id}:{i}".encode()).hexdigest()[:8], 16)
         jobs.append({"index": i, "duration": round(dur, 3), "prompts": prompts, "seed": seed})
-    return {"script_id": script_id, "start_index": start, "budget_minutes": BUDGET_MIN, "jobs": jobs}
+    return {"script_id": script_id, "start_index": start, "budget_minutes": BUDGET_MIN,
+            "steps": LTX_STEPS, "guidance": LTX_GUIDANCE, "negative_prompt": NEGATIVE_PROMPT,
+            "jobs": jobs}
 
 
 def kernel_status(ref):
@@ -396,6 +418,8 @@ def collect(script, ref):
     next_index = script.get("video_next_index") or 0
     if m.get("script_id") != script_id or m.get("start_index") != next_index:
         return 0, "stale"
+    if m.get("gpu"):
+        say(f"Kaggle GPU for this batch: {m.get('gpu')} (devices seen: {m.get('gpu_count', 'unknown')}).")
     video_urls = list(script.get("video_urls") or [])
     saved = 0
     for idx in sorted(m.get("done", [])):
