@@ -26,6 +26,22 @@ away the whole 17-segment run. Checks that are always mechanically fixable
 (zoom ratio, location establishing, subject runs, face close-ups, readable
 text) are repaired in place instead of rejecting.
 
+DOCUMENTARY VFX + SURROUND AMBIENCE (2026-11-12): the final videos had no
+continuous sound of the place (only one short sound clip per shot, plain
+stereo) and almost no visual effects (the rules said lens_effect "none" on
+most shots). Two changes here, both mechanically guaranteed:
+  1. New per-shot field "ambience_cue": the continuous environment bed
+     (wind, room tone, distant traffic ...). Required on every shot. Shots in
+     the same location share the SAME cue word for word so the bed runs
+     unbroken; assembly_stage/ambience_mix build the actual bed from it.
+     auto_repair_ambience() fills empty cues from the lighting/location and
+     unifies cues inside one location, so this can never reject a plan.
+  2. At least MIN_VFX_RATIO (about 1 in 3) of shots now carry a real
+     lens_effect (film grain on wides, shallow depth of field on details and
+     mediums, lens flare only in dawn/golden/dusk light, at most 10%).
+     auto_repair_vfx() tops the share up, spread evenly, if the model wrote
+     too few. The final grade/vignette is applied in assembly_stage.
+
 HISTORY (condensed; full text is in git history before this rewrite):
   2026-08-15 chunked breakdown; 08-20 director fields + writer/checker split;
   08-24 anachronism gate; 08-25 duplicate-character gate; 09-08 documentary
@@ -100,6 +116,25 @@ DEFAULT_BEAT_INTENSITY = "mid"
 ZOOM_FAMILY_MOVEMENTS = {"push_in", "crash_zoom", "zoom_in", "snap_zoom", "dolly_in"}
 MAX_ZOOM_SHOT_RATIO = 0.32
 MAX_CONSECUTIVE_ZOOM_SHOTS = 2
+
+# --- documentary VFX + ambience (2026-11-12) --------------------------------
+MIN_VFX_RATIO = 0.34              # at least this share of shots carry a lens_effect
+MAX_LENS_FLARE_RATIO = 0.10       # lens flare is rare: at most 1 in 10 shots
+MIN_AMBIENCE_WORDS = 3            # shorter ambience_cue counts as missing
+MAX_AMBIENCE_WORDS = 14           # longer ambience_cue is trimmed
+FLARE_LIGHTING = ("golden_hour", "dawn", "dusk")
+AMBIENCE_BY_LIGHTING = {
+    "night": "quiet night air, faint distant wind",
+    "moonlight": "quiet night air, faint distant wind",
+    "dawn": "early morning air, distant birdsong, soft wind",
+    "morning": "morning air, distant street life",
+    "midday": "open air, faint distant street life",
+    "golden_hour": "warm evening air, soft wind",
+    "dusk": "evening air, distant dogs barking, soft wind",
+    "overcast": "overcast air, steady low wind",
+    "firelight": "crackling fire, quiet night air",
+    "interior_lamp": "quiet room tone, faint clock ticking",
+}
 
 PROTAGONIST_MAX_RATIO = 0.30      # protagonist named in at most 30% of shots
 MAX_CONSECUTIVE_SAME_SUBJECT = 2
@@ -243,6 +278,7 @@ def normalize_shot(shot, index):
         "camera_reason": shot.get("camera_reason", "") or "",
         "lens_effect": lens_effect,
         "sfx_cue": shot.get("sfx_cue", "") or "",
+        "ambience_cue": (shot.get("ambience_cue") or "").strip(),
         "primary_subject": (shot.get("primary_subject") or "").strip(),
         "required_onscreen_text": (shot.get("required_onscreen_text") or "").strip(),
         "lighting": lighting,
@@ -511,6 +547,71 @@ def auto_repair_face_closeups(shots):
     return repaired
 
 
+def auto_repair_ambience(shots):
+    """Every shot needs a continuous ambience bed (ambience_cue). Fills empty
+    or too-short cues from the previous shot when it is in the same location,
+    otherwise from the lighting; trims over-long cues; and makes consecutive
+    shots in one location share the SAME cue so the bed runs unbroken.
+    Returns the set of repaired indices."""
+    repaired = set()
+    prev = None
+    for i, s in enumerate(shots):
+        cue = (s["ambience_cue"] or "").strip()
+        words = cue.split()
+        if len(words) > MAX_AMBIENCE_WORDS:
+            cue = " ".join(words[:MAX_AMBIENCE_WORDS]).rstrip(",;")
+            words = cue.split()
+            repaired.add(i)
+        same_place = (
+            prev is not None and s["location_tag"] and prev["location_tag"]
+            and s["location_tag"].lower() == prev["location_tag"].lower()
+        )
+        if len(words) < MIN_AMBIENCE_WORDS:
+            cue = prev["ambience_cue"] if same_place else AMBIENCE_BY_LIGHTING.get(
+                s["lighting"], AMBIENCE_BY_LIGHTING[DEFAULT_LIGHTING])
+            repaired.add(i)
+        elif same_place and cue.lower() != prev["ambience_cue"].lower():
+            cue = prev["ambience_cue"]
+            repaired.add(i)
+        s["ambience_cue"] = cue
+        prev = s
+    return repaired
+
+
+def auto_repair_vfx(shots):
+    """Tops the share of shots with a real lens_effect up to MIN_VFX_RATIO,
+    spread evenly through the episode. Wide/establishing shots get film grain
+    (or a rare lens flare in dawn/golden/dusk light, at most
+    MAX_LENS_FLARE_RATIO of shots); detail inserts and mediums get shallow
+    depth of field; anything else gets film grain. Returns repaired indices."""
+    repaired = set()
+    n = len(shots)
+    if n == 0:
+        return repaired
+    target = int(math.ceil(n * MIN_VFX_RATIO))
+    have = sum(1 for s in shots if s["lens_effect"] != "none")
+    if have >= target:
+        return repaired
+    candidates = [i for i, s in enumerate(shots) if s["lens_effect"] == "none"]
+    need = min(target - have, len(candidates))
+    step = len(candidates) / need
+    flare_limit = int(n * MAX_LENS_FLARE_RATIO)
+    flares = sum(1 for s in shots if s["lens_effect"] == "lens_flare")
+    for k in range(need):
+        s = shots[candidates[int(k * step)]]
+        is_wide = s["shot_type"] in ("wide", "establishing")
+        if is_wide and s["lighting"] in FLARE_LIGHTING and flares < flare_limit:
+            s["lens_effect"] = "lens_flare"
+            flares += 1
+        elif not is_wide and s["shot_type"] in ("detail_insert", "medium", "close_up") \
+                and s["depth_of_field"] != "deep":
+            s["lens_effect"] = "shallow_depth_of_field"
+        else:
+            s["lens_effect"] = "film_grain"
+        repaired.add(candidates[int(k * step)])
+    return repaired
+
+
 def scrub_protagonist(shot, name):
     """LAST RESORT when a segment still names the protagonist too often:
     the name is replaced so the shot no longer carries the protagonist."""
@@ -694,6 +795,13 @@ def validate_and_normalize_shot_response(result, narration_text):
     auto_repair_dominant_subject(shots)
     auto_repair_location_change_without_establishing(shots)
 
+    fixed = auto_repair_ambience(shots)
+    if fixed:
+        print(f"[shots] Auto-repaired the ambience cue on {len(fixed)} shot(s).")
+    fixed = auto_repair_vfx(shots)
+    if fixed:
+        print(f"[shots] Added a lens effect to {len(fixed)} shot(s) to reach {MIN_VFX_RATIO:.0%} VFX coverage.")
+
     name = protagonist_name(setting)
     scrubbed = enforce_protagonist_cap(shots, name)
     if scrubbed:
@@ -800,8 +908,20 @@ For each shot provide:
   makes 4-6 s clips
 - "camera_reason": one short sentence
 - "lens_effect": one of "shallow_depth_of_field", "lens_flare", "film_grain",
-  "none" (most shots "none")
-- "sfx_cue": ambient or dramatic sound, "" only where silence is deliberate
+  "none". At least 1 in 3 shots must use a real effect: "film_grain" for the
+  period-film look on wide and establishing shots, "shallow_depth_of_field"
+  on detail_insert and medium shots, "lens_flare" only on sunlit exterior
+  shots in dawn, golden_hour or dusk light (at most 1 shot in 10)
+- "ambience_cue": REQUIRED on every shot. The continuous sound of the place
+  the shot is in, 4-12 words, keyword style, for example "cold wind, distant
+  gulls, creaking wooden pier" or "quiet office room tone, faint typewriter
+  clatter". Shots in the same location use the SAME ambience_cue word for
+  word so the sound bed runs unbroken; change it only when the location
+  changes. Sounds of the place only: no music and no spoken words
+- "sfx_cue": ONE specific sound that matches the visible action in the shot
+  (a stamp thudding on paper, a door latch clicking, boots on gravel), short
+  and keyword style, different from the ambience. "" only where silence is
+  deliberate
 - "primary_subject", "required_onscreen_text", "location_tag" as above
 - "lighting": one of "dawn", "morning", "midday", "golden_hour", "dusk",
   "night", "overcast", "firelight", "interior_lamp", "moonlight" - consistent
@@ -929,7 +1049,8 @@ Return ONLY valid JSON, no other text, no markdown fences, in this exact format:
       "camera_movement": "pan_left",
       "camera_reason": "Why this movement fits this beat",
       "lens_effect": "none",
-      "sfx_cue": "",
+      "sfx_cue": "a stamp thudding on paper",
+      "ambience_cue": "quiet office room tone, faint typewriter clatter",
       "primary_subject": "",
       "required_onscreen_text": "",
       "lighting": "midday",
