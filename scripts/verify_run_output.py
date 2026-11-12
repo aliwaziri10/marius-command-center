@@ -55,10 +55,25 @@ now writes about one shot per 5 seconds of narration (about 200 shots for a
 17 minute script) instead of 25-35 shots in total. MAX_SHOTS raised from 35
 to 450 so correct new plans are not reported as broken. Old scripts with
 25-35 shots still pass.
+
+DOCUMENTARY-QUALITY CHECKS (2026-11-12): the planner rewrite (commit
+c183001, 2026-11-12T04:23:40Z) made these rules hard limits at write time,
+but nothing re-checked them afterwards, so a hand edit or a planner bug
+could ship a plan that looks nothing like a real documentary (one woman on
+screen for 17 minutes, 34 s shots, faces morphing). verify_planner_rewrite_rules()
+now re-checks, on every script created at/after PLANNER_REWRITE_AT:
+protagonist named in at most 30% of shots, average shot length 3-7 s, no
+shot over 12 s of narration, at least 1 in 4 shots wide/establishing, at
+most ~1/3 zoom-family shots or extreme close-ups, no camera move repeated
+more than twice in a row, no face close-ups, and shot excerpts covering at
+least 80% of the narration. Older scripts are skipped because they were
+planned under the old 25-35 shot rules and would fail these for no real
+reason.
 """
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 
@@ -86,6 +101,43 @@ HTTP_TIMEOUT = 30
 # Checking for it on those older rows was producing false-positive failures
 # on every run. Any script created at/after this cutoff still must have it.
 COLOR_PALETTE_FIELD_ADDED_AT = datetime.fromisoformat("2026-08-20T01:48:19+00:00")
+
+# ADDED (2026-11-12): planner rewrite commit c183001 landed at this time.
+# Scripts created at/after it are held to the documentary-quality rules
+# below; earlier scripts were planned under the old rules and are skipped.
+PLANNER_REWRITE_AT = datetime.fromisoformat("2026-11-12T04:23:40+00:00")
+
+# Duplicated from shot_breakdown_stage.py on purpose (contract, not
+# implementation - see MIN_SHOTS above).
+WORDS_PER_SECOND = 2.5
+MIN_AVG_SHOT_SECONDS = 3.0
+MAX_AVG_SHOT_SECONDS = 7.0
+HARD_MAX_SHOT_SECONDS = 12.0
+MIN_COVERAGE = 0.80
+PROTAGONIST_MAX_RATIO = 0.30
+MIN_WIDE_RATIO = 0.25
+MAX_ZOOM_SHOT_RATIO = 0.32
+MAX_CONSECUTIVE_SAME_MOVEMENT = 2
+ZOOM_FAMILY_MOVEMENTS = {"push_in", "crash_zoom", "zoom_in", "snap_zoom", "dolly_in"}
+FACE_WORDS = ("face", "faces", "eye", "eyes", "gaze", "stare", "staring", "portrait", "expression")
+
+# Same name detection as prompt_focus.py (copied, not imported).
+_NAME_RE = re.compile(
+    r"recurring (?:protagonist|character)(?:,?\s+(?:is|named|called))?\s+(?:named\s+|called\s+)?([A-Z][^\s,.;:]+)"
+)
+_INTRO_RE = re.compile(
+    r"\b([A-Z][^\s,.;:]+)(?:\s+[A-Z][^\s,.;:]+)?\s+is\s+an?\s+[\w-]*year[\w-]*old"
+)
+_PEOPLE_RE = re.compile(
+    r"\b(man|men|woman|women|person|persons|people|child|children|girl|boy|clerk|clerks|"
+    r"worker|workers|soldier|soldiers|officer|officers|guard|guards|figure|figures|crowd|"
+    r"crowds|villager|villagers|family|families|couple|silhouette|silhouettes|"
+    r"he|she|they|his|her|their|him|them|staff|passengers|residents|neighbors|"
+    r"neighbours|onlookers|bystanders|pedestrians|mother|father|son|daughter|doctor|nurse|"
+    r"priest|farmer|farmers|prisoner|prisoners|inmates|refugees|civilians|youth|elder|"
+    r"elders|boys|girls|students|teacher|teachers|merchant|merchants)\b",
+    re.IGNORECASE,
+)
 
 
 def fetch_scripts(status, limit=CHECK_SAMPLE_SIZE, order="created_at.desc"):
@@ -138,6 +190,117 @@ def check_b2_key_alive(object_key, min_bytes=None):
     return True, None
 
 
+def _parse_created_at(script):
+    raw = script.get("created_at")
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _protagonist_name(anchor):
+    match = _NAME_RE.search(anchor or "") or _INTRO_RE.search(anchor or "")
+    return match.group(1).strip() if match else None
+
+
+def _names_protagonist(shot, name):
+    text = " ".join([shot.get("visual_description") or "", shot.get("primary_subject") or ""]).lower()
+    if name and re.search(r"\b" + re.escape(name.lower()) + r"\b", text):
+        return True
+    return "protagonist" in text or "main character" in text
+
+
+def verify_planner_rewrite_rules(script, shot_list):
+    """ADDED (2026-11-12): re-checks the documentary-quality rules the new
+    planner enforces at write time. Only applies to scripts created
+    at/after PLANNER_REWRITE_AT; older scripts return no problems."""
+    problems = []
+    created_at = _parse_created_at(script)
+    if created_at is None or created_at < PLANNER_REWRITE_AT:
+        return problems
+
+    shots = [s for s in shot_list if isinstance(s, dict)]
+    n = len(shots)
+    if n == 0:
+        return problems
+
+    # 1. Protagonist named in at most 30% of shots (same cap formula as planner).
+    name = _protagonist_name(script.get("setting_and_characters"))
+    hits = [i for i, s in enumerate(shots) if _names_protagonist(s, name)]
+    cap = max(1, int(n * PROTAGONIST_MAX_RATIO))
+    if hits and len(hits) > cap:
+        problems.append(
+            f"protagonist{' ' + name if name else ''} named in {len(hits)}/{n} shots "
+            f"({len(hits) / n:.0%}), max {PROTAGONIST_MAX_RATIO:.0%}"
+        )
+
+    # 2. Average shot length, from narration word count.
+    narration = (script.get("narration_text") or "").strip()
+    if narration:
+        total_seconds = len(narration.split()) / WORDS_PER_SECOND
+        avg = total_seconds / n
+        if not (MIN_AVG_SHOT_SECONDS <= avg <= MAX_AVG_SHOT_SECONDS):
+            problems.append(
+                f"average shot is {avg:.1f} s of narration, outside "
+                f"{MIN_AVG_SHOT_SECONDS:.0f}-{MAX_AVG_SHOT_SECONDS:.0f} s"
+            )
+        covered = sum(len((s.get("narration_excerpt") or "").split()) for s in shots)
+        narration_words = len(narration.split())
+        if narration_words and covered < MIN_COVERAGE * narration_words:
+            problems.append(
+                f"shot excerpts cover only {covered} of {narration_words} narration words "
+                f"({covered / narration_words:.0%}), min {MIN_COVERAGE:.0%} - picture and voice drifted apart"
+            )
+
+    # 3. No single shot over 12 s of narration.
+    too_long = [
+        i for i, s in enumerate(shots)
+        if len((s.get("narration_excerpt") or "").split()) / WORDS_PER_SECOND > HARD_MAX_SHOT_SECONDS
+    ]
+    if too_long:
+        problems.append(
+            f"{len(too_long)} shot(s) cover more than {HARD_MAX_SHOT_SECONDS:.0f} s of narration "
+            f"(first at index {too_long[0]})"
+        )
+
+    # 4. Shot variety: wide/establishing share.
+    wide = sum(1 for s in shots if s.get("shot_type") in ("wide", "establishing"))
+    if wide / n < MIN_WIDE_RATIO:
+        problems.append(f"only {wide}/{n} shots ({wide / n:.0%}) are wide/establishing, min {MIN_WIDE_RATIO:.0%}")
+
+    # 5. Zoom discipline.
+    zoomy = sum(
+        1 for s in shots
+        if s.get("camera_movement") in ZOOM_FAMILY_MOVEMENTS or s.get("shot_type") == "extreme_close_up"
+    )
+    if zoomy > int(n * MAX_ZOOM_SHOT_RATIO):
+        problems.append(f"{zoomy}/{n} shots ({zoomy / n:.0%}) are zooms/extreme close-ups, max {MAX_ZOOM_SHOT_RATIO:.0%}")
+
+    # 6. Same camera move repeated too many times in a row.
+    run, prev = 0, None
+    for i, s in enumerate(shots):
+        move = s.get("camera_movement")
+        run = run + 1 if move and move == prev else 1
+        prev = move
+        if move and run > MAX_CONSECUTIVE_SAME_MOVEMENT:
+            problems.append(f"camera move {move!r} repeated {run} times in a row (at shot index {i})")
+            break
+
+    # 7. Face close-ups (the video model draws faces badly).
+    face_closeups = [
+        i for i, s in enumerate(shots)
+        if s.get("shot_type") in ("close_up", "extreme_close_up")
+        and _PEOPLE_RE.search(s.get("visual_description") or "")
+        and any(re.search(r"\b" + w + r"\b", (s.get("visual_description") or "").lower()) for w in FACE_WORDS)
+    ]
+    if face_closeups:
+        problems.append(f"{len(face_closeups)} face close-up(s) (first at index {face_closeups[0]})")
+
+    return problems
+
+
 def verify_shot_breakdown_script(script):
     """Any script that has passed shot breakdown (status images_generated
     or later) should have a shot_list obeying the same bounds/required
@@ -167,6 +330,7 @@ def verify_shot_breakdown_script(script):
                 f"{len(empty)} shot(s) have empty visual_description/narration_excerpt "
                 f"(first at index {empty[0]})"
             )
+        problems.extend(verify_planner_rewrite_rules(script, shot_list))
 
     if not (script.get("setting_and_characters") or "").strip():
         problems.append("setting_and_characters empty")
