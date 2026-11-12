@@ -3324,7 +3324,7 @@
       "file_type": "code",
       "norm_label": "check_b2_key_alive()",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L117"
+      "source_location": "L123"
     },
     {
       "id": "scripts_verify_run_output_check_stalled_scripts",
@@ -3336,7 +3336,7 @@
       "file_type": "code",
       "norm_label": "check_stalled_scripts()",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L226"
+      "source_location": "L232"
     },
     {
       "id": "scripts_verify_run_output_check_url_alive",
@@ -3348,7 +3348,7 @@
       "file_type": "code",
       "norm_label": "check_url_alive()",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L96"
+      "source_location": "L102"
     },
     {
       "id": "scripts_verify_run_output_fetch_scripts",
@@ -3360,7 +3360,7 @@
       "file_type": "code",
       "norm_label": "fetch_scripts()",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L85"
+      "source_location": "L91"
     },
     {
       "id": "scripts_verify_run_output_main",
@@ -3372,7 +3372,7 @@
       "file_type": "code",
       "norm_label": "main()",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L270"
+      "source_location": "L276"
     },
     {
       "id": "scripts_verify_run_output_run_verification",
@@ -3384,7 +3384,7 @@
       "file_type": "code",
       "norm_label": "run_verification()",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L241"
+      "source_location": "L247"
     },
     {
       "id": "scripts_verify_run_output_verify_shot_breakdown_script",
@@ -3396,7 +3396,7 @@
       "file_type": "code",
       "norm_label": "verify_shot_breakdown_script()",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L135"
+      "source_location": "L141"
     },
     {
       "id": "scripts_verify_run_output_verify_video_generated_script",
@@ -3408,7 +3408,7 @@
       "file_type": "code",
       "norm_label": "verify_video_generated_script()",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L188"
+      "source_location": "L194"
     },
     {
       "id": "scripts_narration_assign_shots_to_sentences",
@@ -6924,51 +6924,7 @@
       "source_location": "L1"
     },
     {
-      "id": "scripts_verify_run_output_rationale_118",
-      "label": "ADDED (2026-09-02): the B2-key equivalent of check_url_alive, for\u2026",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "os",
-      "file_type": "rationale",
-      "norm_label": "added (2026-09-02): the b2-key equivalent of check_url_alive, for...",
-      "source_file": "scripts/verify_run_output.py",
-      "source_location": "L118"
-    },
-    {
-      "id": "scripts_verify_run_output_rationale_136",
-      "label": "Any script that has passed shot breakdown (status images_generated or later)\u2026",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "os",
-      "file_type": "rationale",
-      "norm_label": "any script that has passed shot breakdown (status images_generated or later)...",
-      "source_file": "scripts/verify_run_output.py",
-      "source_location": "L136"
-    },
-    {
-      "id": "scripts_verify_run_output_rationale_189",
-      "label": "A script marked video_generated must have a video that's actually live and non-\u2026",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "os",
-      "file_type": "rationale",
-      "norm_label": "a script marked video_generated must have a video that's actually live and non-...",
-      "source_file": "scripts/verify_run_output.py",
-      "source_location": "L189"
-    },
-    {
-      "id": "scripts_verify_run_output_rationale_227",
-      "label": "Non-fatal early warning for the exact pattern STATUS.md is showing right now: a\u2026",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "os",
-      "file_type": "rationale",
-      "norm_label": "non-fatal early warning for the exact pattern status.md is showing right now: a...",
-      "source_file": "scripts/verify_run_output.py",
-      "source_location": "L227"
-    },
-    {
-      "id": "scripts_verify_run_output_rationale_97",
+      "id": "scripts_verify_run_output_rationale_103",
       "label": "HEAD request - confirms the URL is actually live and (optionally) non-trivially\u2026",
       "_origin": "ast",
       "community": 7,
@@ -6976,7 +6932,51 @@
       "file_type": "rationale",
       "norm_label": "head request - confirms the url is actually live and (optionally) non-trivially...",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L97"
+      "source_location": "L103"
+    },
+    {
+      "id": "scripts_verify_run_output_rationale_124",
+      "label": "ADDED (2026-09-02): the B2-key equivalent of check_url_alive, for\u2026",
+      "_origin": "ast",
+      "community": 7,
+      "community_name": "os",
+      "file_type": "rationale",
+      "norm_label": "added (2026-09-02): the b2-key equivalent of check_url_alive, for...",
+      "source_file": "scripts/verify_run_output.py",
+      "source_location": "L124"
+    },
+    {
+      "id": "scripts_verify_run_output_rationale_142",
+      "label": "Any script that has passed shot breakdown (status images_generated or later)\u2026",
+      "_origin": "ast",
+      "community": 7,
+      "community_name": "os",
+      "file_type": "rationale",
+      "norm_label": "any script that has passed shot breakdown (status images_generated or later)...",
+      "source_file": "scripts/verify_run_output.py",
+      "source_location": "L142"
+    },
+    {
+      "id": "scripts_verify_run_output_rationale_195",
+      "label": "A script marked video_generated must have a video that's actually live and non-\u2026",
+      "_origin": "ast",
+      "community": 7,
+      "community_name": "os",
+      "file_type": "rationale",
+      "norm_label": "a script marked video_generated must have a video that's actually live and non-...",
+      "source_file": "scripts/verify_run_output.py",
+      "source_location": "L195"
+    },
+    {
+      "id": "scripts_verify_run_output_rationale_233",
+      "label": "Non-fatal early warning for the exact pattern STATUS.md is showing right now: a\u2026",
+      "_origin": "ast",
+      "community": 7,
+      "community_name": "os",
+      "file_type": "rationale",
+      "norm_label": "non-fatal early warning for the exact pattern status.md is showing right now: a...",
+      "source_file": "scripts/verify_run_output.py",
+      "source_location": "L233"
     },
     {
       "id": "scripts_narration",
@@ -13936,7 +13936,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L234",
+      "source_location": "L240",
       "weight": 1.0
     },
     {
@@ -13948,7 +13948,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L103",
+      "source_location": "L109",
       "weight": 1.0
     },
     {
@@ -13960,7 +13960,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L86",
+      "source_location": "L92",
       "weight": 1.0
     },
     {
@@ -13972,7 +13972,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L271",
+      "source_location": "L277",
       "weight": 1.0
     },
     {
@@ -13984,7 +13984,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L275",
+      "source_location": "L281",
       "weight": 1.0
     },
     {
@@ -13996,7 +13996,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L276",
+      "source_location": "L282",
       "weight": 1.0
     },
     {
@@ -14008,7 +14008,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L280",
+      "source_location": "L286",
       "weight": 1.0
     },
     {
@@ -14020,7 +14020,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L252",
+      "source_location": "L258",
       "weight": 1.0
     },
     {
@@ -14032,7 +14032,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L253",
+      "source_location": "L259",
       "weight": 1.0
     },
     {
@@ -14044,7 +14044,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L259",
+      "source_location": "L265",
       "weight": 1.0
     },
     {
@@ -14056,7 +14056,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L262",
+      "source_location": "L268",
       "weight": 1.0
     },
     {
@@ -14068,7 +14068,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L145",
+      "source_location": "L151",
       "weight": 1.0
     },
     {
@@ -14080,7 +14080,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L210",
+      "source_location": "L216",
       "weight": 1.0
     },
     {
@@ -14092,7 +14092,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L219",
+      "source_location": "L225",
       "weight": 1.0
     },
     {
@@ -17308,7 +17308,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L53",
+      "source_location": "L59",
       "weight": 1.0
     },
     {
@@ -17320,7 +17320,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L54",
+      "source_location": "L60",
       "weight": 1.0
     },
     {
@@ -17332,7 +17332,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L55",
+      "source_location": "L61",
       "weight": 1.0
     },
     {
@@ -17344,7 +17344,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L56",
+      "source_location": "L62",
       "weight": 1.0
     },
     {
@@ -17356,7 +17356,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L59",
+      "source_location": "L65",
       "weight": 1.0
     },
     {
@@ -18244,7 +18244,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L57",
+      "source_location": "L63",
       "weight": 1.0
     },
     {
@@ -22656,13 +22656,24 @@
     },
     {
       "source": "scripts_verify_run_output",
+      "target": "scripts_verify_run_output_check_url_alive",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/verify_run_output.py",
+      "source_location": "L102",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_verify_run_output",
       "target": "scripts_verify_run_output_check_b2_key_alive",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L117",
+      "source_location": "L123",
       "weight": 1.0
     },
     {
@@ -22673,7 +22684,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L135",
+      "source_location": "L141",
       "weight": 1.0
     },
     {
@@ -22684,7 +22695,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L188",
+      "source_location": "L194",
       "weight": 1.0
     },
     {
@@ -22695,7 +22706,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L226",
+      "source_location": "L232",
       "weight": 1.0
     },
     {
@@ -22706,7 +22717,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L241",
+      "source_location": "L247",
       "weight": 1.0
     },
     {
@@ -22717,7 +22728,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L270",
+      "source_location": "L276",
       "weight": 1.0
     },
     {
@@ -22728,18 +22739,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L85",
-      "weight": 1.0
-    },
-    {
-      "source": "scripts_verify_run_output",
-      "target": "scripts_verify_run_output_check_url_alive",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "scripts/verify_run_output.py",
-      "source_location": "L96",
+      "source_location": "L91",
       "weight": 1.0
     },
     {
@@ -24503,58 +24503,58 @@
       "weight": 1.0
     },
     {
-      "source": "scripts_verify_run_output_rationale_118",
-      "target": "scripts_verify_run_output_check_b2_key_alive",
-      "relation": "rationale_for",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "scripts/verify_run_output.py",
-      "source_location": "L118",
-      "weight": 1.0
-    },
-    {
-      "source": "scripts_verify_run_output_rationale_136",
-      "target": "scripts_verify_run_output_verify_shot_breakdown_script",
-      "relation": "rationale_for",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "scripts/verify_run_output.py",
-      "source_location": "L136",
-      "weight": 1.0
-    },
-    {
-      "source": "scripts_verify_run_output_rationale_189",
-      "target": "scripts_verify_run_output_verify_video_generated_script",
-      "relation": "rationale_for",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "scripts/verify_run_output.py",
-      "source_location": "L189",
-      "weight": 1.0
-    },
-    {
-      "source": "scripts_verify_run_output_rationale_227",
-      "target": "scripts_verify_run_output_check_stalled_scripts",
-      "relation": "rationale_for",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "scripts/verify_run_output.py",
-      "source_location": "L227",
-      "weight": 1.0
-    },
-    {
-      "source": "scripts_verify_run_output_rationale_97",
+      "source": "scripts_verify_run_output_rationale_103",
       "target": "scripts_verify_run_output_check_url_alive",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/verify_run_output.py",
-      "source_location": "L97",
+      "source_location": "L103",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_verify_run_output_rationale_124",
+      "target": "scripts_verify_run_output_check_b2_key_alive",
+      "relation": "rationale_for",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/verify_run_output.py",
+      "source_location": "L124",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_verify_run_output_rationale_142",
+      "target": "scripts_verify_run_output_verify_shot_breakdown_script",
+      "relation": "rationale_for",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/verify_run_output.py",
+      "source_location": "L142",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_verify_run_output_rationale_195",
+      "target": "scripts_verify_run_output_verify_video_generated_script",
+      "relation": "rationale_for",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/verify_run_output.py",
+      "source_location": "L195",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_verify_run_output_rationale_233",
+      "target": "scripts_verify_run_output_check_stalled_scripts",
+      "relation": "rationale_for",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/verify_run_output.py",
+      "source_location": "L233",
       "weight": 1.0
     },
     {
@@ -25184,5 +25184,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "c183001da3fd120fd9b60b758e31a4dc7599964b"
+  "built_at_commit": "17685e5e864cf07582e1ea65d8b09a3156896938"
 }
