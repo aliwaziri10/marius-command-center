@@ -49,6 +49,12 @@ the B2 vars) crashed with a KeyError on B2_ENDPOINT_URL before a single
 line of this script's actual logic ran. Fixed by moving the import inside
 check_b2_key_alive(), so it's only loaded - and only requires B2 env vars
 - when the video_generation stage actually calls it.
+
+SHOT-COUNT RANGE FIX (2026-11-12): the planner (shot_breakdown_stage.py)
+now writes about one shot per 5 seconds of narration (about 200 shots for a
+17 minute script) instead of 25-35 shots in total. MAX_SHOTS raised from 35
+to 450 so correct new plans are not reported as broken. Old scripts with
+25-35 shots still pass.
 """
 import argparse
 import json
@@ -67,7 +73,7 @@ HEADERS = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
 # CONTRACT, not the implementation, and should keep working even if
 # someone refactors shot_breakdown_stage.py's internals.
 MIN_SHOTS = 25
-MAX_SHOTS = 35
+MAX_SHOTS = 450
 
 CHECK_SAMPLE_SIZE = 5        # most-recent N scripts per relevant status, each run
 MIN_VIDEO_BYTES = 1_000_000  # 1MB floor - catches empty/near-empty/truncated uploads
