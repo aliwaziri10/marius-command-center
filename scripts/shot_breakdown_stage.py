@@ -1,209 +1,70 @@
 """
 Marius Command Center - Shot Breakdown Stage
 Stage 2 of script generation: from a confirmed-length narration, build the
-shot-by-shot visual production plan, in chunks small enough to fit under
-the LLM's per-request token ceiling.
+shot-by-shot visual production plan.
 
-SPLIT OUT (2026-08-18): relocated from script_writing.py with no behavior
-change. See script_writing.py's module docstring for full history.
+REWRITE 2026-11-12 (quality fix plan, step 1). Script 17fc73b3 produced a
+video with one woman on screen for 17 minutes, morphing faces and objects
+appearing from nowhere. Measured causes fixed here:
+  1. 30 shots for 1,020 s of narration = 34 s per shot. The Kaggle clip
+     generator chains 4 s pieces, so long shots drift and morph. The planner
+     now writes about ONE SHOT PER 4-6 SECONDS of narration (about 200 shots
+     for a 17 minute script). Narration length is estimated from word count
+     (WORDS_PER_SECOND) and split into segments of about CHUNK_TARGET_SECONDS.
+  2. The protagonist limit was blind: it only counted shots whose
+     primary_subject tag was filled in, and the tags were empty. The
+     protagonist is now counted BY NAME (prompt_focus.protagonist_name) in
+     visual_description and primary_subject, with a hard cap of
+     PROTAGONIST_MAX_RATIO (30%) per segment and over the whole episode.
+  3. Every shot is written as ONE visible action given as a direct command,
+     with every object in frame named (nothing may appear from nowhere).
+  4. The video model draws faces badly: wide/medium shots are preferred, and
+     face close-ups are repaired to medium shots.
+Each segment is validated and retried on its own (up to CHUNK_MAX_ATTEMPTS)
+with the reason fed back into the prompt, so one bad segment no longer throws
+away the whole 17-segment run. Checks that are always mechanically fixable
+(zoom ratio, location establishing, subject runs, face close-ups, readable
+text) are repaired in place instead of rejecting.
 
-DIRECTOR FEATURES ADDED (2026-08-20): lighting, beat_intensity, and
-location_tag per-shot fields, plus an episode-wide color_palette anchor
-(carried across chunks the same way setting_and_characters is).
-
-WRITER/CHECKER SPLIT (2026-08-20, Loop Skill 2): once a stitched shot list
-passes validate_and_normalize_shot_response's deterministic checks, it's
-now also graded by a fresh, independent LLM call
-(quality_checker.grade_shot_breakdown) against the channel's house rules -
-catches violations (shots that dodge the banned-phrase keyword scans via
-paraphrasing, visual drift from the setting anchor, monotonous pacing) that
-slip past keyword/structural checks while still violating their spirit. A
-checker rejection is treated exactly like any other content failure below -
-same retry/wait/attempt-count loop, no new infra.
-
-ANACHRONISM KEYWORD GATE (2026-08-24): the video-generation prompt has
-carried a strong negative-instruction ANACHRONISM_GUARD since 2026-08-02
-(video_generation.py), but Zia reported laptops/drones/modern objects
-still routinely appearing in period episodes (1920s-1990s settings). Root
-cause: nothing upstream of Agnes ever checked whether the WRITER's own
-visual_description text already named a modern object - if the shot list
-itself says "a laptop open on the desk," no amount of negative prompting
-downstream can reliably suppress an object the positive instruction
-explicitly asked for. This mirrors the exact same class of bug the
-onscreen-text keyword gate (ONSCREEN_TEXT_KEYWORDS /
-find_missing_onscreen_text_shots) already exists to catch - a deterministic
-keyword scan on the writer's own output, at generation time, is a much
-harder guarantee than a negative instruction handed to a video model that's
-known to weight "no X" instructions unreliably. See MODERN_OBJECT_KEYWORDS /
-find_anachronistic_object_shots below.
-
-DOCUMENTARY-STYLE TIGHTENING (2026-09-08): Zia reported the protagonist
-still appears in too many scenes for a documentary feel (wants heavier
-emphasis on setting/context/B-roll, not a person-in-every-shot movie
-storyboard). MAX_SUBJECT_SHOT_RATIO lowered 0.30->0.20 and
-MAX_CONSECUTIVE_SAME_SUBJECT lowered 3->2, forcing more frequent cutaways
-to pure B-roll (landscapes, documents, objects, crowds, other people)
-between appearances of any single named subject.
-
-IDLE-CROWD KEYWORD GATE (2026-09-10): Zia separately reported crowds/
-groups standing around doing nothing as its own recurring realism problem
-(distinct from the general LOITERING_BANNED_PHRASES check, which is
-worded around a single person). Same class of fix as every other keyword
-gate in this file - a deterministic check on the writer's own output is a
-harder guarantee than a downstream negative instruction alone. See
-IDLE_CROWD_BANNED_PHRASES / find_idle_crowd_shots below, plus the matching
-crowd-specific negative_prompt terms added to prompt_builder.py the same
-session.
-
-ONSCREEN-TEXT AUTO-REPAIR (2026-09-12): this was, by a wide margin, the
-single largest cause of dead topics - live data showed it responsible for
-roughly half of all generation_failed topics, all with the exact same
-shape: Gemini names a newspaper/letter/sign/etc. in visual_description but
-leaves required_onscreen_text empty, despite the prompt's explicit
-FINAL CHECK instruction. Three content-attempt retries almost never fixed
-it, since it's a consistent instruction-following gap, not random noise -
-topics were burning all 3 attempts and dying for a cosmetic detail (an
-on-screen prop's readability) that has nothing to do with the shot's
-actual visual or narrative quality. Root cause of the "hard rejection"
-design: this started as a deterministic keyword gate modeled on the
-anachronism/idle-crowd gates above, which are correctly hard rejections
-because the flagged content (a modern object, an idle crowd) is a real
-defect. But an unfilled required_onscreen_text is not a content defect -
-it's a fixable omission. Changed from a hard rejection to a deterministic
-auto-repair (auto_repair_missing_onscreen_text): every flagged shot has its
-visual_description rewritten in place so the named object is present but
-no longer the readable focus (e.g. "held face-down", "closed on the
-shelf", "too distant to read"), and required_onscreen_text is left as "".
-This mirrors extract_json()'s repair-over-rejection pattern in
-llm_client.py. The keyword scan and prompt instruction are both left in
-place unchanged - this repair is a safety net for when the writer ignores
-that instruction, not a replacement for it.
-
-ONSCREEN-TEXT AUTO-REPAIR SELF-DEFEAT FIX (2026-09-13): confirmed live -
-the 2026-09-12 repair above never actually stopped a shot from being
-rejected. auto_repair_missing_onscreen_text() appends a clarifying phrase
-("...angled and lit so no text on it is legible...") to
-visual_description, but never removes the ORIGINAL keyword that triggered
-the flag (e.g. "newspaper") from the text - it's still sitting right
-there in the rewritten description. find_missing_onscreen_text_shots() is
-a pure keyword scan with no notion of "already repaired", so it
-re-scanned the same (still keyword-containing) text immediately after and
-flagged the exact same shot again as "still missing after auto-repair" -
-every single time, on every attempt, for every topic that hit this path.
-Live logs showed this exact pattern repeatedly: "Auto-repaired 1 shot(s)"
-immediately followed by "1 shot(s) still show ... after auto-repair
-(first at shot N)" - the repair was cosmetic and the hard-rejection
-fallback fired every time regardless, silently reverting this whole fix
-to the original all-or-nothing rejection it was meant to replace. Fixed
-by having auto_repair_missing_onscreen_text() return the set of shot
-indices it actually touched, and having validate_and_normalize_shot_
-response() exclude those indices when re-scanning for "still missing" -
-the post-repair check now only fails on a shot the repair function didn't
-even attempt to touch (a real logic gap between the two functions'
-keyword lists, the scenario the comment already anticipated), not on
-every shot the repair just ran on.
-
-SCHEMA-CONSTRAINED GENERATION + SUBJECT AUTO-REPAIR (2026-09-13): a single
-live run showed all 5 topics in the batch die, and the onscreen-text fix
-above accounted for only some of those deaths - the rest were genuinely
-malformed JSON from Gemini (several distinct shapes, see llm_client.py's
-matching docstring entries) and hard rejections on
-find_excessive_consecutive_subject/find_dominant_subject, the same class
-of "correct rule, unreliable LLM compliance" problem the onscreen-text
-rule had before its auto-repair fix above. Two changes, mirroring that
-same fix:
-(1) generate_shot_breakdown's call_llm() call now passes a response_schema
-(built by build_shot_breakdown_response_schema below) so Gemini's JSON
-structure - every field present, every enum field restricted to a valid
-value - is constrained by the API itself instead of by prose instructions
-alone. This does not replace any check in validate_and_normalize_shot_
-response - normalize_shot's own defaulting logic and every check below
-still run exactly as before, as the real safety net, in case Gemini's
-structured-output support has gaps for a schema this size.
-(2) find_excessive_consecutive_subject and find_dominant_subject were both
-hard rejections that burned a full content attempt whenever the writer
-held on one character too long. Both violations are always mechanically
-fixable the same safe way the onscreen-text one was: blanking a shot's
-primary_subject to "" is never wrong (SHOT_RULES_BLOCK already treats ""
-as intentional B-roll and explicitly asks for more of it), so both are now
-auto-repaired in place (auto_repair_excessive_consecutive_subject,
-auto_repair_dominant_subject) before the corresponding check runs, with
-the original hard-rejection message kept only as a safety net for a
-genuine logic gap in the repair itself.
-
-INT64-AS-STRING FIX (2026-09-14, INSUFFICIENT - see next entry): initial
-hypothesis was that minItems/maxItems needed to be JSON strings (Gemini's
-int64 schema convention). Wrapped both in str(). A live run immediately
-after this fix was deployed showed the EXACT SAME 100% reproducible 400
-INVALID_ARGUMENT on every single call, proving this hypothesis was either
-wrong or incomplete.
-
-MINITEMS/MAXITEMS REMOVED (2026-09-14): rather than guess at a third
-serialization format with no way to see Gemini's detailed error body (the
-400 response for this endpoint carries no further detail beyond
-"Request contains an invalid argument"), removed minItems/maxItems from
-the schema entirely. This is a safe removal, not a workaround: the
-function's own prior docstring already documented these two fields as
-"best effort" and NOT the real enforcement mechanism - shot_list length is
-authoritatively checked in generate_shot_breakdown (CHUNK_MIN_SHOTS/
-CHUNK_MAX_SHOTS) and validate_and_normalize_shot_response (MIN_SHOTS/
-MAX_SHOTS) regardless of whether the schema constrains it too. If this
-turns out not to be the actual cause of the 400, the next live failure's
-raw error should be captured and compared against the schema with
-properties/enum/required alone (no array bounds) to isolate whether the
-issue is elsewhere in the schema shape.
-
-LOCATION-ESTABLISHING AUTO-REPAIR (2026-09-14): with onscreen-text and
-subject-dominance now auto-repaired instead of hard-rejected, a live run
-showed find_location_change_without_establishing become the new dominant
-cause of dead topics by a wide margin - 4 of 5 topics in one batch died
-here, almost every single content attempt across them, all the same
-shape: a shot opens a new location_tag without shot_type being 'wide' or
-'establishing'. Same "correct rule, unreliable LLM compliance" pattern as
-the two fixes above, and the same safe mechanical fix applies: forcing the
-offending shot's shot_type to "establishing" is never wrong (it's a
-factually valid choice for any shot, and SHOT_RULES_BLOCK already asks for
-exactly this), so this is now auto-repaired
-(auto_repair_location_change_without_establishing) instead of rejecting
-the whole attempt, with the original hard-rejection message kept only as
-a safety net for a genuine logic gap in the repair itself.
-
-SCHEMA-CONSTRAINED GENERATION REVERTED FOR THIS CALL (2026-09-14,
-CONFIRMED): two straight guesses at the schema's shape (int64-as-string,
-then removing array bounds entirely) both failed to fix a 100%
-reproducible 400 INVALID_ARGUMENT - confirmed via a live run started
-AFTER the array-bounds-removal fix was already committed, which still
-hit the exact same error on every call. This endpoint's error body
-carries no further detail to diagnose a third guess against. The one
-clear, confirmed-working comparison point is topic_research.py's schema
-(small: 2-4 STRING/INTEGER properties per item, no enum fields)
-succeeding repeatedly on real live runs, versus this file's schema (16
-properties per shot item, several constrained to enum lists of 10-26
-values, nested inside a larger anchor object on the first chunk) failing
-every single time. Rather than continue guessing which part of a much
-larger, enum-heavy schema Gemini's structured-output mode is rejecting,
-generate_shot_breakdown() has been reverted to call_llm(prompt) with no
-response_schema - the same approach already proven reliable across many
-real historical runs via extract_json()'s repair pipeline (see
-llm_client.py) before schema-constrained generation was introduced.
-build_shot_breakdown_response_schema is left in the file, unused, in
-case a future session wants to retry structured output for this call
-with real visibility into why Gemini rejects it (e.g. testing with enum
-fields removed first, in isolation, to narrow down whether enums
-specifically are the trigger).
+HISTORY (condensed; full text is in git history before this rewrite):
+  2026-08-15 chunked breakdown; 08-20 director fields + writer/checker split;
+  08-24 anachronism gate; 08-25 duplicate-character gate; 09-08 documentary
+  tightening; 09-10 idle-crowd gate; 09-12/13 onscreen-text auto-repair;
+  09-13/14 subject and location auto-repair; 09-14 Gemini response_schema
+  tried and reverted (400 INVALID_ARGUMENT, cause never found) - this file
+  does NOT use response_schema, only prose rules plus extract_json repair.
 """
 
+import math
 import re
 import time
 from collections import Counter
 
 from llm_client import call_llm, extract_json, DailyQuotaExhausted, InfraFailure
 from quality_checker import grade_shot_breakdown
+from prompt_focus import protagonist_name, visual_has_people
 
-MIN_SHOTS = 25
-MAX_SHOTS = 35
-MAX_GENERATION_ATTEMPTS = 3
+# --- sizing -----------------------------------------------------------------
+WORDS_PER_SECOND = 2.5            # narration pace used to estimate length
+TARGET_SHOT_SECONDS = 5.0         # aim: one shot every ~5 s
+MIN_AVG_SHOT_SECONDS = 3.0        # more choppy than this is rejected
+MAX_AVG_SHOT_SECONDS = 7.0        # slower than this is rejected
+HARD_MAX_SHOT_SECONDS = 12.0      # no single shot may cover more narration
+CHUNK_TARGET_SECONDS = 60.0       # narration seconds per LLM call
+MIN_COVERAGE = 0.80               # shots must quote >= this share of the segment
+MIN_SHOTS = 25                    # sanity floor (matches verify_run_output.py)
+MAX_SHOTS = 450                   # sanity ceiling (matches verify_run_output.py)
+
+# --- retries ----------------------------------------------------------------
+MAX_GENERATION_ATTEMPTS = 2       # whole-plan attempts (checker rejection etc.)
+CHUNK_MAX_ATTEMPTS = 3            # attempts per segment
 MAX_INFRA_ATTEMPTS = 4
+CHUNK_RETRY_WAIT_SECONDS = 10
+SHOT_CHUNK_CALL_DELAY_SECONDS = 15
+CHECKER_WINDOW = 20               # shots per window sent to the checker
+CHECKER_WINDOWS = 3               # start, middle, end
+
+# --- text limits ------------------------------------------------------------
 MAX_HOOK_TEXT_CHARS = 40
 MAX_HOOK_TEXT_WORDS = 5
 MIN_SETTING_CHARS = 40
@@ -211,15 +72,6 @@ MAX_SETTING_CHARS = 900
 MIN_PALETTE_CHARS = 20
 MAX_PALETTE_CHARS = 400
 MAX_SHOT_REPEAT_COUNT = 2
-CONTENT_RETRY_WAIT_SECONDS = 25
-
-# CHUNKED SHOT BREAKDOWN (2026-08-15): see script_writing.py history.
-# Splitting one large shot request into smaller pieces keeps each call
-# comfortably under the provider's free-tier token ceiling.
-NUM_SHOT_CHUNKS = 2
-CHUNK_MIN_SHOTS = MIN_SHOTS // NUM_SHOT_CHUNKS
-CHUNK_MAX_SHOTS = -(-MAX_SHOTS // NUM_SHOT_CHUNKS)  # ceil division
-SHOT_CHUNK_CALL_DELAY_SECONDS = 20
 
 EXAMPLE_HOOK_TEXT = "312 DIARIES. ONE BOMB. GONE IN SECONDS."
 
@@ -232,30 +84,16 @@ VALID_CAMERA_MOVEMENTS = {
     "whip_pan", "handheld_shake", "orbit", "drone_rise", "drone_descend",
     "parallax", "focus_pull", "dutch_angle", "snap_zoom", "speed_ramp",
 }
-VALID_LENS_EFFECTS = {
-    "shallow_depth_of_field", "lens_flare", "film_grain", "none"
-}
-
-# DIRECTOR FEATURES (2026-08-20)
+VALID_LENS_EFFECTS = {"shallow_depth_of_field", "lens_flare", "film_grain", "none"}
 VALID_LIGHTING = {
     "dawn", "morning", "midday", "golden_hour", "dusk", "night",
     "overcast", "firelight", "interior_lamp", "moonlight",
 }
 DEFAULT_LIGHTING = "midday"
-
-# CINEMATOGRAPHER FIELDS (added, enhancing the existing structured schema
-# rather than adding a separate agent/pass - keeps one single authority
-# over every visual choice per shot, same as camera_movement/lighting
-# above, instead of Nova's disconnected second-pass DP-brief text that
-# frequently contradicts the shot writer's own camera pick).
 VALID_FRAMING_ANGLE = {"eye_level", "low_angle", "high_angle", "overhead"}
 DEFAULT_FRAMING_ANGLE = "eye_level"
-
 VALID_DEPTH_OF_FIELD = {"shallow", "deep", "standard"}
 DEFAULT_DEPTH_OF_FIELD = "standard"
-
-MAX_CONSECUTIVE_SAME_FRAMING_ANGLE = 2
-
 VALID_BEAT_INTENSITY = {"low", "mid", "high"}
 DEFAULT_BEAT_INTENSITY = "mid"
 
@@ -263,24 +101,18 @@ ZOOM_FAMILY_MOVEMENTS = {"push_in", "crash_zoom", "zoom_in", "snap_zoom", "dolly
 MAX_ZOOM_SHOT_RATIO = 0.32
 MAX_CONSECUTIVE_ZOOM_SHOTS = 2
 
-# DOCUMENTARY-STYLE TIGHTENING (2026-09-08): lowered from 3/0.30 - see
-# module docstring. Forces cutaways to B-roll more often, so no single
-# named subject dominates the episode's screentime the way a movie
-# storyboard (vs a real documentary edit) would.
+PROTAGONIST_MAX_RATIO = 0.30      # protagonist named in at most 30% of shots
 MAX_CONSECUTIVE_SAME_SUBJECT = 2
-MAX_SUBJECT_SHOT_RATIO = 0.20
+MAX_SUBJECT_SHOT_RATIO = 0.30
 
+# Only phrases that make a shot depend on the shot before/after it. A single
+# visible action ("a clerk stamps a file") is now REQUIRED, so action verbs
+# are no longer banned.
 CONTINUATION_BANNED_PHRASES = (
-    "continues to", "continues ", "then walks", "then runs", "then turns",
-    "then opens", "then reaches", "then picks", "then lifts", "then carries",
-    "then hands", "then pours", "still walking", "still running", "still turning",
-    "begins to walk", "begins to run", "begins to turn", "begins to open",
-    "starts to walk", "starts to run", "starts to turn", "starts to open",
-    "walking toward", "walking to ", "walks toward", "walks to ",
-    "running toward", "running to ", "runs toward", "runs to ",
-    "turning to", "turns to face", "reaching for", "reaches for",
-    "picks up and carries", "lifts and carries", "carries the",
-    "hands over the", "pours the", "opens the door and", "proceeds to",
+    "continues to", "continues ", "continuing to", "then walks", "then runs",
+    "then turns", "then opens", "then reaches", "then picks", "then lifts",
+    "then carries", "then hands", "then pours", "begins to ", "starts to ",
+    "proceeds to", "a moment later", "seconds later", "afterwards",
 )
 
 LOITERING_BANNED_PHRASES = (
@@ -290,10 +122,6 @@ LOITERING_BANNED_PHRASES = (
     "looking around aimlessly", "with nothing in particular",
 )
 
-# IDLE-CROWD KEYWORD GATE (2026-09-10): see module docstring. Deliberately
-# separate from LOITERING_BANNED_PHRASES - that list is worded around a
-# single person ("standing there"), while these phrases specifically
-# target a crowd/group described as a static, purposeless backdrop.
 IDLE_CROWD_BANNED_PHRASES = (
     "crowd stands", "crowd standing", "crowd stood", "crowd gathered watching",
     "crowd looks on", "crowd looking on", "crowd watches silently",
@@ -310,12 +138,6 @@ ONSCREEN_TEXT_KEYWORDS = (
     "ledger", "diary", "certificate", "gravestone", "tombstone",
 )
 
-# ANACHRONISM KEYWORD GATE (2026-08-24): unambiguous, era-independent
-# modern-technology terms only - deliberately does NOT include things like
-# "car" or "television" whose appropriateness is era-dependent (a 1990s
-# Sarajevo story can legitimately have cars). These are objects that are
-# never correct in any of this channel's historical episodes, matching
-# ANACHRONISM_GUARD's own explicit list in video_generation.py.
 MODERN_OBJECT_KEYWORDS = (
     "laptop", "computer screen", "computer monitor", "desktop computer",
     "smartphone", "smart phone", "cell phone", "cellphone", "mobile phone",
@@ -326,18 +148,6 @@ MODERN_OBJECT_KEYWORDS = (
     "cctv", "led light strip", "plastic water bottle",
 )
 
-# DUPLICATE-CHARACTER KEYWORD GATE (2026-08-25): Zia reported the same
-# named protagonist rendered TWICE in a single shot (e.g. two of the same
-# nurse visible together) despite DISTINCT_INDIVIDUALS_GUARD already being
-# live in every video_generation.py prompt at the time this episode was
-# written - confirming the negative video-model instruction alone isn't a
-# reliable defense here either, same class of problem as the anachronism
-# gate above. This catches the case where the WRITER's own
-# visual_description explicitly calls for two instances of the same
-# person (a mirror/reflection, a double, a twin, "both her and her") -
-# deliberately narrow/conservative wording only, to avoid false-positives
-# on legitimate multi-person crowd shots that happen to use "two" or
-# "both" for genuinely different people.
 DUPLICATE_CHARACTER_KEYWORDS = (
     "her own reflection standing", "his own reflection standing",
     "mirror image of her", "mirror image of him",
@@ -351,75 +161,88 @@ DUPLICATE_CHARACTER_KEYWORDS = (
     "both her and her", "both him and him",
 )
 
+FACE_WORDS = ("face", "faces", "eye", "eyes", "gaze", "stare", "staring", "portrait", "expression")
+
+
+class ChunkFailure(Exception):
+    """A segment could not be produced after CHUNK_MAX_ATTEMPTS attempts."""
+
+
+# --- sizing helpers ----------------------------------------------------------
+
+def estimate_seconds(text):
+    return len((text or "").split()) / WORDS_PER_SECOND
+
+
+def plan_chunking(narration_text):
+    total = estimate_seconds(narration_text)
+    return total, max(1, int(round(total / CHUNK_TARGET_SECONDS)))
+
+
+def shot_bounds(seconds):
+    lo = max(1, int(seconds // MAX_AVG_SHOT_SECONDS))
+    hi = max(lo + 1, int(math.ceil(seconds / MIN_AVG_SHOT_SECONDS)))
+    return lo, hi
+
+
+def protagonist_cap(shot_count):
+    return max(1, int(shot_count * PROTAGONIST_MAX_RATIO))
+
 
 def split_narration_into_chunks(narration_text, num_chunks):
-    """Splits narration into num_chunks pieces, breaking only at sentence
-    boundaries (never mid-sentence) and balancing word count across pieces
-    as evenly as possible. Each chunk becomes its own, much smaller,
-    shot-breakdown call."""
+    """Splits narration into num_chunks pieces at sentence boundaries,
+    balancing word count as evenly as possible."""
     sentences = re.split(r"(?<=[.!?])\s+", narration_text.strip())
     sentences = [s for s in sentences if s.strip()]
-
     if len(sentences) <= num_chunks:
         return [s.strip() for s in sentences] or [narration_text.strip()]
-
     total_words = sum(len(s.split()) for s in sentences)
     target_words = total_words / num_chunks
-
-    chunks = []
-    current = []
-    current_words = 0
+    chunks, current, current_words = [], [], 0
     for sentence in sentences:
         current.append(sentence)
         current_words += len(sentence.split())
         if current_words >= target_words and len(chunks) < num_chunks - 1:
             chunks.append(" ".join(current).strip())
-            current = []
-            current_words = 0
+            current, current_words = [], 0
     if current:
         chunks.append(" ".join(current).strip())
-
     return chunks
 
+
+# --- normalisation -----------------------------------------------------------
 
 def normalize_shot(shot, index):
     shot_type = shot.get("shot_type")
     if shot_type not in VALID_SHOT_TYPES:
         shot_type = "medium"
-
     camera_movement = shot.get("camera_movement")
     if camera_movement not in VALID_CAMERA_MOVEMENTS:
         camera_movement = "static"
-
     lens_effect = shot.get("lens_effect")
     if lens_effect not in VALID_LENS_EFFECTS:
         lens_effect = "none"
-
     lighting = shot.get("lighting")
     if lighting not in VALID_LIGHTING:
         lighting = DEFAULT_LIGHTING
-
     beat_intensity = shot.get("beat_intensity")
     if beat_intensity not in VALID_BEAT_INTENSITY:
         beat_intensity = DEFAULT_BEAT_INTENSITY
-
     framing_angle = shot.get("framing_angle")
     if framing_angle not in VALID_FRAMING_ANGLE:
         framing_angle = DEFAULT_FRAMING_ANGLE
-
     depth_of_field = shot.get("depth_of_field")
     if depth_of_field not in VALID_DEPTH_OF_FIELD:
         depth_of_field = DEFAULT_DEPTH_OF_FIELD
-
     return {
         "shot_number": shot.get("shot_number", index + 1),
-        "visual_description": shot.get("visual_description", ""),
-        "narration_excerpt": shot.get("narration_excerpt", ""),
+        "visual_description": shot.get("visual_description", "") or "",
+        "narration_excerpt": shot.get("narration_excerpt", "") or "",
         "shot_type": shot_type,
         "camera_movement": camera_movement,
-        "camera_reason": shot.get("camera_reason", ""),
+        "camera_reason": shot.get("camera_reason", "") or "",
         "lens_effect": lens_effect,
-        "sfx_cue": shot.get("sfx_cue", ""),
+        "sfx_cue": shot.get("sfx_cue", "") or "",
         "primary_subject": (shot.get("primary_subject") or "").strip(),
         "required_onscreen_text": (shot.get("required_onscreen_text") or "").strip(),
         "lighting": lighting,
@@ -434,7 +257,6 @@ def normalize_hook_text(result):
     hook_text = (result.get("hook_text") or "").strip()
     if hook_text:
         return hook_text[:MAX_HOOK_TEXT_CHARS].rstrip()
-
     shot_list = result.get("shot_list") or []
     if shot_list:
         fallback = (shot_list[0].get("narration_excerpt") or "").strip()
@@ -442,100 +264,82 @@ def normalize_hook_text(result):
             return fallback
         if fallback:
             return fallback[:MAX_HOOK_TEXT_CHARS].rsplit(" ", 1)[0] + "..."
-
     return ""
 
 
 def hook_text_matches_prompt_example(hook_text):
     def _simplify(s):
         return "".join(ch.lower() for ch in s if ch.isalnum())
-
     return _simplify(hook_text) == _simplify(EXAMPLE_HOOK_TEXT)
 
 
 def hook_text_too_long_to_glance(hook_text):
-    word_count = len(hook_text.split())
-    return word_count > MAX_HOOK_TEXT_WORDS
+    return len(hook_text.split()) > MAX_HOOK_TEXT_WORDS
 
 
 def hook_text_matches_story(hook_text, narration_text):
     if not hook_text or not narration_text:
         return False
-
     narration_lower = narration_text.lower()
     hook_words = [w.strip(".,!?\"'").lower() for w in hook_text.split()]
     meaningful_words = [w for w in hook_words if len(w) >= 4]
-
     if not meaningful_words:
         return True
-
     return any(w in narration_lower for w in meaningful_words)
 
 
-def find_duplicate_shots(normalized_shots):
+# --- detectors ---------------------------------------------------------------
+
+def find_duplicate_shots(shots):
     pair_counts = Counter(
         ((s["visual_description"] or "").strip().lower(), (s["narration_excerpt"] or "").strip().lower())
-        for s in normalized_shots
+        for s in shots
     )
-    return [
-        (visual, narration, count)
-        for (visual, narration), count in pair_counts.items()
-        if visual and count > MAX_SHOT_REPEAT_COUNT
-    ]
+    return [(v, n, c) for (v, n), c in pair_counts.items() if v and c > MAX_SHOT_REPEAT_COUNT]
 
 
-def find_empty_shots(normalized_shots):
+def find_empty_shots(shots):
     return [
-        i for i, s in enumerate(normalized_shots)
+        i for i, s in enumerate(shots)
         if not (s["visual_description"] or "").strip() or not (s["narration_excerpt"] or "").strip()
     ]
 
 
-def find_continuation_language_shots(normalized_shots):
+def _phrase_hits(shots, phrases):
     hits = []
-    for i, s in enumerate(normalized_shots):
+    for i, s in enumerate(shots):
         desc = (s["visual_description"] or "").lower()
-        for phrase in CONTINUATION_BANNED_PHRASES:
+        for phrase in phrases:
             if phrase in desc:
                 hits.append((i, phrase))
                 break
     return hits
 
 
-def find_loitering_shots(normalized_shots):
-    hits = []
-    for i, s in enumerate(normalized_shots):
-        desc = (s["visual_description"] or "").lower()
-        for phrase in LOITERING_BANNED_PHRASES:
-            if phrase in desc:
-                hits.append((i, phrase))
-                break
-    return hits
+def find_continuation_language_shots(shots):
+    return _phrase_hits(shots, CONTINUATION_BANNED_PHRASES)
 
 
-def find_idle_crowd_shots(normalized_shots):
-    """IDLE-CROWD KEYWORD GATE (2026-09-10): see module docstring."""
-    hits = []
-    for i, s in enumerate(normalized_shots):
-        desc = (s["visual_description"] or "").lower()
-        for phrase in IDLE_CROWD_BANNED_PHRASES:
-            if phrase in desc:
-                hits.append((i, phrase))
-                break
-    return hits
+def find_loitering_shots(shots):
+    return _phrase_hits(shots, LOITERING_BANNED_PHRASES)
 
 
-def find_missing_onscreen_text_shots(normalized_shots, skip_indices=None):
-    """ONSCREEN-TEXT AUTO-REPAIR SELF-DEFEAT FIX (2026-09-13): accepts an
-    optional set of shot indices to skip - used to exclude shots that
-    auto_repair_missing_onscreen_text() already rewrote, since that
-    repair does not (and by design cannot, without breaking the object's
-    continuity with the rest of the shot) remove the original keyword
-    from visual_description, so a plain re-scan would immediately
-    re-flag the exact same shot it just "fixed". See module docstring."""
+def find_idle_crowd_shots(shots):
+    return _phrase_hits(shots, IDLE_CROWD_BANNED_PHRASES)
+
+
+def find_anachronistic_object_shots(shots):
+    return _phrase_hits(shots, MODERN_OBJECT_KEYWORDS)
+
+
+def find_duplicate_character_shots(shots):
+    return _phrase_hits(shots, DUPLICATE_CHARACTER_KEYWORDS)
+
+
+def find_missing_onscreen_text_shots(shots, skip_indices=None):
     skip_indices = skip_indices or set()
     hits = []
-    for i, s in enumerate(normalized_shots):
+    for i, s in enumerate(shots):
         if i in skip_indices:
             continue
         desc = (s["visual_description"] or "").lower()
@@ -544,76 +348,35 @@ def find_missing_onscreen_text_shots(normalized_shots, skip_indices=None):
     return hits
 
 
-def auto_repair_missing_onscreen_text(normalized_shots):
-    """ONSCREEN-TEXT AUTO-REPAIR (2026-09-12): see module docstring. For
-    every shot flagged by find_missing_onscreen_text_shots, deterministically
-    rewrite visual_description in place so the named object is present but
-    no longer positioned as readable/legible, instead of rejecting the
-    entire shot list over one omitted field. Mutates normalized_shots
-    in place and returns the SET of shot indices repaired (changed from a
-    plain count on 2026-09-13 - see module docstring's SELF-DEFEAT FIX -
-    so the caller can exclude these exact shots from the post-repair
-    re-scan, since the rewritten text still legitimately contains the
-    original keyword)."""
-    repaired_indices = set()
-    for i, s in enumerate(normalized_shots):
-        desc = (s["visual_description"] or "")
-        desc_lower = desc.lower()
-        if any(kw in desc_lower for kw in ONSCREEN_TEXT_KEYWORDS) and not s["required_onscreen_text"]:
-            s["visual_description"] = (
-                desc.rstrip(". ")
-                + ", angled and lit so no text on it is legible to the viewer."
-            )
-            repaired_indices.add(i)
-    return repaired_indices
+def shot_mentions_protagonist(shot, name):
+    text = " ".join([shot.get("visual_description") or "", shot.get("primary_subject") or ""]).lower()
+    if name and re.search(r"\b" + re.escape(name.lower()) + r"\b", text):
+        return True
+    return "protagonist" in text or "main character" in text
 
 
-def find_anachronistic_object_shots(normalized_shots):
-    """ANACHRONISM KEYWORD GATE (2026-08-24): catches shots whose own
-    visual_description names an unambiguous modern object, regardless of
-    story era. This is a deterministic pre-generation check, independent
-    of (and much stronger than) the negative ANACHRONISM_GUARD instruction
-    handed to Agnes downstream - see module docstring."""
-    hits = []
-    for i, s in enumerate(normalized_shots):
-        desc = (s["visual_description"] or "").lower()
-        for kw in MODERN_OBJECT_KEYWORDS:
-            if kw in desc:
-                hits.append((i, kw))
-                break
-    return hits
+def protagonist_shot_indices(shots, name):
+    return [i for i, s in enumerate(shots) if shot_mentions_protagonist(s, name)]
 
 
-def find_duplicate_character_shots(normalized_shots):
-    """DUPLICATE-CHARACTER KEYWORD GATE (2026-08-25): see module docstring
-    and DUPLICATE_CHARACTER_KEYWORDS comment above."""
-    hits = []
-    for i, s in enumerate(normalized_shots):
-        desc = (s["visual_description"] or "").lower()
-        for kw in DUPLICATE_CHARACTER_KEYWORDS:
-            if kw in desc:
-                hits.append((i, kw))
-                break
-    return hits
+def seconds_for_excerpt(excerpt):
+    return estimate_seconds(excerpt)
 
 
-def find_dominant_subject(normalized_shots):
-    subject_counts = Counter(
-        s["primary_subject"].lower() for s in normalized_shots if s["primary_subject"]
-    )
+def find_dominant_subject(shots):
+    subject_counts = Counter(s["primary_subject"].lower() for s in shots if s["primary_subject"])
     if not subject_counts:
         return None
     subject, count = subject_counts.most_common(1)[0]
-    ratio = count / len(normalized_shots)
+    ratio = count / len(shots)
     if ratio > MAX_SUBJECT_SHOT_RATIO:
         return subject, count, ratio
     return None
 
 
-def find_excessive_consecutive_subject(normalized_shots):
-    run_subject = None
-    run_length = 0
-    for i, s in enumerate(normalized_shots):
+def find_excessive_consecutive_subject(shots):
+    run_subject, run_length = None, 0
+    for i, s in enumerate(shots):
         subject = s["primary_subject"].lower()
         if subject and subject == run_subject:
             run_length += 1
@@ -625,74 +388,9 @@ def find_excessive_consecutive_subject(normalized_shots):
     return None
 
 
-def auto_repair_excessive_consecutive_subject(normalized_shots):
-    """CONSECUTIVE-SUBJECT AUTO-REPAIR (2026-09-13): mirrors the onscreen-
-    text auto-repair pattern above (2026-09-12) - blanking a shot's
-    primary_subject to "" is always safe (SHOT_RULES_BLOCK already treats
-    "" as intentional B-roll and explicitly asks for more of it), so a run
-    longer than MAX_CONSECUTIVE_SAME_SUBJECT can be mechanically broken up
-    by blanking every shot past the allowed run length, instead of
-    rejecting the entire shot list and hoping a fresh generation does
-    better on a rule the writer has repeatedly struggled to hold to
-    unaided (see DOCUMENTARY-STYLE TIGHTENING module docstring entry).
-    Mutates normalized_shots in place and returns the set of repaired
-    indices."""
-    repaired_indices = set()
-    run_subject = None
-    run_length = 0
-    for i, s in enumerate(normalized_shots):
-        subject_lower = s["primary_subject"].lower()
-        if subject_lower and subject_lower == run_subject:
-            run_length += 1
-        else:
-            run_subject = subject_lower
-            run_length = 1 if subject_lower else 0
-        if subject_lower and run_length > MAX_CONSECUTIVE_SAME_SUBJECT:
-            s["primary_subject"] = ""
-            repaired_indices.add(i)
-            run_subject = None
-            run_length = 0
-    return repaired_indices
-
-
-def auto_repair_dominant_subject(normalized_shots):
-    """DOMINANT-SUBJECT AUTO-REPAIR (2026-09-13): same reasoning as above -
-    if one named subject is the primary_subject of more than
-    MAX_SUBJECT_SHOT_RATIO of all shots, mechanically blank enough of
-    their occurrences (picked from the middle of their remaining
-    appearances outward on each pass, so cuts spread through the episode
-    rather than clustering at the start or end) to bring the ratio into
-    compliance, instead of rejecting the whole shot list. Mutates
-    normalized_shots in place and returns the set of repaired indices."""
-    repaired_indices = set()
-    total = len(normalized_shots)
-    if total == 0:
-        return repaired_indices
-    max_allowed = int(total * MAX_SUBJECT_SHOT_RATIO)
-    while True:
-        subject_counts = Counter(
-            s["primary_subject"].lower() for s in normalized_shots if s["primary_subject"]
-        )
-        if not subject_counts:
-            break
-        subject, count = subject_counts.most_common(1)[0]
-        if count <= max_allowed:
-            break
-        indices = [i for i, s in enumerate(normalized_shots) if s["primary_subject"].lower() == subject]
-        idx_to_blank = indices[len(indices) // 2]
-        normalized_shots[idx_to_blank]["primary_subject"] = ""
-        repaired_indices.add(idx_to_blank)
-    return repaired_indices
-
-
-def find_location_change_without_establishing(normalized_shots):
-    """DIRECTOR FEATURE (2026-08-20): whenever location_tag changes between
-    consecutive shots (and both are non-empty), the new shot must be
-    'wide' or 'establishing' shot_type. Shots with no location_tag set are
-    skipped entirely (opt-in field, never blocks scripts that don't use it)."""
+def find_location_change_without_establishing(shots, prev_location=None):
     hits = []
-    prev_location = None
-    for i, s in enumerate(normalized_shots):
+    for i, s in enumerate(shots):
         loc = s["location_tag"]
         if loc and prev_location and loc.lower() != prev_location.lower():
             if s["shot_type"] not in ("wide", "establishing"):
@@ -702,754 +400,538 @@ def find_location_change_without_establishing(normalized_shots):
     return hits
 
 
-def auto_repair_location_change_without_establishing(normalized_shots):
-    """LOCATION-ESTABLISHING AUTO-REPAIR (2026-09-14): see module docstring -
-    this became the new dominant cause of dead topics once the onscreen-
-    text/subject checks above stopped hard-rejecting. Forcing the offending
-    shot's shot_type to "establishing" is always a safe, valid choice for
-    any shot (unlike, say, inventing new visual content), so this is
-    mechanically repaired the same way instead of rejecting the whole
-    attempt. Also nudges depth_of_field back to "standard" when it was
-    "shallow", since SHOT_RULES_BLOCK itself says shallow only reads
-    correctly on medium/close_up/extreme_close_up shots - a small
-    consistency bonus alongside the real fix, not a separate requirement.
-    Mirrors find_location_change_without_establishing's own loop exactly,
-    so it flags/repairs precisely the same shots that function would find.
-    Mutates normalized_shots in place and returns the set of repaired
-    indices."""
-    repaired_indices = set()
-    prev_location = None
-    for i, s in enumerate(normalized_shots):
+# --- auto-repairs (always safe, mechanical) ----------------------------------
+
+def auto_repair_missing_onscreen_text(shots):
+    repaired = set()
+    for i, s in enumerate(shots):
+        desc = s["visual_description"] or ""
+        if any(kw in desc.lower() for kw in ONSCREEN_TEXT_KEYWORDS) and not s["required_onscreen_text"]:
+            s["visual_description"] = desc.rstrip(". ") + ", angled and lit so no text on it is legible to the viewer."
+            repaired.add(i)
+    return repaired
+
+
+def auto_repair_excessive_consecutive_subject(shots):
+    repaired = set()
+    run_subject, run_length = None, 0
+    for i, s in enumerate(shots):
+        subject_lower = s["primary_subject"].lower()
+        if subject_lower and subject_lower == run_subject:
+            run_length += 1
+        else:
+            run_subject = subject_lower
+            run_length = 1 if subject_lower else 0
+        if subject_lower and run_length > MAX_CONSECUTIVE_SAME_SUBJECT:
+            s["primary_subject"] = ""
+            repaired.add(i)
+            run_subject, run_length = None, 0
+    return repaired
+
+
+def auto_repair_dominant_subject(shots):
+    repaired = set()
+    total = len(shots)
+    if total == 0:
+        return repaired
+    max_allowed = int(total * MAX_SUBJECT_SHOT_RATIO)
+    while True:
+        counts = Counter(s["primary_subject"].lower() for s in shots if s["primary_subject"])
+        if not counts:
+            break
+        subject, count = counts.most_common(1)[0]
+        if count <= max_allowed:
+            break
+        indices = [i for i, s in enumerate(shots) if s["primary_subject"].lower() == subject]
+        idx = indices[len(indices) // 2]
+        shots[idx]["primary_subject"] = ""
+        repaired.add(idx)
+    return repaired
+
+
+def auto_repair_location_change_without_establishing(shots, prev_location=None):
+    repaired = set()
+    for i, s in enumerate(shots):
         loc = s["location_tag"]
         if loc and prev_location and loc.lower() != prev_location.lower():
             if s["shot_type"] not in ("wide", "establishing"):
                 s["shot_type"] = "establishing"
                 if s["depth_of_field"] == "shallow":
                     s["depth_of_field"] = "standard"
-                repaired_indices.add(i)
+                repaired.add(i)
         if loc:
             prev_location = loc
-    return repaired_indices
+    return repaired
+
+
+def auto_repair_zoom_discipline(shots):
+    """Breaks zoom runs and trims the zoom share to MAX_ZOOM_SHOT_RATIO by
+    switching offending shots to a calm camera. Returns repaired indices."""
+    repaired = set()
+    run = 0
+    for i, s in enumerate(shots):
+        if s["camera_movement"] in ZOOM_FAMILY_MOVEMENTS:
+            run += 1
+            if run > MAX_CONSECUTIVE_ZOOM_SHOTS:
+                s["camera_movement"] = "pan_right" if i % 2 else "pan_left"
+                repaired.add(i)
+                run = 0
+        else:
+            run = 0
+
+    def zoomy(s):
+        return s["camera_movement"] in ZOOM_FAMILY_MOVEMENTS or s["shot_type"] == "extreme_close_up"
+
+    limit = int(len(shots) * MAX_ZOOM_SHOT_RATIO)
+    for i, s in enumerate(shots):
+        if sum(1 for x in shots if zoomy(x)) <= limit:
+            break
+        if zoomy(s):
+            if s["camera_movement"] in ZOOM_FAMILY_MOVEMENTS:
+                s["camera_movement"] = "static"
+            if s["shot_type"] == "extreme_close_up":
+                s["shot_type"] = "close_up"
+            repaired.add(i)
+    return repaired
+
+
+def auto_repair_face_closeups(shots):
+    """The video model draws faces badly: a close-up whose description is
+    about a face/eyes becomes a medium shot."""
+    repaired = set()
+    for i, s in enumerate(shots):
+        if s["shot_type"] not in ("close_up", "extreme_close_up"):
+            continue
+        desc = (s["visual_description"] or "").lower()
+        if visual_has_people(desc) and any(re.search(r"\b" + w + r"\b", desc) for w in FACE_WORDS):
+            s["shot_type"] = "medium"
+            if s["depth_of_field"] == "shallow":
+                s["depth_of_field"] = "standard"
+            repaired.add(i)
+    return repaired
+
+
+def scrub_protagonist(shot, name):
+    """LAST RESORT when a segment still names the protagonist too often:
+    the name is replaced so the shot no longer carries the protagonist."""
+    desc = shot["visual_description"]
+    if name:
+        desc = re.sub(r"\b" + re.escape(name) + r"\b", "an unidentified person", desc)
+    desc = re.sub(r"\bthe (?:recurring )?protagonist\b", "an unidentified person", desc, flags=re.IGNORECASE)
+    desc = re.sub(r"\bthe main character\b", "an unidentified person", desc, flags=re.IGNORECASE)
+    shot["visual_description"] = desc
+    shot["primary_subject"] = ""
+
+
+def enforce_protagonist_cap(shots, name):
+    """Scrubs the middle occurrences until the cap holds. Returns the count scrubbed."""
+    if not name and not any("protagonist" in (s["visual_description"] or "").lower() for s in shots):
+        return 0
+    scrubbed = 0
+    cap = protagonist_cap(len(shots))
+    while True:
+        idx = protagonist_shot_indices(shots, name)
+        if len(idx) <= cap:
+            break
+        pick = idx[len(idx) // 2]
+        scrub_protagonist(shots[pick], name)
+        scrubbed += 1
+        if scrubbed > len(shots):
+            break
+    return scrubbed
+
+
+# --- validation --------------------------------------------------------------
+
+def anchor_problem(setting, palette):
+    if len(setting) < MIN_SETTING_CHARS:
+        return (f"setting_and_characters missing or too short ({len(setting)} chars, need at least "
+                f"{MIN_SETTING_CHARS}) - fix the real-world location/era/ethnicity and describe every "
+                f"recurring character's appearance")
+    if len(palette) < MIN_PALETTE_CHARS:
+        return (f"color_palette missing or too short ({len(palette)} chars, need at least "
+                f"{MIN_PALETTE_CHARS}) - give a concrete episode-wide color and mood palette")
+    return None
+
+
+def anchor_declares_no_protagonist(anchor):
+    low = (anchor or "").lower()
+    return "no single recurring protagonist" in low or "no individually" in low or "no recurring protagonist" in low
+
+
+def hook_problem(parsed, shot_list_raw, narration_text):
+    hook = normalize_hook_text({"hook_text": parsed.get("hook_text"), "shot_list": shot_list_raw})
+    if hook_text_matches_prompt_example(hook):
+        return "hook_text copied the prompt's example verbatim - write a real one from this story"
+    if hook_text_too_long_to_glance(hook):
+        return f"hook_text is {len(hook.split())} words - max {MAX_HOOK_TEXT_WORDS}"
+    if not hook_text_matches_story(hook, narration_text):
+        return f"hook_text {hook!r} does not appear related to this story's narration"
+    return None
+
+
+def content_problems(shots):
+    """Hard content checks shared by segment and whole-list validation.
+    Returns a reason string, or None when everything passes."""
+    empty = find_empty_shots(shots)
+    if empty:
+        return (f"{len(empty)} shot(s) have an empty visual_description and/or narration_excerpt "
+                f"(first at shot {empty[0] + 1}) - every shot needs real content")
+    dups = find_duplicate_shots(shots)
+    if dups:
+        worst = max(dups, key=lambda d: d[2])
+        return (f"a shot is repeated {worst[2]} times ({worst[0][:70]!r}) - every shot must be distinct "
+                f"and cover new narration")
+    hits = find_anachronistic_object_shots(shots)
+    if hits:
+        return (f"{len(hits)} shot(s) name a modern object (first at shot {hits[0][0] + 1}, "
+                f"{hits[0][1]!r}) - use only objects that existed in this story's era")
+    hits = find_duplicate_character_shots(shots)
+    if hits:
+        return (f"shot {hits[0][0] + 1} shows the same character twice ({hits[0][1]!r}) - a named "
+                f"character appears exactly once per shot")
+    hits = find_continuation_language_shots(shots)
+    if hits:
+        return (f"shot {hits[0][0] + 1} depends on another shot or describes a sequence "
+                f"({hits[0][1]!r}) - each shot is ONE self-contained visible action")
+    hits = find_loitering_shots(shots)
+    if hits:
+        return (f"shot {hits[0][0] + 1} has a person doing nothing ({hits[0][1]!r}) - give every "
+                f"person a concrete task")
+    hits = find_idle_crowd_shots(shots)
+    if hits:
+        return (f"shot {hits[0][0] + 1} has an idle crowd ({hits[0][1]!r}) - give the crowd an "
+                f"activity or remove it")
+    return None
+
+
+def validate_chunk(raw_shots, chunk_text, name, prev_location=None):
+    """Validates ONE segment. Returns (ok, reason_or_None, normalized_shots)."""
+    chunk_seconds = estimate_seconds(chunk_text)
+    lo, hi = shot_bounds(chunk_seconds)
+    target = max(1, int(round(chunk_seconds / TARGET_SHOT_SECONDS)))
+    if len(raw_shots) < lo or len(raw_shots) > hi:
+        return False, (f"you wrote {len(raw_shots)} shots but this segment (about {chunk_seconds:.0f} s of "
+                       f"narration) needs between {lo} and {hi}, aiming for about {target} - one shot per "
+                       f"4-6 seconds of narration"), []
+    shots = [normalize_shot(s, i) for i, s in enumerate(raw_shots)]
+
+    problem = content_problems(shots)
+    if problem:
+        return False, problem, []
+
+    too_long = [i for i, s in enumerate(shots)
+                if seconds_for_excerpt(s["narration_excerpt"]) > HARD_MAX_SHOT_SECONDS]
+    if too_long:
+        words = len(shots[too_long[0]]["narration_excerpt"].split())
+        return False, (f"shot {too_long[0] + 1} covers {words} words (about "
+                       f"{seconds_for_excerpt(shots[too_long[0]]['narration_excerpt']):.0f} s) - split it; "
+                       f"no shot may cover more than about {int(HARD_MAX_SHOT_SECONDS * WORDS_PER_SECOND)} words"), []
+
+    chunk_words = len(chunk_text.split())
+    covered = sum(len(s["narration_excerpt"].split()) for s in shots)
+    if chunk_words and covered < MIN_COVERAGE * chunk_words:
+        return False, (f"your narration_excerpt fields only cover {covered} of the segment's "
+                       f"{chunk_words} words - the excerpts must quote the WHOLE segment, in order, "
+                       f"with no skipped sentences"), []
+
+    auto_repair_missing_onscreen_text(shots)
+    auto_repair_face_closeups(shots)
+    auto_repair_location_change_without_establishing(shots, prev_location)
+
+    if name:
+        idx = protagonist_shot_indices(shots, name)
+        cap = protagonist_cap(len(shots))
+        if len(idx) > cap:
+            return False, (f"{name} appears in {len(idx)} of {len(shots)} shots (shots "
+                           f"{', '.join(str(i + 1) for i in idx[:12])}) but at most {cap} are allowed - "
+                           f"rewrite the extra ones as B-roll: places, objects, documents, other unnamed "
+                           f"people doing tasks, landscapes, aftermath - and do not name {name} in them"), []
+    return True, None, shots
 
 
 def validate_and_normalize_shot_response(result, narration_text):
-    """Validates everything EXCEPT narration_text/CTA, since those were
-    already confirmed during the narration stage before this is ever called.
-    Runs on the FULL stitched shot list (all chunks combined), so every
-    episode-wide check here (total shot count, zoom ratio, subject
-    dominance, location/establishing discipline, etc.) still applies
-    exactly as before chunking was added."""
-    setting_and_characters = (result.get("setting_and_characters") or "").strip()
-    if len(setting_and_characters) < MIN_SETTING_CHARS:
-        return False, (
-            f"setting_and_characters missing or too short "
-            f"({len(setting_and_characters)} chars, need at least {MIN_SETTING_CHARS}) - "
-            f"must fix the real-world location/era/ethnicity and describe every "
-            f"recurring character's appearance"
-        )
-    result["setting_and_characters"] = setting_and_characters[:MAX_SETTING_CHARS]
-
-    color_palette = (result.get("color_palette") or "").strip()
-    if len(color_palette) < MIN_PALETTE_CHARS:
-        return False, (
-            f"color_palette missing or too short ({len(color_palette)} chars, need "
-            f"at least {MIN_PALETTE_CHARS}) - must give a concrete episode-wide color "
-            f"and mood palette (e.g. dominant tones, saturation, contrast feel)"
-        )
-    result["color_palette"] = color_palette[:MAX_PALETTE_CHARS]
+    """Whole-list validation after all segments are stitched. Mostly
+    mechanical repairs, because every segment was already validated."""
+    setting = (result.get("setting_and_characters") or "").strip()
+    palette = (result.get("color_palette") or "").strip()
+    problem = anchor_problem(setting, palette)
+    if problem:
+        return False, problem
+    result["setting_and_characters"] = setting[:MAX_SETTING_CHARS]
+    result["color_palette"] = palette[:MAX_PALETTE_CHARS]
 
     shot_list = result.get("shot_list")
-    if not isinstance(shot_list, list) or len(shot_list) == 0:
+    if not isinstance(shot_list, list) or not shot_list:
         return False, "missing or empty shot_list"
 
-    if len(shot_list) < MIN_SHOTS or len(shot_list) > MAX_SHOTS:
-        return False, f"shot count {len(shot_list)} outside {MIN_SHOTS}-{MAX_SHOTS} range"
+    total_seconds = estimate_seconds(narration_text)
+    lo, hi = shot_bounds(total_seconds)
+    min_ok = max(MIN_SHOTS, int(lo * 0.85))
+    max_ok = min(MAX_SHOTS, int(math.ceil(hi * 1.15)))
+    if len(shot_list) < min_ok or len(shot_list) > max_ok:
+        return False, (f"shot count {len(shot_list)} outside {min_ok}-{max_ok} for about "
+                       f"{total_seconds:.0f} s of narration")
 
-    normalized_shots = [normalize_shot(s, i) for i, s in enumerate(shot_list)]
+    shots = [normalize_shot(s, i) for i, s in enumerate(shot_list)]
+    for i, s in enumerate(shots):
+        s["shot_number"] = i + 1
 
-    empty_shots = find_empty_shots(normalized_shots)
-    if empty_shots:
-        return False, (
-            f"{len(empty_shots)} of {len(normalized_shots)} shots have an empty "
-            f"visual_description and/or narration_excerpt (first at shot index "
-            f"{empty_shots[0]}) - every shot must have real content, do not pad "
-            f"the list with placeholder shots just to reach {MIN_SHOTS} total; "
-            f"split the real narration into more/finer shots instead"
-        )
+    problem = content_problems(shots)
+    if problem:
+        return False, problem
 
-    duplicate_shots = find_duplicate_shots(normalized_shots)
-    if duplicate_shots:
-        worst_visual, _, worst_count = max(duplicate_shots, key=lambda d: d[2])
-        return False, (
-            f"{len(duplicate_shots)} shot(s) are repeated more than "
-            f"{MAX_SHOT_REPEAT_COUNT} times instead of being distinct - worst case "
-            f"repeated {worst_count} times ({worst_visual[:80]!r}...). This means the "
-            f"shot list was padded by looping an earlier block of shots instead of "
-            f"covering new narration - write more real, distinct shots covering the "
-            f"full story instead of repeating any."
-        )
+    fixed = auto_repair_zoom_discipline(shots)
+    if fixed:
+        print(f"[shots] Auto-repaired {len(fixed)} shot(s) for zoom discipline.")
+    fixed = auto_repair_missing_onscreen_text(shots)
+    if fixed:
+        print(f"[shots] Auto-repaired {len(fixed)} shot(s) with unreadable-text wording.")
+    fixed = auto_repair_face_closeups(shots)
+    if fixed:
+        print(f"[shots] Auto-repaired {len(fixed)} face close-up(s) to medium shots.")
+    auto_repair_excessive_consecutive_subject(shots)
+    auto_repair_dominant_subject(shots)
+    auto_repair_location_change_without_establishing(shots)
 
-    anachronism_hits = find_anachronistic_object_shots(normalized_shots)
-    if anachronism_hits:
-        worst_i, worst_kw = anachronism_hits[0]
-        return False, (
-            f"{len(anachronism_hits)} shot(s) name a modern object that cannot exist "
-            f"in this period story (first at shot {worst_i}, term {worst_kw!r}) - this "
-            f"is a HARD REJECTION regardless of era. Rewrite every flagged shot's "
-            f"visual_description to use only objects that plausibly existed in this "
-            f"story's actual time period and setting - no laptops, computers, "
-            f"smartphones, tablets, drones, screens/monitors of any kind, or other "
-            f"modern technology, ever."
-        )
+    name = protagonist_name(setting)
+    scrubbed = enforce_protagonist_cap(shots, name)
+    if scrubbed:
+        print(f"[shots] Last-resort: removed the protagonist from {scrubbed} shot(s) to hold the "
+              f"{PROTAGONIST_MAX_RATIO:.0%} cap.")
+    if name:
+        n_prot = len(protagonist_shot_indices(shots, name))
+        print(f"[shots] {name} is named in {n_prot}/{len(shots)} shots ({n_prot / len(shots):.0%}).")
 
-    duplicate_character_hits = find_duplicate_character_shots(normalized_shots)
-    if duplicate_character_hits:
-        worst_i, worst_kw = duplicate_character_hits[0]
-        return False, (
-            f"{len(duplicate_character_hits)} shot(s) explicitly call for two instances "
-            f"of the same named character in one frame (first at shot {worst_i}, phrase "
-            f"{worst_kw!r}) - this is a HARD REJECTION. A named recurring character must "
-            f"appear EXACTLY ONCE per shot, never as a reflection, double, twin, or "
-            f"duplicate alongside themselves. Rewrite the flagged shot(s) so only one "
-            f"instance of that character is described."
-        )
-
-    zoom_count = sum(
-        1 for s in normalized_shots
-        if s["camera_movement"] in ZOOM_FAMILY_MOVEMENTS or s["shot_type"] == "extreme_close_up"
-    )
-    zoom_ratio = zoom_count / len(normalized_shots)
-    if zoom_ratio > MAX_ZOOM_SHOT_RATIO:
-        return False, (
-            f"too many zoomed-in shots: {zoom_count}/{len(normalized_shots)} "
-            f"({zoom_ratio:.0%}) use a zoom-in-family movement or extreme_close_up, "
-            f"over the {MAX_ZOOM_SHOT_RATIO:.0%} ceiling - spread in more wide/establishing shots"
-        )
-
-    consecutive_zoom = 0
-    max_consecutive_zoom = 0
-    for s in normalized_shots:
-        if s["camera_movement"] in ZOOM_FAMILY_MOVEMENTS:
-            consecutive_zoom += 1
-            max_consecutive_zoom = max(max_consecutive_zoom, consecutive_zoom)
-        else:
-            consecutive_zoom = 0
-    if max_consecutive_zoom > MAX_CONSECUTIVE_ZOOM_SHOTS:
-        return False, (
-            f"{max_consecutive_zoom} zoom-in-family shots in a row (max {MAX_CONSECUTIVE_ZOOM_SHOTS}) "
-            f"- too claustrophobic back to back, spread zoom movements out through the episode"
-        )
-
-    continuation_hits = find_continuation_language_shots(normalized_shots)
-    if continuation_hits:
-        worst_i, worst_phrase = continuation_hits[0]
-        return False, (
-            f"{len(continuation_hits)} shot(s) describe an action IN PROGRESS or "
-            f"continuing across a cut instead of an already-resolved end state "
-            f"(first at shot {worst_i}, phrase {worst_phrase!r}) - every shot must "
-            f"show the action already complete/stable (e.g. 'already holding the "
-            f"letter', not 'reaches for the letter'). This causes objects to morph "
-            f"mid-action and forces the next shot to fake-continue motion it never "
-            f"actually generated."
-        )
-
-    loitering_hits = find_loitering_shots(normalized_shots)
-    if loitering_hits:
-        worst_i, worst_phrase = loitering_hits[0]
-        return False, (
-            f"{len(loitering_hits)} shot(s) describe a character just standing/"
-            f"waiting/sitting with no active task (first at shot {worst_i}, phrase "
-            f"{worst_phrase!r}) - every shot with a person in frame must anchor on "
-            f"a specific ongoing task or intent, already mid-task (e.g. 'already "
-            f"kneeling, mending a fishing net' not 'standing near the shore'). "
-            f"A character present in frame with nothing to do reads as aimless "
-            f"loitering on screen, not a purposeful, stable moment."
-        )
-
-    idle_crowd_hits = find_idle_crowd_shots(normalized_shots)
-    if idle_crowd_hits:
-        worst_i, worst_phrase = idle_crowd_hits[0]
-        return False, (
-            f"{len(idle_crowd_hits)} shot(s) describe a crowd/group standing or "
-            f"watching with no active task (first at shot {worst_i}, phrase "
-            f"{worst_phrase!r}) - a crowd is never a static backdrop. Either give "
-            f"each cluster within the crowd a concrete, plausible activity "
-            f"(working, moving with purpose, reacting physically, gesturing) or "
-            f"remove the crowd from the shot entirely if it isn't narratively "
-            f"necessary."
-        )
-
-    # ONSCREEN-TEXT AUTO-REPAIR (2026-09-12): was a hard rejection here -
-    # see module docstring. Now auto-repaired in place instead of failing
-    # the whole shot list.
-    # SELF-DEFEAT FIX (2026-09-13): the repaired shots are excluded from
-    # the post-repair re-scan below, since the repair legitimately leaves
-    # the original keyword in place (it only changes whether that object
-    # is presented as readable) - a plain re-scan would always re-flag
-    # them. Only a shot the repair function didn't touch at all can still
-    # show up here now.
-    repaired_indices = auto_repair_missing_onscreen_text(normalized_shots)
-    if repaired_indices:
-        print(f"[shots] Auto-repaired {len(repaired_indices)} shot(s) with an unfilled "
-              f"required_onscreen_text by rewriting them so the named object is "
-              f"no longer a readable focus.")
-    still_missing = find_missing_onscreen_text_shots(normalized_shots, skip_indices=repaired_indices)
-    if still_missing:
-        # Reachable now only when a shot has an unfilled required_onscreen_text
-        # AND was somehow not caught by auto_repair_missing_onscreen_text in
-        # the first place (a genuine mismatch between the two functions'
-        # keyword matching, not the self-defeat bug fixed 2026-09-13).
-        return False, (
-            f"{len(still_missing)} shot(s) still show a newspaper/letter/sign/"
-            f"document/etc. with required_onscreen_text empty and were not caught "
-            f"by auto-repair (first at shot {still_missing[0]}) - check "
-            f"auto_repair_missing_onscreen_text for a keyword-matching mismatch "
-            f"against find_missing_onscreen_text_shots."
-        )
-
-    # CONSECUTIVE/DOMINANT-SUBJECT AUTO-REPAIR (2026-09-13): were hard
-    # rejections here - see module docstring. Same reasoning as the
-    # onscreen-text fix above: blanking a shot's primary_subject to "" is
-    # always a safe, mechanically guaranteed fix, so both are now
-    # auto-repaired in place instead of burning a whole content attempt on
-    # a rule the writer has repeatedly struggled to hold to unaided.
-    consecutive_repaired = auto_repair_excessive_consecutive_subject(normalized_shots)
-    if consecutive_repaired:
-        print(f"[shots] Auto-repaired {len(consecutive_repaired)} shot(s) that held on "
-              f"the same primary_subject too many shots in a row, by blanking the "
-              f"excess occurrences to pure B-roll.")
-    excessive_subject = find_excessive_consecutive_subject(normalized_shots)
-    if excessive_subject:
-        # Reachable now only if the repair above has a genuine logic gap -
-        # its single pass over the list is expected to always clear this.
-        idx, subject, run_length = excessive_subject
-        return False, (
-            f"'{subject}' is STILL the primary_subject of {run_length} consecutive "
-            f"shots ending at shot {idx} (max {MAX_CONSECUTIVE_SAME_SUBJECT}) even "
-            f"after auto-repair - check auto_repair_excessive_consecutive_subject "
-            f"for a logic gap."
-        )
-
-    dominant_repaired = auto_repair_dominant_subject(normalized_shots)
-    if dominant_repaired:
-        print(f"[shots] Auto-repaired {len(dominant_repaired)} shot(s) where one named "
-              f"subject dominated the episode's screentime, by blanking excess "
-              f"occurrences to pure B-roll.")
-    dominant_subject = find_dominant_subject(normalized_shots)
-    if dominant_subject:
-        # Reachable now only if the repair above has a genuine logic gap -
-        # its while loop is expected to always clear this.
-        subject, count, ratio = dominant_subject
-        return False, (
-            f"'{subject}' is STILL the primary_subject of {count}/{len(normalized_shots)} "
-            f"shots ({ratio:.0%}) even after auto-repair, over the "
-            f"{MAX_SUBJECT_SHOT_RATIO:.0%} episode-wide ceiling - check "
-            f"auto_repair_dominant_subject for a logic gap."
-        )
-
-    # LOCATION-ESTABLISHING AUTO-REPAIR (2026-09-14): was a hard rejection
-    # here - see module docstring. Now auto-repaired in place the same way
-    # as the checks above, instead of failing the whole attempt over one
-    # shot's shot_type.
-    location_repaired = auto_repair_location_change_without_establishing(normalized_shots)
-    if location_repaired:
-        print(f"[shots] Auto-repaired {len(location_repaired)} shot(s) that opened a "
-              f"new location without a wide/establishing shot, by forcing that "
-              f"shot's type to establishing.")
-    location_hits = find_location_change_without_establishing(normalized_shots)
-    if location_hits:
-        # Reachable now only if the repair above has a genuine logic gap -
-        # its single pass over the list is expected to always clear this.
-        idx, prev_loc, new_loc = location_hits[0]
-        return False, (
-            f"shot {idx} STILL moves location from {prev_loc!r} to {new_loc!r} "
-            f"without using a 'wide' or 'establishing' shot_type even after "
-            f"auto-repair - check auto_repair_location_change_without_establishing "
-            f"for a logic gap."
-        )
-
-    result["shot_list"] = normalized_shots
-    result["music_mood"] = result.get("music_mood", "").strip() or (
+    result["shot_list"] = shots
+    result["music_mood"] = (result.get("music_mood") or "").strip() or (
         "Tense cinematic thriller score, sparse low piano and rising strings "
         "at the start, driving percussion and brass stabs building through "
         "the middle, explosive full-orchestra climax at the reveal, "
         "tapering to a quiet resolution."
     )
     result["hook_text"] = normalize_hook_text(result)
-
-    if hook_text_matches_prompt_example(result["hook_text"]):
-        return False, "hook_text copied the prompt's example verbatim instead of writing a real one"
-
-    if hook_text_too_long_to_glance(result["hook_text"]):
-        return False, f"hook_text is {len(result['hook_text'].split())} words - too long to read in a 2-second glance (max {MAX_HOOK_TEXT_WORDS})"
-
-    if not hook_text_matches_story(result["hook_text"], narration_text):
-        return False, f"hook_text {result['hook_text']!r} doesn't appear related to this story's narration"
-
     result["narration_text"] = narration_text
     return True, result
 
 
-SHOT_RULES_BLOCK = f"""CINEMATIC DIRECTOR - shot list requirements:
-This is a dense, sub-sentence level breakdown - a single narration sentence
-should often span 2-3 separate shots, not one. Do not write sparse,
-paragraph-level shots. Every "narration_excerpt" must be an exact, verbatim
-substring taken from the NARRATION SEGMENT below, in order, covering it
-start to finish.
+# --- prompts -----------------------------------------------------------------
 
-EVERY SHOT MUST BE DISTINCT - THIS IS ALSO A HARD REQUIREMENT: every shot
-must have its own real visual_description and narration_excerpt drawn from
-a different part of the narration segment. NEVER repeat an earlier shot
-(same visual_description and narration_excerpt) later in the list just to
-reach the shot count - a script that repeats any shot more than twice will
-be rejected and regenerated.
+def build_shot_rules_block(target, lo, hi, cap, name):
+    who = name if name else "the protagonist"
+    return f"""CINEMATIC DIRECTOR - shot list requirements:
 
-PERIOD ACCURACY (HARD RULE - AUTOMATIC REJECTION): this is a real historical
-episode set in a specific time period. NEVER write a visual_description
-that names or implies a modern object - no laptops, computers, smartphones,
-cell phones, tablets, drones, screens or monitors of any kind, modern
-vehicles, or any other technology that did not exist in this story's actual
-era. This applies no matter how old or recent the story's setting is (a
-1920s story and a 1990s story are both "period" - use only objects that
-plausibly existed at that specific time). If a scene needs a character
-reading, writing, communicating, or navigating, use the era-correct
-equivalent (a paper letter, a ledger, a compass, a wall map, a rotary
-telephone, a printed newspaper) instead of a modern device. A shot naming a
-modern object is an automatic rejection of the entire shot list, exactly
-like the on-screen-text rule below - check every single shot against this
-before finishing your response.
+SHOT LENGTH AND COUNT (HARD RULE): every shot lasts about 4-6 seconds of
+narration (roughly 10-15 spoken words). Write about {target} shots for this
+segment, never fewer than {lo} and never more than {hi}. Every
+"narration_excerpt" must be an exact, verbatim substring of the NARRATION
+SEGMENT, in order, and together the excerpts must cover the WHOLE segment
+with no sentence skipped. No excerpt may be longer than 30 words. Never
+repeat an earlier shot.
 
-Every shot's "visual_description" must stay consistent with the
-"setting_and_characters" anchor given below - same location/era/ethnicity,
-and any recurring person described there must match their fixed appearance
-in every shot they appear in. Do not introduce a different ethnicity,
-region, or unplanned recurring character partway through.
+ONE ACTION PER SHOT, WRITTEN AS A COMMAND (HARD RULE): "visual_description"
+is one subject + ONE single, clearly visible action + one location, written
+as a direct present-tense instruction to a video model, for example:
+"A clerk in a grey wool coat stamps a thick file at a wooden desk, a green
+desk lamp beside him, medium shot." Name every object that is in the frame.
+Nothing may appear from nowhere, no sequences, no "then", no "continues",
+no two actions in one shot, and nothing that depends on the shot before or
+after it. Every shot must match what the narration line is about at that
+exact moment.
 
-ONE INSTANCE PER CHARACTER PER SHOT (HARD RULE): a named recurring
-character appears EXACTLY ONCE in any given shot - never write a shot
-where the same character appears twice (a reflection, a mirror image, a
-double, a twin, or any other duplicate of themselves in the same frame).
-If a shot needs to show two people, they must be two genuinely different
-people, each described distinctly.
+PROTAGONIST LIMIT (HARD RULE): {who} may appear in at most {cap} shots of
+this segment (counted by name in visual_description or primary_subject).
+Refer to the protagonist by first name only. Every other shot is B-roll that
+shows what the narration describes: places, buildings, objects, documents,
+hands doing a task, other unnamed people doing tasks, landscapes, weather,
+the wider event, aftermath. Set primary_subject to the protagonist's first
+name when featured, otherwise "". Never name the protagonist in a B-roll shot.
 
-COLOR AND LIGHT (episode-wide "color_palette" anchor given below): every
-shot's mood and lighting choice must feel like it belongs to the same
-graded film - do not swing from warm golden tones to cold blue tones and
-back without a real story reason (time-of-day or location change).
+FACES (HARD RULE): the video model draws faces badly. Prefer wide and medium
+shots. Show people from behind, from a distance, from the side, in
+silhouette, or only through their hands and the objects they work with.
+Avoid close_up and extreme_close_up of a face. Never describe eyes, gaze,
+staring or detailed facial expressions.
 
-VARY PHYSICAL REACTIONS - DO NOT DEFAULT TO GASPING: when a shot's
-visual_description shows a character reacting to shock, danger, or a
-sudden turn in the story, do not default to "gasps" / "gasping" / "a sharp
-gasp" as the go-to reaction. Draw from a wide range of physical reactions
-instead - a held breath, a stiffened body, a hand frozen mid-motion, wide
-unmoving eyes, a dropped object, trembling hands, a clenched jaw, a
-sudden stillness - and pick whichever fits this specific character and
-moment. Across a full shot list, no single reaction beat (gasping
-included) should repeat more than once or twice.
+PERIOD ACCURACY (HARD RULE): this is a real historical episode. Never name
+a modern object (laptops, computers, smartphones, tablets, drones, screens
+or monitors, modern vehicles, other technology that did not exist in the
+story's era). Use era-correct equivalents (paper letter, ledger, compass,
+wall map, rotary telephone, printed newspaper).
 
-DOCUMENTARY SHOT INDEPENDENCE (HARD RULE): write the shot list as a
-documentary editor, not a movie storyboard. Every shot must be a complete,
-independent visual composition that starts from an already-stable moment
-and makes sense on its own, without depending on the shot before or after
-it. Never write a shot as a continuation of physical motion from the
-previous one, and never leave an action unresolved expecting the next shot
-to finish it - each shot must reach a complete, stable end state within
-itself (the door already open, the letter already unfolded, the cup
-already set down). Do not use words like walking, running, turning,
-opening, reaching, continues, then, next, still, or begins to when
-describing what's happening RIGHT NOW in the shot - instead describe the
-subject already in position: "standing beside the open door," "already
-seated at the table," "holding the letter, already unfolded." If the
-underlying real-world action genuinely needs more than one shot to cover
-(e.g. someone crossing a room), the shot that picks it back up must use a
-different shot_type, camera_movement, AND framing_angle than the shot
-before it - never the exact same camera setup, since holding an identical
-setup across a cut reads as a jump cut, not a scene change.
+CONSISTENCY: every shot must stay consistent with the "setting_and_characters"
+anchor - same location/era/ethnicity, and every recurring person must match
+their fixed description. Every shot's mood and lighting must belong to the
+same graded film as the "color_palette" anchor.
 
-REAL DOCUMENTARY BALANCE - THE STORY IS NOT JUST THE PROTAGONIST (HARD
-RULE): a real documentary spends most of its screen time on context, not
-on one person's face - archival-style footage of the wider event, the
-physical setting, objects, documents, crowds, other people mentioned in
-the story, landscapes, aftermath, evidence. No single named character
-(primary_subject) may be the subject of more than {MAX_CONSECUTIVE_SAME_SUBJECT}
-consecutive shots, or more than {MAX_SUBJECT_SHOT_RATIO:.0%} of the total
-shots in this episode. Treat pure B-roll (primary_subject left as "") as
-the default, not the exception - actively look for narration beats that
-describe an event, place, object, or outcome rather than a person's
-reaction, and shoot those as B-roll instead of cutting back to the same
-face.
+ONE INSTANCE PER CHARACTER PER SHOT (HARD RULE): a named character appears
+exactly once in a shot - never a reflection, double, twin or duplicate. If a
+shot needs two people they are two genuinely different people.
 
-PURPOSEFUL STILLNESS, NOT LOITERING (HARD RULE): "already in position" does
-NOT mean "just standing/sitting there with nothing to do." Every shot with a
-person in frame must anchor them in a specific, concrete, already-in-progress
-task or intent - not a static end-state with no purpose. Instead of "already
-standing near the field," write "already kneeling in the field, both hands
-gripping the plow mid-furrow." Every shot must answer: what is this person
-doing, and why, at this exact frozen moment. Never use phrasing like
-"standing around," "standing there," "waiting there," "sitting there doing
-nothing," or "looking around" with no stated task or focus.
+PURPOSEFUL PEOPLE (HARD RULE): every person in frame is doing one specific
+concrete task. Never "standing around", "standing there", "waiting there",
+"looking around". Crowds must be doing something (working, moving with
+purpose, reacting physically) - never a motionless row of onlookers. When
+in doubt leave the crowd out.
 
-CROWDS MUST BE DOING SOMETHING, NOT WATCHING FROM A STANDSTILL (HARD RULE):
-this applies just as strictly to a crowd or group as it does to a single
-person above. Do not write a crowd/group of onlookers, bystanders,
-villagers, or spectators as a static wall of people standing and staring -
-never "the crowd stands watching" or "onlookers gather, watching silently."
-Only include a crowd in a shot when the story genuinely needs one, and when
-you do, give it a real, plausible collective activity for this exact
-moment (working, moving through the space with purpose, reacting physically
-to what's happening, gesturing to each other) - or, if the story needs
-bystanders witnessing an event, make their reaction active (turning toward
-it, pointing, recoiling, leaning in) rather than a motionless row of
-onlookers. A shot with an unnecessary or idle crowd is weaker than the same
-shot with no crowd at all - when in doubt, leave the crowd out.
+LOCATION CHANGES MUST RE-ESTABLISH: fill "location_tag" with a short
+consistent place name. The FIRST shot in a new location must use shot_type
+"wide" or "establishing". Use "" when no clear location.
 
-OBJECT INTEGRITY: every object named in a shot must remain that same
-object for the whole shot - never describe an action mid-transformation.
-Favor "already holding," "already placed," "already resting on" phrasing
-over active verbs like "lifts," "pours," "hands over," which invite the
-video model to try to render (and lose track of) motion it can't sustain.
+LEGIBLE ON-SCREEN TEXT (HARD RULE): if a visual_description mentions any of
+newspaper, letter, document, sign, headline, inscription, poster, map, book,
+plaque, telegram, postcard, banner, ledger, diary, certificate, gravestone,
+tombstone, either fill "required_onscreen_text" with the exact correctly
+spelled wording, or write the shot so that object is present but not
+readable (a closed book on a shelf, a letter held face-down).
 
-CUTAWAY DISCIPLINE: the same character must not appear as the
-primary_subject of more than {MAX_CONSECUTIVE_SAME_SUBJECT} consecutive
-shots. Frequently cut to B-roll - landscapes, buildings, documents,
-objects, hands, tools, crowds, weather, architecture. Whenever the same
-character reappears after a cutaway, change the camera angle, framing,
-and body orientation, but keep their fixed physical description IDENTICAL
-to what's stated in "setting_and_characters" every single time.
+VARY REACTIONS: do not default to "gasps"; vary physical reactions (a held
+breath, a stiffened body, a dropped object, trembling hands).
 
-LOCATION CHANGES MUST RE-ESTABLISH (HARD RULE): fill "location_tag" with a
-short consistent name for where the shot physically takes place (e.g.
-"village square", "riverbank", "soldier's tent"). Whenever the story moves
-to a new location, the FIRST shot in that new location must use shot_type
-"wide" or "establishing" before cutting closer - never open a new location
-on a medium or close_up shot. If a shot doesn't have a clearly defined
-location, leave location_tag as "".
-
-MATCH CUTS AND VISUAL RHYMES: where two moments in the story naturally
-echo each other (e.g. hands closing a diary early on, hands closing a
-coffin later), compose both shots with matching framing/composition so the
-visual rhyme reads clearly - this is a major driver of a "crafted" feel.
-
-SILENCE AS A TOOL: not every shot needs an sfx_cue. Before a major reveal
-or emotional beat, it is often stronger to deliberately leave sfx_cue as ""
-and let the moment sit in silence rather than filling it with sound.
-
-LEGIBLE ON-SCREEN TEXT (HARD RULE - THIS IS THE #1 CAUSE OF REJECTED SHOT
-LISTS): if a shot's visual_description mentions ANY of the following words -
-newspaper, letter, document, sign, headline, inscription, poster, map,
-book, plaque, telegram, postcard, banner, ledger, diary, certificate,
-gravestone, tombstone - you MUST either (a) fill "required_onscreen_text"
-with the exact wording that must appear on it, correctly spelled, or (b)
-rewrite the visual_description so that object is present but not the
-readable focus of the shot (e.g. a closed book on a shelf, a letter held
-face-down). A shot that names one of these objects with
-required_onscreen_text left empty is an automatic rejection of the entire
-shot list - check every single shot against this list before finishing
-your response.
-
-For each shot, provide:
+For each shot provide:
 - "shot_type": one of "wide", "medium", "close_up", "extreme_close_up",
-  "establishing", "detail_insert"
+  "establishing", "detail_insert" (mostly wide, medium, establishing and
+  detail_insert of objects)
 - "camera_movement": one of "static", "pan_left", "pan_right", "tilt_up",
   "tilt_down", "zoom_in", "zoom_out", "push_in", "pull_out", "dolly_in",
   "dolly_out", "tracking", "crash_zoom", "whip_pan", "handheld_shake",
   "orbit", "drone_rise", "drone_descend", "parallax", "focus_pull",
-  "dutch_angle", "snap_zoom", "speed_ramp"
-- "camera_reason": one short sentence on why this movement was chosen for
-  this specific narration beat
+  "dutch_angle", "snap_zoom", "speed_ramp" - keep it gentle; the generator
+  makes 4-6 s clips
+- "camera_reason": one short sentence
 - "lens_effect": one of "shallow_depth_of_field", "lens_flare", "film_grain",
-  "none" - use sparingly. Most shots should be "none".
-- "primary_subject": a short consistent tag for the main character/subject
-  of this shot, matching how they're named in setting_and_characters. Use
-  "" for pure B-roll shots.
-- "required_onscreen_text": if this shot deliberately shows readable text,
-  the exact wording that must appear, correctly spelled. Otherwise "".
+  "none" (most shots "none")
+- "sfx_cue": ambient or dramatic sound, "" only where silence is deliberate
+- "primary_subject", "required_onscreen_text", "location_tag" as above
 - "lighting": one of "dawn", "morning", "midday", "golden_hour", "dusk",
-  "night", "overcast", "firelight", "interior_lamp", "moonlight" - must
-  stay consistent with the story's actual timeline, not jump around
-  without reason.
-- "beat_intensity": one of "low", "mid", "high" - how emotionally charged
-  this exact moment is. Use this to shape pacing: mostly "low"/"mid" early,
-  building toward more "high" beats near the episode's climax.
-- "location_tag": short consistent name for where this shot takes place,
-  or "" if not clearly a distinct location.
+  "night", "overcast", "firelight", "interior_lamp", "moonlight" - consistent
+  with the story's timeline
+- "beat_intensity": one of "low", "mid", "high" - building toward the climax
 - "framing_angle": one of "eye_level", "low_angle", "high_angle", "overhead"
-  - the camera's vertical relationship to the subject, independent of
-  camera_movement. Use low_angle/high_angle/overhead deliberately for
-  power dynamics or emotional weight (e.g. low_angle makes a subject
-  feel dominant/threatening, high_angle makes them feel small/vulnerable,
-  overhead for scale or isolation) - do not default to eye_level for
-  every shot, but never use the same non-eye_level angle more than 2
-  shots in a row.
-- "depth_of_field": one of "shallow", "deep", "standard" - shallow
-  isolates the subject against a blurred background (use for intimate/
-  emotional close moments), deep keeps foreground and background both
-  sharp (use for establishing/wide shots where environment matters),
-  standard for everything else. Do not set shallow on wide/establishing
-  shot_type - it only reads correctly on medium/close_up/extreme_close_up.
+- "depth_of_field": one of "shallow", "deep", "standard" (never shallow on
+  wide/establishing)
 
-PACING RHYTHM (Gen Z attention span - keep it moving):
-- Default to quick shots (roughly 2-4 seconds of narration each).
-- Only use a held/static shot deliberately, right before a big reveal.
-- Vary shot_type, camera_movement, and lens_effect constantly - never repeat
-  the same camera_movement more than twice in a row.
-
-ZOOM DISCIPLINE:
-- At most 1 in 4 shots may use a zoom-in-family movement (push_in,
-  crash_zoom, zoom_in, snap_zoom) or an extreme_close_up shot_type. Never
-  use two zoom-in-family movements back to back.
-- At least 1 in 4 shots must be "wide" or "establishing" shot_type, spread
-  through this segment.
-- For the remaining shots, favor movements that add energy WITHOUT
-  tightening the frame: pan_left, pan_right, tilt_up, tilt_down, tracking,
-  dolly_in, dolly_out, whip_pan, orbit, drone_rise, drone_descend,
-  parallax, handheld_shake, dutch_angle, speed_ramp, pull_out, zoom_out.
-
-SOUND DESIGNER:
-- For each shot, include "sfx_cue" for both loud dramatic moments and
-  quieter ambient/atmospheric sound. Aim for at least half of all shots to
-  carry some sfx_cue, leaving "" only where truly no distinct sound would
-  be audible or where silence is the deliberate choice (see SILENCE AS A
-  TOOL above)."""
-
-
-SHOT_ITEM_SCHEMA = {
-    "type": "OBJECT",
-    "properties": {
-        "shot_number": {"type": "INTEGER"},
-        "visual_description": {"type": "STRING"},
-        "narration_excerpt": {"type": "STRING"},
-        "shot_type": {"type": "STRING", "enum": sorted(VALID_SHOT_TYPES)},
-        "camera_movement": {"type": "STRING", "enum": sorted(VALID_CAMERA_MOVEMENTS)},
-        "camera_reason": {"type": "STRING"},
-        "lens_effect": {"type": "STRING", "enum": sorted(VALID_LENS_EFFECTS)},
-        "sfx_cue": {"type": "STRING"},
-        "primary_subject": {"type": "STRING"},
-        "required_onscreen_text": {"type": "STRING"},
-        "lighting": {"type": "STRING", "enum": sorted(VALID_LIGHTING)},
-        "beat_intensity": {"type": "STRING", "enum": sorted(VALID_BEAT_INTENSITY)},
-        "location_tag": {"type": "STRING"},
-        "framing_angle": {"type": "STRING", "enum": sorted(VALID_FRAMING_ANGLE)},
-        "depth_of_field": {"type": "STRING", "enum": sorted(VALID_DEPTH_OF_FIELD)},
-    },
-    "required": [
-        "shot_number", "visual_description", "narration_excerpt", "shot_type",
-        "camera_movement", "camera_reason", "lens_effect", "sfx_cue",
-        "primary_subject", "required_onscreen_text", "lighting",
-        "beat_intensity", "location_tag", "framing_angle", "depth_of_field",
-    ],
-}
-
-
-def build_shot_breakdown_response_schema(min_shots, max_shots, include_anchor_fields):
-    """UNUSED as of 2026-09-14 - see module docstring's SCHEMA-CONSTRAINED
-    GENERATION REVERTED FOR THIS CALL entry. Left in place, not deleted,
-    for a future session to retry structured output on this call with a
-    narrower experiment (e.g. removing all enum fields first, in
-    isolation) once there's a way to see Gemini's actual rejection reason
-    for a schema this size - do not wire this back into generate_shot_
-    breakdown without new evidence of what specifically fails.
-
-    MINITEMS/MAXITEMS REMOVED (2026-09-14): these were tried as native
-    ints, then as str()-wrapped ints (INT64-AS-STRING FIX), and BOTH forms
-    produced a 100% reproducible Gemini 400 INVALID_ARGUMENT on every
-    call - and removing them entirely (this version) ALSO did not fix it,
-    confirming array bounds were never the real cause. min_shots/max_shots
-    are unused parameters kept for call-site compatibility."""
-    properties = {
-        "shot_list": {
-            "type": "ARRAY",
-            "items": SHOT_ITEM_SCHEMA,
-        },
-    }
-    required = ["shot_list"]
-    if include_anchor_fields:
-        properties.update({
-            "setting_and_characters": {"type": "STRING"},
-            "color_palette": {"type": "STRING"},
-            "hook_text": {"type": "STRING"},
-            "music_mood": {"type": "STRING"},
-        })
-        required.extend(["setting_and_characters", "color_palette", "hook_text", "music_mood"])
-    return {
-        "type": "OBJECT",
-        "properties": properties,
-        "required": required,
-    }
+PACING: vary shot_type and camera_movement; never the same camera_movement
+more than twice in a row. At most 1 in 4 shots may use a zoom-in-family
+movement (push_in, crash_zoom, zoom_in, snap_zoom, dolly_in) and never two
+in a row. At least 1 in 4 shots must be "wide" or "establishing"."""
 
 
 def build_shot_breakdown_chunk_prompt(
     title, angle, chunk_text, chunk_index, num_chunks,
-    min_shots_chunk, max_shots_chunk,
-    setting_and_characters=None, color_palette=None,
-    prior_last_subject=None, prior_last_movement=None,
+    setting_and_characters=None, color_palette=None, name=None,
+    prior_last_subject=None, prior_last_movement=None, feedback=None,
 ):
-    """Builds the prompt for ONE narration chunk's shot breakdown. The
-    first chunk (chunk_index == 0) also produces the episode-wide
-    setting_and_characters/hook_text/music_mood/color_palette anchor; later
-    chunks are handed that same anchor text back so every shot stays
-    visually consistent, and are given a short note on the previous
-    chunk's last shot so cutaway discipline carries across the chunk
-    boundary."""
     segment_label = f"segment {chunk_index + 1} of {num_chunks}"
+    chunk_seconds = estimate_seconds(chunk_text)
+    lo, hi = shot_bounds(chunk_seconds)
+    target = max(1, int(round(chunk_seconds / TARGET_SHOT_SECONDS)))
+    cap = protagonist_cap(target)
 
     if chunk_index == 0:
-        anchor_block = f"""SETTING AND CHARACTERS - write this as a fixed visual anchor for the WHOLE
-episode (not just this segment). This is the single most important field for
-keeping the episode visually consistent across all {num_chunks} segments, so
-treat it as non-negotiable:
+        anchor_block = f"""SETTING AND CHARACTERS - write a fixed visual anchor for the WHOLE episode, as one
+standalone paragraph of 2-5 sentences:
 - State the real-world location, country/region, era, and the actual
-  ethnicity/culture of the people in this specific story. Be explicit and
-  concrete (e.g. "rural Gambia, West Africa, 1981 - Gambian people, dark
-  skin, traditional and period-appropriate West African dress" NOT vague
-  phrasing that a video model could misread as a different region).
-- For every recurring named or clearly-identifiable person in the story
-  (e.g. "the mother," "the young soldier," "the porter"), give one fixed,
-  concrete physical description (approximate age, build, hair, distinctive
-  clothing) that must be repeated consistently - this person must look the
-  same in every shot they appear in, not reinterpreted shot to shot.
-  If the story has no individually-tracked recurring character (e.g. it
-  follows a crowd or an unnamed narrator's perspective), say so explicitly
-  instead of inventing one.
-This full anchor will be attached to every single shot's image/video
-generation prompt later in the pipeline (across all {num_chunks} segments),
-so write it as a standalone paragraph that makes sense with no other
-context - 2-5 sentences.
+  ethnicity/culture of the people in this story, explicit and concrete.
+- Introduce the main character with EXACTLY this wording so software can find
+  the name: "The recurring protagonist is <FirstName> <Surname>, a <age>-year-old
+  ..." followed by one fixed physical description (build, hair, clothing).
+  Later, refer to them by first name only. If the story has no single
+  recurring person, write exactly: "There is no single recurring protagonist."
+- Give any other recurring person one fixed physical description too.
 
-COLOR PALETTE - include "color_palette": a fixed episode-wide color and
-mood grade (e.g. "desaturated blues and greys with warm amber highlights
-at emotional peaks, high contrast, slightly crushed blacks"). This will
-also be attached to every shot's generation prompt, so every shot stays
-visually part of the same graded film rather than looking like disconnected
-images. 1-3 sentences.
+COLOR PALETTE - include "color_palette": a fixed episode-wide color and mood
+grade, 1-3 sentences.
 
-THUMBNAIL HOOK TEXT - a short, punchy line of thumbnail cover text that
-would make someone scrolling YouTube stop and click. This is NOT a
-narration sentence - it should read like a headline: concrete, high-stakes,
-and built around the single most shocking number, name, or fact in THIS
-SPECIFIC STORY (you may draw on the full episode topic/angle above, not
-just this first segment).
+THUMBNAIL HOOK TEXT - include "hook_text": a short punchy thumbnail line built
+around the most shocking number, name or fact in THIS story: {MAX_HOOK_TEXT_WORDS}
+words maximum, under {MAX_HOOK_TEXT_CHARS} characters, short fragments
+separated by periods. Style example only, never copy it: "{EXAMPLE_HOOK_TEXT}"
 
-THE 2-SECOND RULE: a thumbnail gets about 2 seconds of a scrolling viewer's
-attention, and most viewers see it shrunk down on a phone screen. The hook
-text must be absorbable in that window - which means SHORT:
-{MAX_HOOK_TEXT_WORDS} words maximum, ideally 3-4, under {MAX_HOOK_TEXT_CHARS}
-characters. Use short punchy fragments separated by periods, not one
-flowing sentence.
-
-The example below shows the STYLE only. Do not reuse or adapt it - write an
-entirely new line using facts that actually appear in the story.
-   Style example only, from an unrelated story - never copy this line
-   itself: "312 DIARIES. ONE BOMB. GONE IN SECONDS."
-
-MUSIC MOOD - include "music_mood": a single descriptive prompt for an AI
-music generator describing the background score for the WHOLE episode -
-scored like a thriller movie, building tension progressively, peaking at
-the biggest reveal, then resolving.
+MUSIC MOOD - include "music_mood": one prompt for an AI music generator
+describing a thriller-style score for the whole episode, building tension,
+peaking at the biggest reveal, then resolving.
 
 """
-        json_extra_fields = """  "setting_and_characters": "2-5 sentence fixed anchor for the WHOLE episode.",
-  "color_palette": "1-3 sentence fixed color/mood grade for the WHOLE episode.",
-  "hook_text": "Short punchy thumbnail cover line, max {max_words} words and under {max_chars} characters.",
-  "music_mood": "Background score prompt for the whole episode, describing its build-up arc.",
-""".format(max_words=MAX_HOOK_TEXT_WORDS, max_chars=MAX_HOOK_TEXT_CHARS)
+        json_extra_fields = (
+            '  "setting_and_characters": "2-5 sentence fixed anchor for the WHOLE episode.",\n'
+            '  "color_palette": "1-3 sentence fixed color/mood grade for the WHOLE episode.",\n'
+            f'  "hook_text": "Short punchy thumbnail cover line, max {MAX_HOOK_TEXT_WORDS} words.",\n'
+            '  "music_mood": "Background score prompt for the whole episode.",\n'
+        )
         continuity_note = ""
+        rules_name = None
     else:
-        anchor_block = f"""SETTING AND CHARACTERS - this is ALREADY FIXED for the whole episode. Every
-shot you write below must stay strictly consistent with it (same location,
-era, ethnicity, and exact fixed physical description for any recurring
-character named in it):
+        anchor_block = f"""SETTING AND CHARACTERS - ALREADY FIXED for the whole episode. Stay strictly
+consistent with it:
 
 ---
 {setting_and_characters}
 ---
 
-COLOR PALETTE - this is ALSO ALREADY FIXED for the whole episode. Every
-shot's lighting/mood must stay consistent with it:
+COLOR PALETTE - ALREADY FIXED for the whole episode:
 
 ---
 {color_palette}
 ---
 
-Do NOT invent a new setting_and_characters, color_palette, hook_text, or
-music_mood in this response - this segment only returns a shot_list.
+Do NOT invent a new setting_and_characters, color_palette, hook_text or
+music_mood - this segment only returns a shot_list.
 
 """
         json_extra_fields = ""
-        continuity_bits = []
+        bits = []
         if prior_last_subject:
-            continuity_bits.append(
-                f'the previous segment\'s last shot had primary_subject "{prior_last_subject}" - '
-                f"avoid opening this segment with more consecutive shots of that same subject; "
-                f"cut to something else first if this segment's narration allows it"
-            )
+            bits.append(f'the previous segment ended on a shot with primary_subject "{prior_last_subject}" - '
+                        f"do not open this segment with more shots of that subject if you can avoid it")
         if prior_last_movement:
-            continuity_bits.append(
-                f'the previous segment\'s last shot used camera_movement "{prior_last_movement}" - '
-                f"don't repeat that exact movement as this segment's first shot"
-            )
-        continuity_note = (
-            "CONTINUITY WITH THE PREVIOUS SEGMENT: " + "; also ".join(continuity_bits) + ".\n\n"
-            if continuity_bits else ""
-        )
+            bits.append(f'the previous segment\'s last shot used camera_movement "{prior_last_movement}" - '
+                        f"do not repeat it as this segment's first shot")
+        continuity_note = ("CONTINUITY: " + "; also ".join(bits) + ".\n\n") if bits else ""
+        rules_name = name
 
-    return f"""You are the visual director and sound designer for "Erased," a
-YouTube documentary channel. The narration script for this episode has
-ALREADY been written and finalized - do not rewrite, shorten, or alter it.
-Your job right now is ONLY to build the shot-by-shot breakdown for
-{segment_label} of this episode's narration (given below as NARRATION
-SEGMENT). This segment will later be stitched together with the other
-{num_chunks - 1} segment(s) into one continuous shot list, so treat the
-NARRATION SEGMENT below as a slice of a longer script, not a complete story
-by itself.
+    feedback_block = ""
+    if feedback:
+        feedback_block = (f"PREVIOUS ATTEMPT WAS REJECTED BECAUSE: {feedback}\n"
+                          f"Fix exactly that problem and keep every other rule.\n\n")
+
+    rules = build_shot_rules_block(target, lo, hi, cap, rules_name)
+
+    return f"""You are the visual director and sound designer for "Erased," a YouTube
+documentary channel. The narration for this episode is FINAL - do not rewrite,
+shorten or alter it. Your job is ONLY the shot-by-shot breakdown for
+{segment_label} of the narration (given below as NARRATION SEGMENT), which will
+be stitched together with the other segments into one continuous shot list.
 
 Episode topic: {title}
 Angle: {angle}
 
-{anchor_block}NARRATION SEGMENT ({segment_label}, do not change this text):
+{anchor_block}NARRATION SEGMENT ({segment_label}, about {chunk_seconds:.0f} seconds when spoken, do not change this text):
 ---
 {chunk_text}
 ---
 
-{continuity_note}Break the NARRATION SEGMENT above into EXACTLY between
-{min_shots_chunk} and {max_shots_chunk} shots covering this segment only,
-start to finish - this is a hard requirement, not a suggestion.
+{continuity_note}{feedback_block}Break the NARRATION SEGMENT into between {lo} and {hi} shots, aiming for about
+{target} (one shot per 4-6 seconds of narration), covering this segment start
+to finish. This is a hard requirement.
 
-{SHOT_RULES_BLOCK}
+{rules}
 
-FINAL CHECK before you output: for every shot whose visual_description
-mentions a newspaper, letter, sign, document, headline, inscription,
-poster, map, book, plaque, telegram, postcard, banner, ledger, diary,
-certificate, or gravestone/tombstone - you MUST fill in
-required_onscreen_text with the exact wording, or rewrite that shot so no
-readable text is the focus. A shot with one of those words present and
-required_onscreen_text left empty will be rejected outright. ALSO check
-every shot for any modern object (laptop, computer, smartphone, cell
-phone, tablet, drone, screen, monitor, or any other modern technology) -
-a period episode with even one modern object named in visual_description
-will be rejected outright, same as the on-screen-text rule. ALSO check
-every crowd/group shot for idle phrasing ("crowd stands," "onlookers
-watching," "villagers standing around") - give the crowd a real activity
-or remove it. Also confirm every shot has "lighting", "beat_intensity",
-"location_tag", "framing_angle", and "depth_of_field" filled in, and that
-any location change is opened with a wide/establishing shot.
-
-Return ONLY valid JSON, no other text, no markdown fences, in this exact
-format:
+Return ONLY valid JSON, no other text, no markdown fences, in this exact format:
 
 {{
 {json_extra_fields}  "shot_list": [
     {{
       "shot_number": 1,
-      "visual_description": "Detailed description for AI image/video generation, consistent with setting_and_characters",
+      "visual_description": "ONE subject doing ONE visible action in one place, as a direct command, every object named",
       "narration_excerpt": "The exact, verbatim portion of THIS SEGMENT's narration this shot covers",
       "shot_type": "wide",
-      "camera_movement": "push_in",
+      "camera_movement": "pan_left",
       "camera_reason": "Why this movement fits this beat",
       "lens_effect": "none",
       "sfx_cue": "",
       "primary_subject": "",
-      "required_onscreen_text": "REQUIRED if visual_description names a newspaper/letter/sign/document/etc - the exact wording, otherwise leave as empty string",
+      "required_onscreen_text": "",
       "lighting": "midday",
       "beat_intensity": "mid",
       "location_tag": "short consistent location name, or empty string",
@@ -1459,166 +941,171 @@ format:
   ]
 }}
 
-Include between {min_shots_chunk} and {max_shots_chunk} shots covering this
-segment's narration above - every shot must be distinct, never repeat an
-earlier shot."""
+Include between {lo} and {hi} shots for this segment - every shot distinct."""
 
 
-def generate_shot_breakdown(title, angle, narration_text):
-    """CHUNKED (2026-08-15): splits narration into NUM_SHOT_CHUNKS pieces and
-    makes one small LLM call per piece (spaced SHOT_CHUNK_CALL_DELAY_SECONDS
-    apart), instead of one huge call that structurally cannot fit under the
-    provider's free-tier token ceiling. All chunk shot_lists are stitched
-    and renumbered, then validated with the exact same episode-wide rules
-    as before chunking (validate_and_normalize_shot_response is unchanged
-    in structure, only extended with the new color_palette/location checks).
-    A stitched list that passes those deterministic checks is then graded
-    by quality_checker.grade_shot_breakdown (2026-08-20, Loop Skill 2)
-    before being accepted - see module docstring.
+# --- generation --------------------------------------------------------------
 
-    SCHEMA-CONSTRAINED GENERATION REVERTED (2026-09-14): each chunk call
-    no longer passes a response_schema - see module docstring's REVERTED
-    entry. Relies entirely on prose instructions (SHOT_RULES_BLOCK, the
-    JSON example, the FINAL CHECK reminder) plus llm_client.extract_json's
-    repair pipeline, exactly as before schema-constrained generation was
-    introduced on 2026-09-13."""
-    chunks = split_narration_into_chunks(narration_text, NUM_SHOT_CHUNKS)
+def _call_with_infra_retry(prompt, state):
+    """One LLM call; infra failures (timeouts, 5xx) are retried with backoff
+    and never count against content attempts."""
+    while True:
+        try:
+            return call_llm(prompt)
+        except DailyQuotaExhausted:
+            raise
+        except RuntimeError as e:
+            state["infra"] += 1
+            state["last_reason"] = f"LLM call failed: {e}"
+            print(f"[shots] Infra retry {state['infra']}/{MAX_INFRA_ATTEMPTS} failed - {e}")
+            if state["infra"] >= MAX_INFRA_ATTEMPTS:
+                if state["reached"]:
+                    raise RuntimeError(f"Shot breakdown failed after repeated LLM errors. Last: {e}")
+                raise InfraFailure(
+                    f"LLM never returned a usable response after {state['infra']} infra retries "
+                    f"during shot-breakdown stage (narration was already confirmed good). Last: {e}")
+            wait = state["infra"] * 20
+            print(f"[shots] Backing off {wait}s before the next infra retry...")
+            time.sleep(wait)
+
+
+def _build_full_plan(title, angle, narration_text, chunks, state):
     num_chunks = len(chunks)
+    setting = color_palette = hook_text = music_mood = None
+    name = None
+    stitched = []
 
-    last_reason = None
-    ever_reached_content = False
-    content_attempt = 0
-    infra_attempt = 0
-
-    while content_attempt < MAX_GENERATION_ATTEMPTS:
-        setting_and_characters = None
-        color_palette = None
-        hook_text = None
-        music_mood = None
-        stitched_shots = []
-        infra_failed_this_round = False
-        content_failure_reason = None
-
-        for idx, chunk_text in enumerate(chunks):
-            if idx > 0:
-                print(f"[shots] Waiting {SHOT_CHUNK_CALL_DELAY_SECONDS}s before segment "
-                      f"{idx + 1}/{num_chunks} call...")
-                time.sleep(SHOT_CHUNK_CALL_DELAY_SECONDS)
-
-            prior_last_subject = stitched_shots[-1].get("primary_subject") if stitched_shots else None
-            prior_last_movement = stitched_shots[-1].get("camera_movement") if stitched_shots else None
-
+    for idx, chunk_text in enumerate(chunks):
+        if idx > 0:
+            time.sleep(SHOT_CHUNK_CALL_DELAY_SECONDS)
+        feedback = None
+        chunk_shots = None
+        last_why = None
+        for attempt in range(1, CHUNK_MAX_ATTEMPTS + 1):
             prompt = build_shot_breakdown_chunk_prompt(
                 title, angle, chunk_text, idx, num_chunks,
-                CHUNK_MIN_SHOTS, CHUNK_MAX_SHOTS,
-                setting_and_characters=setting_and_characters,
-                color_palette=color_palette,
-                prior_last_subject=prior_last_subject,
-                prior_last_movement=prior_last_movement,
+                setting_and_characters=setting, color_palette=color_palette, name=name,
+                prior_last_subject=stitched[-1]["primary_subject"] if stitched else None,
+                prior_last_movement=stitched[-1]["camera_movement"] if stitched else None,
+                feedback=feedback,
             )
-
-            try:
-                raw = call_llm(prompt)
-            except DailyQuotaExhausted:
-                # FIX (2026-08-15, later): propagate straight up, do not
-                # treat as an ordinary per-chunk infra retry.
-                raise
-            except RuntimeError as e:
-                infra_attempt += 1
-                last_reason = f"LLM call failed on segment {idx + 1}/{num_chunks}: {e}"
-                print(f"[shots] Infra retry {infra_attempt}/{MAX_INFRA_ATTEMPTS} failed - {last_reason} "
-                      f"(does not count against the {MAX_GENERATION_ATTEMPTS} content attempts)")
-                infra_failed_this_round = True
-                break
-
-            ever_reached_content = True
+            raw = _call_with_infra_retry(prompt, state)
+            state["reached"] = True
             try:
                 parsed = extract_json(raw)
             except ValueError as e:
-                content_failure_reason = f"JSON parse failed on segment {idx + 1}/{num_chunks}: {e}"
-                break
-
-            if idx == 0:
-                setting_and_characters = (parsed.get("setting_and_characters") or "").strip()
-                color_palette = (parsed.get("color_palette") or "").strip()
-                hook_text = (parsed.get("hook_text") or "").strip()
-                music_mood = (parsed.get("music_mood") or "").strip()
-
-            chunk_shot_list = parsed.get("shot_list")
-            if not isinstance(chunk_shot_list, list) or len(chunk_shot_list) == 0:
-                content_failure_reason = f"segment {idx + 1}/{num_chunks} returned missing/empty shot_list"
-                break
-            if len(chunk_shot_list) < CHUNK_MIN_SHOTS or len(chunk_shot_list) > CHUNK_MAX_SHOTS:
-                content_failure_reason = (
-                    f"segment {idx + 1}/{num_chunks} shot count {len(chunk_shot_list)} outside "
-                    f"{CHUNK_MIN_SHOTS}-{CHUNK_MAX_SHOTS} range"
-                )
-                break
-
-            stitched_shots.extend(chunk_shot_list)
-
-        if infra_failed_this_round:
-            if infra_attempt >= MAX_INFRA_ATTEMPTS:
-                break
-            wait = infra_attempt * 20
-            print(f"Backing off {wait}s before next infra retry...")
-            time.sleep(wait)
-            continue
-
-        content_attempt += 1
-
-        if content_failure_reason:
-            last_reason = content_failure_reason
-            print(f"[shots] Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
-            if content_attempt < MAX_GENERATION_ATTEMPTS:
-                print(f"Waiting {CONTENT_RETRY_WAIT_SECONDS}s before next content attempt "
-                      f"(prevents bursting past the free-tier RPM ceiling)...")
-                time.sleep(CONTENT_RETRY_WAIT_SECONDS)
-            continue
-
-        for i, shot in enumerate(stitched_shots):
-            shot["shot_number"] = i + 1
-
-        result = {
-            "setting_and_characters": setting_and_characters,
-            "color_palette": color_palette,
-            "hook_text": hook_text,
-            "music_mood": music_mood,
-            "shot_list": stitched_shots,
-        }
-
-        is_valid, validated = validate_and_normalize_shot_response(result, narration_text)
-        if is_valid:
-            # WRITER/CHECKER SPLIT (2026-08-20, Loop Skill 2): fresh
-            # independent grading call against the house rules, before
-            # acceptance. Treated exactly like any other content failure.
-            passed, grade_reason = grade_shot_breakdown(
-                title, angle,
-                validated["setting_and_characters"], validated["color_palette"], validated["shot_list"],
-            )
-            if not passed:
-                last_reason = f"checker rejected shot list - {grade_reason}"
-                print(f"[shots] Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
-                if content_attempt < MAX_GENERATION_ATTEMPTS:
-                    print(f"Waiting {CONTENT_RETRY_WAIT_SECONDS}s before next content attempt "
-                          f"(prevents bursting past the free-tier RPM ceiling)...")
-                    time.sleep(CONTENT_RETRY_WAIT_SECONDS)
+                last_why = f"your JSON could not be parsed ({e}) - return ONLY valid JSON"
+                feedback = last_why
+                print(f"[shots] Segment {idx + 1}/{num_chunks} attempt {attempt}: {last_why}")
+                time.sleep(CHUNK_RETRY_WAIT_SECONDS)
                 continue
 
-            print(f"[shots] Checker passed ({grade_reason}).")
-            return validated
+            raw_shots = parsed.get("shot_list")
+            if not isinstance(raw_shots, list) or not raw_shots:
+                last_why = "shot_list was missing or empty"
+                feedback = last_why
+                print(f"[shots] Segment {idx + 1}/{num_chunks} attempt {attempt}: {last_why}")
+                time.sleep(CHUNK_RETRY_WAIT_SECONDS)
+                continue
 
-        last_reason = validated
-        print(f"[shots] Attempt {content_attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
-        if content_attempt < MAX_GENERATION_ATTEMPTS:
-            print(f"Waiting {CONTENT_RETRY_WAIT_SECONDS}s before next content attempt "
-                  f"(prevents bursting past the free-tier RPM ceiling)...")
-            time.sleep(CONTENT_RETRY_WAIT_SECONDS)
+            if idx == 0:
+                cand_setting = (parsed.get("setting_and_characters") or "").strip()
+                cand_palette = (parsed.get("color_palette") or "").strip()
+                why = anchor_problem(cand_setting, cand_palette)
+                cand_name = protagonist_name(cand_setting)
+                if not why and not cand_name and not anchor_declares_no_protagonist(cand_setting):
+                    why = ('setting_and_characters must contain the exact sentence '
+                           '"The recurring protagonist is <FirstName> <Surname>, a <age>-year-old ..." '
+                           'or "There is no single recurring protagonist."')
+                if not why:
+                    why = hook_problem(parsed, raw_shots, narration_text)
+                if why:
+                    last_why = why
+                    feedback = why
+                    print(f"[shots] Segment 1/{num_chunks} attempt {attempt}: {why}")
+                    time.sleep(CHUNK_RETRY_WAIT_SECONDS)
+                    continue
+                cand_name_for_check = cand_name
+            else:
+                cand_name_for_check = name
 
-    if not ever_reached_content:
-        raise InfraFailure(
-            f"LLM never returned a usable response after {infra_attempt} infra "
-            f"retries during shot-breakdown stage (narration was already confirmed "
-            f"good). Last reason: {last_reason}"
-        )
-    raise RuntimeError(f"Shot breakdown failed after {content_attempt} content attempts. Last reason: {last_reason}")
+            ok, why, shots = validate_chunk(
+                raw_shots, chunk_text, cand_name_for_check,
+                prev_location=next((s["location_tag"] for s in reversed(stitched) if s["location_tag"]), None),
+            )
+            if not ok:
+                last_why = why
+                feedback = why
+                print(f"[shots] Segment {idx + 1}/{num_chunks} attempt {attempt}/{CHUNK_MAX_ATTEMPTS}: {why}")
+                if attempt < CHUNK_MAX_ATTEMPTS:
+                    time.sleep(CHUNK_RETRY_WAIT_SECONDS)
+                continue
+
+            if idx == 0:
+                setting, color_palette = cand_setting, cand_palette
+                hook_text = (parsed.get("hook_text") or "").strip()
+                music_mood = (parsed.get("music_mood") or "").strip()
+                name = cand_name
+                print(f"[shots] Protagonist: {name or 'none'}.")
+            chunk_shots = shots
+            break
+
+        if chunk_shots is None:
+            raise ChunkFailure(f"segment {idx + 1}/{num_chunks} failed {CHUNK_MAX_ATTEMPTS} attempts - {last_why}")
+        stitched.extend(chunk_shots)
+        print(f"[shots] Segment {idx + 1}/{num_chunks} done: {len(chunk_shots)} shots "
+              f"({len(stitched)} so far).")
+
+    return {
+        "setting_and_characters": setting,
+        "color_palette": color_palette,
+        "hook_text": hook_text,
+        "music_mood": music_mood,
+        "shot_list": stitched,
+    }
+
+
+def _checker_sample(shots):
+    """The checker reads three windows (start, middle, end) so its prompt
+    stays small even for 200+ shots."""
+    if len(shots) <= CHECKER_WINDOW * CHECKER_WINDOWS:
+        return shots
+    mid = len(shots) // 2 - CHECKER_WINDOW // 2
+    return shots[:CHECKER_WINDOW] + shots[mid:mid + CHECKER_WINDOW] + shots[-CHECKER_WINDOW:]
+
+
+def generate_shot_breakdown(title, angle, narration_text):
+    total_seconds, num_chunks = plan_chunking(narration_text)
+    chunks = split_narration_into_chunks(narration_text, num_chunks)
+    print(f"[shots] Narration is about {total_seconds:.0f} s; planning in {len(chunks)} segment(s), "
+          f"about one shot every {TARGET_SHOT_SECONDS:.0f} s.")
+
+    state = {"infra": 0, "reached": False, "last_reason": None}
+    last_reason = None
+
+    for attempt in range(1, MAX_GENERATION_ATTEMPTS + 1):
+        try:
+            result = _build_full_plan(title, angle, narration_text, chunks, state)
+        except ChunkFailure as e:
+            last_reason = str(e)
+            print(f"[shots] Attempt {attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
+            continue
+
+        ok, validated = validate_and_normalize_shot_response(result, narration_text)
+        if not ok:
+            last_reason = validated
+            print(f"[shots] Attempt {attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
+            continue
+
+        sample = _checker_sample(validated["shot_list"])
+        passed, grade_reason = grade_shot_breakdown(
+            title, angle, validated["setting_and_characters"], validated["color_palette"], sample)
+        if not passed:
+            last_reason = f"checker rejected shot list - {grade_reason}"
+            print(f"[shots] Attempt {attempt}/{MAX_GENERATION_ATTEMPTS} failed - {last_reason}")
+            continue
+        print(f"[shots] Checker passed on {len(sample)} sampled shots ({grade_reason}).")
+        print(f"[shots] Done: {len(validated['shot_list'])} shots.")
+        return validated
+
+    raise RuntimeError(f"Shot breakdown failed after {MAX_GENERATION_ATTEMPTS} attempts. Last reason: {last_reason}")
