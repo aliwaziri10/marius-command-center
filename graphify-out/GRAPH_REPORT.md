@@ -1,7 +1,7 @@
-# Graph Report - marius-command-center  (2026-11-12)
+# Graph Report - marius-command-center  (2026-11-18)
 
 ## Corpus Check
-- 52 files · ~78,395 words
+- 52 files · ~78,533 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `d250fd1b`
+- Built from commit: `d7825032`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
