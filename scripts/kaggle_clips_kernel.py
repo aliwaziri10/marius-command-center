@@ -2,8 +2,11 @@
 Runs ON KAGGLE (free GPU). Marius shot-clip generator (2026-11-10, rev 2).
 
 The GitHub runner (scripts/kaggle_clips.py) bakes the shot jobs into MANIFEST (base64).
-This notebook makes each shot with LTX-Video 2B distilled: the first piece of a shot is
-text-to-video, longer shots continue picture-to-video from the previous piece's last frame.
+This notebook makes each shot with LTX-Video 2B distilled. CUT MODE (default, rev 3, 2026-11-12):
+every ~4 s piece of a shot is its OWN text-to-video clip built from its own beat prompt, so a long
+shot becomes a sequence of cuts instead of one picture-to-video chain that drifts and morphs
+(the first Kaggle video, script 17fc73b3, showed that drift on 34 s average shots). Set
+MANIFEST["cut_mode"] = false to get the old chain behaviour (continue from the previous last frame).
 It writes shot_NNN.mp4 plus manifest_out.json into /kaggle/working.
 Silent video only: narration, music and sound effects are added later by Marius's own assembly.
 Model loading follows scripts/kaggle_video_test/kernel.py.
@@ -25,6 +28,7 @@ BUDGET_SEC = int(MANIFEST.get("budget_minutes", 420)) * 60
 W, H, STEPS, FPS = 704, 480, 8, 24
 MAX_SEG_FRAMES = 97
 MAX_PROMPT_TOKENS = 256
+CUT_MODE = bool(MANIFEST.get("cut_mode", True))
 CKPTS = [
     "https://huggingface.co/Lightricks/LTX-Video/ltxv-2b-0.9.8-distilled.safetensors",
     "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltxv-2b-0.9.8-distilled.safetensors",
@@ -120,16 +124,16 @@ def make_shot(pipe, i2v, job, attempt):
         have = len(frames)
         if have >= need:
             break
-        remaining = need - have + (1 if k > 0 else 0)
+        chain = (k > 0) and (not CUT_MODE) and (i2v is not None)
+        remaining = need - have + (1 if chain else 0)
         nf = seg_frames(remaining)
         seed = int(job["seed"]) + 101 * k + 7919 * attempt
-        if k == 0:
-            piece = call(pipe, prompt, seed, nf)
-        else:
-            if i2v is None:
-                raise RuntimeError("picture-to-video pipeline not available for the continuation piece")
+        if chain:
             piece = call(i2v, prompt, seed, nf, image=frames[-1])
             piece = piece[1:]
+        else:
+            # first piece, or CUT MODE: a fresh text-to-video clip from this beat's own prompt
+            piece = call(pipe, prompt, seed, nf)
         frames.extend(piece)
         free()
     if not frames:
